@@ -1,0 +1,19 @@
+# ViaCall configuration.
+# Values here are the shipped defaults; environment variables (see .env) take
+# precedence and override anything in this file. Secrets (API keys, admin
+# credentials) are NEVER stored here — they live in .env.
+
+gemini:
+  # WebSocket/Live model used by LiveTranscriber for streaming transcription.
+  live_model: gemini-2.5-flash-native-audio-preview-12-2025
+  # REST model used for transcript generation and scorecard analysis.
+  analysis_model: gemini-2.5-flash
+
+paths:
+  # Root directory for the SQLite DB and audio/pcm artifacts.
+  # null => default to <project>/../data
+  data_dir: null
+
+youtube:
+  # Enable YouTube video ingestion via Telegram bot
+  enabled: true

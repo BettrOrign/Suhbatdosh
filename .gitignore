@@ -1,0 +1,49 @@
+# secrets / local config
+.env
+.env.*
+backend/.env
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.local
+
+# data (audio + db)
+data/
+*.db
+*.db-wal
+*.db-shm
+*.wav
+*.mp3
+*.pcm
+*.webm
+
+# logs
+logs/
+*.log
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*.suo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# misc
+*.tmp
+*.bak

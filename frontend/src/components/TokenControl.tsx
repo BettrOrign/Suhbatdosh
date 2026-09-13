@@ -38,9 +38,21 @@ export function TokenControl({ token, onRegenerate, disabled }: TokenControlProp
     setBusy(true)
     try {
       const next = await onRegenerate()
-      setVisible(false)
-      await navigator.clipboard.writeText(next)
-      toast.success(t('token.new_copied'))
+      setVisible(true)
+      try {
+        await navigator.clipboard.writeText(next)
+        toast.success(t('token.new_copied'))
+      } catch {
+        const ta = document.createElement('textarea')
+        ta.value = next
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+        toast.success(t('token.new_copied'))
+      }
     } catch (e) {
       toast.error(t('token.regenerate_failed', { error: (e as Error).message }))
     } finally {

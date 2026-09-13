@@ -26,7 +26,6 @@ export function WavePlayer({ url }: Props) {
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [retryCount, setRetryCount] = useState(0)
-  const waveKey = useRef(0)
 
   useEffect(() => {
     if (!containerRef.current) return

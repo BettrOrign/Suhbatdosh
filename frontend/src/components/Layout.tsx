@@ -23,7 +23,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   ]
 
   return (
-    <div className="min-h-dvh flex">
+    <div className="min-h-screen flex">
       {/* Mobile sidebar overlay */}
       <AnimatePresence>
         {sidebarOpen && (
@@ -39,7 +39,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Right sidebar */}
       <motion.aside
-        className={`fixed right-0 top-0 z-30 h-dvh w-64 overflow-y-auto bg-background border-l shadow-xl transform transition-transform duration-300 ease-smooth ${
+        className={`fixed right-0 top-0 z-30 h-screen w-64 overflow-y-auto bg-background border-l shadow-xl transform transition-transform duration-300 ease-smooth ${
           sidebarOpen ? 'translate-x-0' : 'translate-x-full'
         } lg:translate-x-0 lg:left-0 lg:right-auto lg:shadow-none lg:border-r lg:border-l-0`}
       >

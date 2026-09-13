@@ -46,8 +46,11 @@ def me(user: dict = Depends(get_current_user)):
 @router.post("/auth/token")
 def regenerate_own_token(user: dict = Depends(get_current_user)):
     """Regenerate the current user's API token (revokes the previous one)."""
-    token = generate_api_token()
-    db.update_user(user["id"], api_token=token)
+    try:
+        token = generate_api_token()
+        db.update_user(user["id"], api_token=token)
+    except Exception as exc:
+        raise HTTPException(500, f"Failed to regenerate token: {exc}")
     return {"api_token": token}
 
 
@@ -115,8 +118,11 @@ def regenerate_user_token(user_id: int, user: dict = Depends(require_role("admin
     target = db.get_user(user_id)
     if not target:
         raise HTTPException(404, "User not found")
-    token = generate_api_token()
-    db.update_user(user_id, api_token=token)
+    try:
+        token = generate_api_token()
+        db.update_user(user_id, api_token=token)
+    except Exception as exc:
+        raise HTTPException(500, f"Failed to regenerate token: {exc}")
     return {"api_token": token}
 
 

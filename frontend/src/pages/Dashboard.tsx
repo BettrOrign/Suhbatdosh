@@ -725,37 +725,37 @@ export function Dashboard() {
               </Stagger>
             )}
 
+           {/* Charts row */}
+           {reduceMotion ? (
+             <div className="mb-6 grid gap-4 md:grid-cols-2">
+               <ScoreDistributionChart calls={calls} />
+               <CallTypePieChart calls={calls} />
+             </div>
+           ) : (
+             <Stagger className="mb-6 grid gap-4 md:grid-cols-2">
+               <motion.div key="score-dist" variants={fadeUp}>
+                 <ScoreDistributionChart calls={calls} />
+               </motion.div>
+               <motion.div key="call-type" variants={fadeUp}>
+                 <CallTypePieChart calls={calls} />
+               </motion.div>
+             </Stagger>
+           )}
+
           {/* Call cards */}
           {reduceMotion ? (
-            <div className="mb-6 grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2">
               {filteredCalls.map((c) => (
                 <CallCard key={c.id} call={c} />
               ))}
             </div>
           ) : (
-            <Stagger className="mb-6 grid gap-4 md:grid-cols-2">
+            <Stagger className="grid gap-4 md:grid-cols-2">
               {filteredCalls.map((c) => (
                 <motion.div key={c.id} variants={fadeUp}>
                   <CallCard call={c} />
                 </motion.div>
               ))}
-            </Stagger>
-          )}
-
-          {/* Charts row */}
-          {reduceMotion ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              <ScoreDistributionChart calls={calls} />
-              <CallTypePieChart calls={calls} />
-            </div>
-          ) : (
-            <Stagger className="grid gap-4 md:grid-cols-2">
-              <motion.div key="score-dist" variants={fadeUp}>
-                <ScoreDistributionChart calls={calls} />
-              </motion.div>
-              <motion.div key="call-type" variants={fadeUp}>
-                <CallTypePieChart calls={calls} />
-              </motion.div>
             </Stagger>
           )}
         </>

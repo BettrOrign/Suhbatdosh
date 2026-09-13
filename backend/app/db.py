@@ -206,12 +206,14 @@ def init_db():
 
 
 def create_user(name: str, email: str, password_hash: str, role: str = "manager") -> int:
-    """Insert a user and return the new row id."""
+    """Insert a user with a freshly generated API token and return the new row id."""
+    from .auth import generate_api_token
     ts = now()
+    api_token = generate_api_token()
     with get_db() as db:
         cur = db.execute(
-            "INSERT INTO users (name, email, password_hash, role, created_at) VALUES (?,?,?,?,?)",
-            (name, email, password_hash, role, ts),
+            "INSERT INTO users (name, email, password_hash, role, api_token, created_at) VALUES (?,?,?,?,?,?)",
+            (name, email, password_hash, role, api_token, ts),
         )
         return cur.lastrowid
 

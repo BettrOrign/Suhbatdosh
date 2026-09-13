@@ -84,13 +84,15 @@ def _seed_admin():
 
 
 def _seed_default_users():
-    """Seed default managers and a receptionist if they don't already exist."""
+    """Seed default managers and receptionists if they don't already exist."""
     log = logging.getLogger("viacall.main")
 
     managers = [
         ("Aziz Karimov", "aziz@viacall.local", "aziz1234"),
         ("Nodira Raximova", "nodira@viacall.local", "nodira1234"),
         ("Sardor Alimov", "sardor@viacall.local", "sardor1234"),
+        ("Jasur Qosimov", "jasur@viacall.local", "jasur1234"),
+        ("Malika Turdiyeva", "malika@viacall.local", "malika1234"),
     ]
     for name, email, password in managers:
         if db.get_user_by_email(email):
@@ -100,6 +102,7 @@ def _seed_default_users():
 
     receptionists = [
         ("Dilnoza Karimova", "dilnoza@viacall.local", "dilnoza1234"),
+        ("Nilufar Hamidova", "nilufar@viacall.local", "nilufar1234"),
     ]
     for name, email, password in receptionists:
         if db.get_user_by_email(email):
@@ -124,6 +127,8 @@ def _seed_demo_calls():
         ("Aziz Karimov", "aziz@viacall.local", "aziz1234"),
         ("Nodira Raximova", "nodira@viacall.local", "nodira1234"),
         ("Sardor Alimov", "sardor@viacall.local", "sardor1234"),
+        ("Jasur Qosimov", "jasur@viacall.local", "jasur1234"),
+        ("Malika Turdiyeva", "malika@viacall.local", "malika1234"),
     ]
     for name, email, password in managers:
         if not db.get_user_by_email(email):
@@ -133,6 +138,9 @@ def _seed_demo_calls():
     if not db.get_user_by_email("dilnoza@viacall.local"):
         db.create_user("Dilnoza Karimova", "dilnoza@viacall.local", hash_password("dilnoza1234"), role="receptionist")
         log.info("Seeded receptionist: dilnoza@viacall.local")
+    if not db.get_user_by_email("nilufar@viacall.local"):
+        db.create_user("Nilufar Hamidova", "nilufar@viacall.local", hash_password("nilufar1234"), role="receptionist")
+        log.info("Seeded receptionist: nilufar@viacall.local")
 
     if not db.get_user_by_email("admin@viacall.local"):
         db.create_user("Admin", "admin@viacall.local", hash_password("admin1234"), role="admin")
@@ -141,9 +149,38 @@ def _seed_demo_calls():
     aziz = db.get_user_by_email("aziz@viacall.local")
     nodira = db.get_user_by_email("nodira@viacall.local")
     sardor = db.get_user_by_email("sardor@viacall.local")
+    jasur = db.get_user_by_email("jasur@viacall.local")
+    malika = db.get_user_by_email("malika@viacall.local")
     dilnoza = db.get_user_by_email("dilnoza@viacall.local")
+    nilufar = db.get_user_by_email("nilufar@viacall.local")
     admin = db.get_user_by_email("admin@viacall.local")
-    users = [aziz, nodira, sardor, dilnoza, admin]
+
+    # Seed demo clients
+    demo_clients_data = [
+        ("TechSoft LLC", "998901234567", "TechSoft", "info@techsoft.uz", "IT xizmatlari bo'yicha doimiy mijoz"),
+        ("Green Valley", "998907654321", "Green Valley", "contact@greenvalley.uz", "Kosmetika optom savdosi"),
+        ("StartUp Hub", "998901112233", "StartUp Hub", "hello@startuphub.uz", "Yangi startap, inkubator"),
+        ("UzbekTrade", "998903334455", "UzbekTrade", "info@uzbektrade.uz", "Tashqi savdo kompaniyasi"),
+        ("MegaMarket", "998905556677", "MegaMarket", "support@megamarket.uz", "Onlayn do'kon tarmog'i"),
+        ("IT Park", "998908889900", "IT Park", "collaboration@itpark.uz", "IT sohasida hamkorlik"),
+        ("SmartEducation", "998902223344", "SmartEducation", "info@smartedu.uz", "Ta'lim platformasi"),
+        ("AutoPrime", "998904445566", "AutoPrime", "sales@autoprime.uz", "Avtomobil savdosi"),
+    ]
+
+    existing_clients = {c["name"] for c in db.list_clients()}
+    client_map = {}
+    for name, phone, company, email, notes in demo_clients_data:
+        if name not in existing_clients:
+            cid = db.create_client(name, phone=phone, company=company, email=email, notes=notes)
+            log.info("Seeded client: %s (id=%d)", name, cid)
+            client_map[name] = cid
+        else:
+            for c in db.list_clients():
+                if c["name"] == name:
+                    client_map[name] = c["id"]
+                    break
+
+    users = [aziz, nodira, sardor, jasur, malika, dilnoza, nilufar, admin]
 
     audio_dir = config.AUDIO_DIR
     wav_files = sorted(audio_dir.glob("*.wav")) if audio_dir.exists() else []
@@ -161,6 +198,7 @@ def _seed_demo_calls():
         {
             "name": "CRM tizimini joriy qilish bo'yicha dastlabki suhbat",
             "user_id": aziz["id"] if aziz else None,
+            "client_id": client_map.get("TechSoft LLC"),
             "call_type": "manager",
             "duration_sec": 342,
             "language": "uz",
@@ -185,6 +223,7 @@ def _seed_demo_calls():
         {
             "name": "Telefon orqali oldindan buyurtma qabul qilish",
             "user_id": nodira["id"] if nodira else None,
+            "client_id": client_map.get("Green Valley"),
             "call_type": "manager",
             "duration_sec": 198,
             "language": "uz",
@@ -209,6 +248,7 @@ def _seed_demo_calls():
         {
             "name": "IT xizmatlari bo'yicha texnik maslahat",
             "user_id": sardor["id"] if sardor else None,
+            "client_id": client_map.get("TechSoft LLC"),
             "call_type": "manager",
             "duration_sec": 456,
             "language": "ru",
@@ -257,6 +297,7 @@ def _seed_demo_calls():
         {
             "name": "Yangi ofis jihozlari bo'yicha narx muzokarasi",
             "user_id": aziz["id"] if aziz else None,
+            "client_id": client_map.get("StartUp Hub"),
             "call_type": "manager",
             "duration_sec": 285,
             "language": "uz",
@@ -281,6 +322,7 @@ def _seed_demo_calls():
         {
             "name": "Korporativ trening dasturini sotish",
             "user_id": aziz["id"] if aziz else None,
+            "client_id": client_map.get("SmartEducation"),
             "call_type": "manager",
             "duration_sec": 410,
             "language": "uz",
@@ -305,6 +347,7 @@ def _seed_demo_calls():
         {
             "name": "Mahsulot yangilanishi haqida jarayon",
             "user_id": sardor["id"] if sardor else None,
+            "client_id": client_map.get("UzbekTrade"),
             "call_type": "manager",
             "duration_sec": 165,
             "language": "ru",
@@ -329,6 +372,7 @@ def _seed_demo_calls():
         {
             "name": "Boshlang'ich biznes rejalash maslahati",
             "user_id": nodira["id"] if nodira else None,
+            "client_id": client_map.get("StartUp Hub"),
             "call_type": "manager",
             "duration_sec": 320,
             "language": "uz",
@@ -353,6 +397,7 @@ def _seed_demo_calls():
         {
             "name": "Kontrakt shartnomasini muzokara qilish",
             "user_id": sardor["id"] if sardor else None,
+            "client_id": client_map.get("MegaMarket"),
             "call_type": "manager",
             "duration_sec": 250,
             "language": "ru",
@@ -425,6 +470,7 @@ def _seed_demo_calls():
         {
             "name": "Uzoq muzokaralar natijasi",
             "user_id": aziz["id"] if aziz else None,
+            "client_id": client_map.get("UzbekTrade"),
             "call_type": "manager",
             "duration_sec": 510,
             "language": "uz",
@@ -449,6 +495,7 @@ def _seed_demo_calls():
         {
             "name": "Klient qayta murojaat qilish",
             "user_id": nodira["id"] if nodira else None,
+            "client_id": client_map.get("Green Valley"),
             "call_type": "manager",
             "duration_sec": 185,
             "language": "uz",
@@ -566,6 +613,106 @@ def _seed_demo_calls():
             "status": "done",
             "source_type": "upload",
         },
+        {
+            "name": "Avto salon uchun CRM tizimi sotish",
+            "user_id": jasur["id"] if jasur else None,
+            "client_id": client_map.get("AutoPrime"),
+            "call_type": "manager",
+            "duration_sec": 380,
+            "language": "uz",
+            "transcript": "Sotuvchi: Assalomu alaykum! Jasur Qosimovman. ViaCall dan qo'ng'iroq qilyapman.\nMijoz: Assalomu alaykum, ha eshitaman.\nSotuvchi: Sizning avto saloningiz uchun maxsus CRM tizimini taklif qilmoqchiman. Barcha mijozlaringizni, avtolarini va shartnomalarini bir joyda saqlash.\nMijoz: Bizda hozir Excel foydalanamiz, juda qiyin.\nSotuvchi: Tushundim. Bizning tizimimiz avtomatik eslatmalar, avtomobil bazasi va shartnoma generatsiyasini qiladi.\nMijoz: Integratsiya qilish qiyinmi?\nSotuvchi: Yo'q, bizning jamoamiz o'rnatib beradi. 2-3 kun ichida.\nMijoz: Narxi qancha?\nSotuvchi: Oylik 300,000 so'm. Yillik to'lovda 20% chegirma.\nMijoz: Yaxshi, sinab ko'raman.\nSotuvchi: Ajoyib! Ertaga o'rnatishni boshlaymiz.",
+            "analysis": {
+                "topic": "Avto salon uchun CRM tizimi sotish",
+                "language": "uz",
+                "summary": "Jasur avto salonga CRM tizimini taklif qildi. Mijozning Excel muammosini tushundi va yechim taklif qildi.",
+                "scorecard": {"opening": 86, "discovery": 82, "objection_handling": 85, "value_prop": 88, "closing": 90, "rapport": 84, "talk_ratio": 52, "overall": 85},
+                "rep_share_of_talk": 0.52,
+                "outcome": "win",
+                "key_metrics": [{"name": "Narx", "value": "300,000 so'm/oy"}, {"name": "Chegirma", "value": "20% yillik"}, {"name": "O'rn.", "value": "2-3 kun"}],
+                "strengths": ["Mijozning muammosini tushundi", "Integratsiya haqida aytdi", "Narxni aniq belgiladi"],
+                "weaknesses": ["Demo ko'rsatmadi", "Boshqa funksiyalarni aytmadi"],
+                "coaching_points": ["Demo tayyorlang", "Qo'shimcha funksiyalarni taqdim qiling"],
+                "next_steps": ["CRM o'rnatishni boshlash", "Mijozga kirish treningini berish"],
+                "action_items": [{"description": "O'rnatish uchun jamoani yuborish", "due_date": None, "assignee": "manager", "priority": "high"}]
+            },
+            "status": "done",
+            "source_type": "upload",
+        },
+        {
+            "name": "Onlayn do'kon uchun marketing strategiyasi",
+            "user_id": malika["id"] if malika else None,
+            "client_id": client_map.get("MegaMarket"),
+            "call_type": "manager",
+            "duration_sec": 290,
+            "language": "uz",
+            "transcript": "Sotuvchi: Assalomu alaykum! Malika Turdiyevaman. MegaMarket uchun marketing strategiyasini muhokama qilmoqchi edim.\nMijoz: Assalomu alaykum! Ha, bizning marketingimiz zaif.\nSotuvchi: Biz SMM, Google reklama va influencer marketingni birlashtirgan strategiya tayyorladik.\nMijoz: Qancha vaqt kerak?\nSotuvchi: Birinchi natijalar 2 haftada ko'rinadi. To'liq strategiya 1 oy ichida.\nMijoz: Narxi nechi?\nSotuvchi: Baz paket 150,000 so'm/oy. Premium paket 350,000 so'm/oy.\nMijoz: Bizga baz paket yetadi.\nSotuvchi: Yaxshi! Ertaga boshlaymiz. Sizning Instagram va Telegram akkauntingizni so'rayman.\nMijoz: Yuboramiz. Rahmat!",
+            "analysis": {
+                "topic": "Onlayn do'kon uchun marketing strategiyasi",
+                "language": "uz",
+                "summary": "Malika MegaMarket uchun marketing strategiyasini taklif qildi. Mijoz baz paketni tanladi.",
+                "scorecard": {"opening": 84, "discovery": 78, "objection_handling": 82, "value_prop": 86, "closing": 88, "rapport": 85, "talk_ratio": 50, "overall": 83},
+                "rep_share_of_talk": 0.50,
+                "outcome": "win",
+                "key_metrics": [{"name": "Paket", "value": "Baz - 150,000 so'm"}, {"name": "Natija", "value": "2 haftada"}, {"name": "Kanal", "value": "Instagram + Telegram"}],
+                "strengths": ["Strategiyani aniq tushuntirdi", "Narx variantlarini ko'rsatdi", "Tez boshlash vaqtini aytdi"],
+                "weaknesses": ["ROI ko'rsatmadi", "Raqobatchilar haqida gapirmadi"],
+                "coaching_points": ["ROI hisobini tayyorlang", "Raqobatchi tahlili qo'shing"],
+                "next_steps": ["Akkаунтlar so'rash", "Reklama kampaniyasini boshlash"],
+                "action_items": [{"description": "Akkаунтlarini olish va audit qilish", "due_date": None, "assignee": "manager", "priority": "high"}]
+            },
+            "status": "done",
+            "source_type": "upload",
+        },
+        {
+            "name": "IT Park bilan hamkorlik haqida",
+            "user_id": sardor["id"] if sardor else None,
+            "client_id": client_map.get("IT Park"),
+            "call_type": "manager",
+            "duration_sec": 420,
+            "language": "ru",
+            "transcript": "Менеджер: Здравствуйте! Сардор Алимов из ViaCall. Хотел обсудить партнёрство.\nКлиент: Здравствуйте, слушаю. Какое партнёрство?\nМенеджер: Мы предлагаем интеграцию ViaCall с вашими стартапами. Каждый стартап получает CRM и аналитику звонков.\nКлиент: Интересно. Сколько стартапов у вас?\nМенеджер: Пока 5, но мы хотим масштабироваться. Для IT Park специальная цена.\nКлиент: Какая?\nМенеджер: Для каждого стартапа 200,000 сум вместо 500,000. Годовой контракт.\nКлиент: Это хорошее предложение. Я обсужу с руководством.\nМенеджер: Хорошо, я подготовлю презентацию.\nКлиент: Давайте на следующей неделе.\nМенеджер: Отлично!",
+            "analysis": {
+                "topic": "IT Park bilan hamkorlik haqida",
+                "language": "ru",
+                "summary": "Сардор предложил IT Park партнёрство. Специальная цена для стартапов заинтересовала клиента.",
+                "scorecard": {"opening": 85, "discovery": 80, "objection_handling": 83, "value_prop": 87, "closing": 82, "rapport": 86, "talk_ratio": 48, "overall": 84},
+                "rep_share_of_talk": 0.48,
+                "outcome": "likely",
+                "key_metrics": [{"name": "Стартапы", "value": "5 шт"}, {"name": "Цена", "value": "200,000 сум/мес"}, {"name": "Контракт", "value": "1 год"}],
+                "strengths": ["Специальную цену предложил", "Масштабируемость показал", "Профессионально подошёл"],
+                "weaknesses": ["Презентацию не показал", "ROI не рассчитал"],
+                "coaching_points": ["Подготовьте презентацию", "Покажите ROI для стартапов"],
+                "next_steps": ["Подготовить презентацию", "Встреча на следующей неделе"],
+                "action_items": [{"description": "Презентацию подготовить", "due_date": None, "assignee": "manager", "priority": "high"}]
+            },
+            "status": "done",
+            "source_type": "upload",
+        },
+        {
+            "name": "Ta'lim platformasi uchun integratsiya",
+            "user_id": jasur["id"] if jasur else None,
+            "client_id": client_map.get("SmartEducation"),
+            "call_type": "manager",
+            "duration_sec": 350,
+            "language": "uz",
+            "transcript": "Sotuvchi: Assalomu alaykum! Jasur Qosimovman. SmartEducation platformangiz uchun ViaCall integratsiyasini taklif qilmoqchiman.\nMijoz: Assalomu alaykum. Qanday integratsiya?\nSotuvchi: O'quvchilar bilan telefon suhbatlaringizni avtomatik tahlil qiladi. Har bir suhbatdan keyin baho va tavsiyalar beradi.\nMijoz: Bizda 500 dan ortiq o'quvchi bor. Barchasini qila olasizmi?\nSotuvchi: Albatta. Bizning tizimimiz kuniga 1000+ suhbatni qayta ishlaydi.\nMijoz: Narxi qancha?\nSotuvchi: O'quvchi soniga qarab. 500 o'quvchi uchun oylik 800,000 so'm.\nMijoz: Bu juda qimmat!\nSotuvchi: Tushundim. 3 oylik sinov muddati bepul. Keyin qaraysiz.\nMijoz: Yaxshi, sinab ko'raman!\nSotuvchi: Ajoyib! Ertaga boshlaymiz.",
+            "analysis": {
+                "topic": "Ta'lim platformasi uchun integratsiya",
+                "language": "uz",
+                "summary": "Jasur SmartEducation platformasiga ViaCall integratsiyasini taklif qildi. Bepul sinov muddati mijozni qiziqtirdi.",
+                "scorecard": {"opening": 88, "discovery": 84, "objection_handling": 87, "value_prop": 90, "closing": 85, "rapport": 86, "talk_ratio": 54, "overall": 86},
+                "rep_share_of_talk": 0.54,
+                "outcome": "win",
+                "key_metrics": [{"name": "O'quvchilar", "value": "500+"}, {"name": "Narx", "value": "800,000 so'm/oy"}, {"name": "Sinov", "value": "3 oy bepul"}],
+                "strengths": ["Aniq qiymat ko'rsatdi", "Bepul sinov taklif qildi", "Mijoz soniga moslashdi"],
+                "weaknesses": ["Texnik detallarni kam aytdi", "Raqobatchilar haqida gapirmadi"],
+                "coaching_points": ["Texnik arxitekturani tushuntiring", "Raqobatchi afzalliklarni taqqoslang"],
+                "next_steps": ["Integratsiyani boshlash", "Texnik jamoani tanishtirish"],
+                "action_items": [{"description": "Texnik jamoani tayyorlash", "due_date": None, "assignee": "manager", "priority": "high"}]
+            },
+            "status": "done",
+            "source_type": "upload",
+        },
     ]
 
     for i, call_data in enumerate(demo_calls):
@@ -580,6 +727,7 @@ def _seed_demo_calls():
             duration_sec=call_data["duration_sec"],
             call_type=call_data["call_type"],
             user_id=call_data["user_id"],
+            client_id=call_data.get("client_id"),
             source_type=call_data["source_type"],
         )
         db.update_call(

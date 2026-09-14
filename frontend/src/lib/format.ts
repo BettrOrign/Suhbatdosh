@@ -8,8 +8,9 @@ export function statusVariant(status: CallStatus): 'default' | 'secondary' | 'de
 
 export function formatDuration(sec: number | null | undefined): string {
   if (sec == null) return '—'
-  const m = Math.floor(sec / 60)
-  const s = Math.round(sec % 60)
+  const total = Math.round(sec)
+  const m = Math.floor(total / 60)
+  const s = total % 60
   return `${m}:${String(s).padStart(2, '0')}`
 }
 

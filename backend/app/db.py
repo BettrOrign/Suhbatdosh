@@ -786,7 +786,7 @@ def get_day_over_day_stats() -> dict:
                 "SELECT AVG(duration_sec) FROM calls WHERE date(created_at) = ? AND status = 'done'",
                 (date_str,),
             ).fetchone()
-            avg_duration = round(avg_duration_row[0], 1) if avg_duration_row and avg_duration_row[0] is not None else None
+            avg_duration = round(avg_duration_row[0]) if avg_duration_row and avg_duration_row[0] is not None else None
             avg_talk_row = db.execute(
                 "SELECT AVG(json_extract(analysis, '$.rep_share_of_talk')) "
                 "FROM calls WHERE date(created_at) = ? AND status = 'done' "
@@ -827,7 +827,7 @@ def get_weekly_trend() -> list[dict]:
             {
                 "day": r[0], "total_calls": r[1], "done_calls": r[2],
                 "avg_score": round(r[3]) if r[3] is not None else None,
-                "avg_duration": round(r[4], 1) if r[4] is not None else None,
+                "avg_duration": round(r[4]) if r[4] is not None else None,
             }
             for r in rows
         ]

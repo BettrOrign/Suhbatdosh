@@ -12,16 +12,16 @@ export const translations: Record<Lang, Record<string, string>> = {
     'nav.role.manager': 'manager',
     'nav.role.receptionist': 'receptionist',
     'nav.logout': 'Logout',
-    'brand.name': 'ViaCall',
-    'brand.tagline': 'AI sales call coaching',
+    'brand.name': 'Suhbatdosh',
+    'brand.tagline': 'AI suhbat coach',
 
     // login
     'app.sign_in': 'Sign in',
-    'app.sign_in_desc': 'Use your ViaCall account',
+    'app.sign_in_desc': 'Use your Suhbatdosh account',
     'app.email': 'Email',
     'app.password': 'Password',
     'app.signing_in': 'Signing in…',
-    'app.email_placeholder': 'admin@viacall.local',
+    'app.email_placeholder': 'admin@suhbatdosh.local',
     'app.password_placeholder': '••••••••',
     'app.contact_admin': 'Tizimga kirish uchun administrator bilan bog\'laning',
 
@@ -181,7 +181,7 @@ export const translations: Record<Lang, Record<string, string>> = {
 
     // users
     'users.title': 'Team',
-    'users.desc': 'Manage who can access ViaCall and what they can do.',
+    'users.desc': 'Manage who can access Suhbatdosh and what they can do.',
     'users.add': 'Add user',
     'users.add_first': 'Add your first user',
     'users.add_dialog': 'Add user',
@@ -215,7 +215,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     'users.delete_btn': 'Delete user',
     'users.cant_delete_self': "You can't delete your own account",
     'users.name_placeholder': 'e.g. Alex Morgan',
-    'users.email_placeholder': 'alex@viacall.local',
+    'users.email_placeholder': 'alex@suhbatdosh.local',
     'users.inactive': 'Inactive',
     'users.load_failed': 'Failed to load users: {error}',
 
@@ -331,16 +331,16 @@ export const translations: Record<Lang, Record<string, string>> = {
     'nav.role.manager': 'menejer',
     'nav.role.receptionist': 'recepsiya',
     'nav.logout': 'Chiqish',
-    'brand.name': 'ViaCall',
-    'brand.tagline': 'AI sotuv chatlari',
+    'brand.name': 'Suhbatdosh',
+    'brand.tagline': 'AI suhbat coach',
 
     // login
     'app.sign_in': 'Kirish',
-    'app.sign_in_desc': 'ViaCall hisobingizdan foydalaning',
+    'app.sign_in_desc': 'Suhbatdosh hisobingizdan foydalaning',
     'app.email': 'Email',
     'app.password': 'Maxfiy soʻz',
     'app.signing_in': 'Kirilmoqda…',
-    'app.email_placeholder': 'admin@viacall.local',
+    'app.email_placeholder': 'admin@suhbatdosh.local',
     'app.password_placeholder': '••••••••',
     'app.contact_admin': 'Доступ к тизиму, обратитесь к администратору',
 
@@ -534,7 +534,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     'users.delete_btn': 'Foydalanuvchini oʻchirish',
     'users.cant_delete_self': 'Oʻz hisobingizni oʻchira olmaysiz',
     'users.name_placeholder': 'masalan, Alisher Karimov',
-    'users.email_placeholder': 'alex@viacall.local',
+    'users.email_placeholder': 'alex@suhbatdosh.local',
     'users.inactive': 'Nofaol',
     'users.load_failed': 'Foydalanuvchilarni yuklashda xatolik: {error}',
 

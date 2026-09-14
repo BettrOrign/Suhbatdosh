@@ -14,7 +14,7 @@ from .auth import get_current_user
 from .live import LiveTranscriber
 from .transcribe import Transcriber
 
-logger = logging.getLogger("viacall.api")
+logger = logging.getLogger("suhbatdosh.api")
 router = APIRouter(prefix="/api")
 
 # Lazy singletons for the live WebSocket transcription path.
@@ -350,7 +350,7 @@ def _reanalyse_done_calls():
     if not need_reanalysis:
         return
 
-    logger = logging.getLogger("viacall.api")
+    logger = logging.getLogger("suhbatdosh.api")
     logger.info("Re-analysing %d done calls to add topic field", len(need_reanalysis))
 
     for idx, (call_id, transcript) in enumerate(need_reanalysis):

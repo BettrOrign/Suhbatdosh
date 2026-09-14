@@ -12,7 +12,7 @@ from pathlib import Path
 
 from . import audio, config, db
 
-logger = logging.getLogger("viacall.youtube")
+logger = logging.getLogger("suhbatdosh.youtube")
 
 # Regex to extract YouTube video ID from various URL formats
 _YT_ID_RE = re.compile(

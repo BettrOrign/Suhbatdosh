@@ -43,7 +43,7 @@ from .reports import (
 )
 from .youtube import extract_video_id, process_youtube_video
 
-logger = logging.getLogger("viacall.telegram")
+logger = logging.getLogger("suhbatdosh.telegram")
 
 PAGE_SIZE = 5
 
@@ -1361,7 +1361,7 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     lines = [
-        _header("ViaCall Bot"),
+        _header("Suhbatdosh Bot"),
         "",
         "You are not linked to a manager account yet.",
         "",
@@ -1427,7 +1427,7 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_adm = _is_admin(update.effective_user.id) if update.effective_user else False
 
     lines = [
-        _header("ViaCall Bot Commands"),
+        _header("Suhbatdosh Bot Commands"),
         "",
         "/start - Open main menu",
         "/link &lt;token&gt; - Link your manager account",

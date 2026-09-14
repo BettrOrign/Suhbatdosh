@@ -1,6 +1,6 @@
 import type { Call, Client, Manager, User, Notification, Tag, YoutubeWhitelistEntry } from './types'
 
-const TOKEN_KEY = 'viacall_token'
+const TOKEN_KEY = 'suhbatdosh_token'
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)

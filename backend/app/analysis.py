@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from . import config
 from .prompts import SCORING_SYSTEM_PROMPT
 
-logger = logging.getLogger("viacall.analysis")
+logger = logging.getLogger("suhbatdosh.analysis")
 
 
 class Scorecard(BaseModel):

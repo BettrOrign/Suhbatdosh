@@ -1,4 +1,4 @@
-# ViaCall configuration.
+# Suhbatdosh configuration.
 # Values here are the shipped defaults; environment variables (see .env) take
 # precedence and override anything in this file. Secrets (API keys, admin
 # credentials) are NEVER stored here — they live in .env.

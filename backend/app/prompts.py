@@ -1,4 +1,4 @@
-"""System prompts for the ViaCall AI agents.
+"""System prompts for the Suhbatdosh AI agents.
 
 Each prompt here is a self-contained task description of the role it assigns to
 the model it is sent to.

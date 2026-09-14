@@ -1,4 +1,4 @@
-"""Report generation and export for ViaCall analytics.
+"""Report generation and export for Suhbatdosh analytics.
 
 Produces formatted text reports for Telegram delivery, covering
 day-over-day comparison, trends, problem calls, and manager rankings.

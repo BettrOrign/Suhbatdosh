@@ -1,4 +1,4 @@
-"""SQLite persistence layer for ViaCall.
+"""SQLite persistence layer for Suhbatdosh.
 
 Wraps a per-thread SQLite connection (WAL mode) and exposes small, typed
 helpers for users, sessions, clients and calls. All helpers write rows as

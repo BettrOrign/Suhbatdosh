@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { translations, type Lang } from './translations'
 
-const LANG_KEY = 'viacall_lang'
+const LANG_KEY = 'suhbatdosh_lang'
 
 interface I18nContext {
   lang: Lang

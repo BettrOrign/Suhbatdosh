@@ -40,9 +40,9 @@ async def lifespan(app: FastAPI):
                 await _telegram_app.initialize()
                 await _telegram_app.start()
                 await _telegram_app.updater.start_polling()
-                logging.getLogger("viacall.main").info("Telegram bot started (polling)")
+                logging.getLogger("suhbatdosh.main").info("Telegram bot started (polling)")
             except Exception as exc:
-                logging.getLogger("viacall.main").warning(
+                logging.getLogger("suhbatdosh.main").warning(
                     "Telegram bot could not start (continuing without it): %s", exc
                 )
                 _telegram_app = None
@@ -51,10 +51,10 @@ async def lifespan(app: FastAPI):
         await _telegram_app.updater.stop()
         await _telegram_app.stop()
         await _telegram_app.shutdown()
-        logging.getLogger("viacall.main").info("Telegram bot stopped")
+        logging.getLogger("suhbatdosh.main").info("Telegram bot stopped")
 
 
-app = FastAPI(title="viacall - AI sales call coaching", lifespan=lifespan)
+app = FastAPI(title="suhbatdosh - AI suhbat coach", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -74,26 +74,26 @@ app.include_router(sources_router)
 
 def _seed_admin():
     if not config.ADMIN_EMAIL or not config.ADMIN_PASSWORD:
-        logging.getLogger("viacall.main").warning(
+        logging.getLogger("suhbatdosh.main").warning(
             "Skipping admin seed: ADMIN_EMAIL / ADMIN_PASSWORD are not set in the environment."
         )
         return
     if db.get_user_by_email(config.ADMIN_EMAIL):
         return
     db.create_user(config.ADMIN_NAME, config.ADMIN_EMAIL, hash_password(config.ADMIN_PASSWORD), role="admin")
-    logging.getLogger("viacall.main").info("Seeded admin user: %s", config.ADMIN_EMAIL)
+    logging.getLogger("suhbatdosh.main").info("Seeded admin user: %s", config.ADMIN_EMAIL)
 
 
 def _seed_default_users():
     """Seed default managers and receptionists if they don't already exist."""
-    log = logging.getLogger("viacall.main")
+    log = logging.getLogger("suhbatdosh.main")
 
     managers = [
-        ("Aziz Karimov", "aziz@viacall.local", "aziz1234"),
-        ("Nodira Raximova", "nodira@viacall.local", "nodira1234"),
-        ("Sardor Alimov", "sardor@viacall.local", "sardor1234"),
-        ("Jasur Qosimov", "jasur@viacall.local", "jasur1234"),
-        ("Malika Turdiyeva", "malika@viacall.local", "malika1234"),
+        ("Aziz Karimov", "aziz@suhbatdosh.local", "aziz1234"),
+        ("Nodira Raximova", "nodira@suhbatdosh.local", "nodira1234"),
+        ("Sardor Alimov", "sardor@suhbatdosh.local", "sardor1234"),
+        ("Jasur Qosimov", "jasur@suhbatdosh.local", "jasur1234"),
+        ("Malika Turdiyeva", "malika@suhbatdosh.local", "malika1234"),
     ]
     for name, email, password in managers:
         if db.get_user_by_email(email):
@@ -102,8 +102,8 @@ def _seed_default_users():
         log.info("Seeded manager: %s", email)
 
     receptionists = [
-        ("Dilnoza Karimova", "dilnoza@viacall.local", "dilnoza1234"),
-        ("Nilufar Hamidova", "nilufar@viacall.local", "nilufar1234"),
+        ("Dilnoza Karimova", "dilnoza@suhbatdosh.local", "dilnoza1234"),
+        ("Nilufar Hamidova", "nilufar@suhbatdosh.local", "nilufar1234"),
     ]
     for name, email, password in receptionists:
         if db.get_user_by_email(email):
@@ -117,7 +117,7 @@ def _seed_demo_calls():
     import random
     import time as _time
 
-    log = logging.getLogger("viacall.main")
+    log = logging.getLogger("suhbatdosh.main")
 
     with db.get_db() as conn:
         count = conn.execute("SELECT COUNT(*) FROM calls").fetchone()[0]
@@ -125,36 +125,36 @@ def _seed_demo_calls():
         return
 
     managers = [
-        ("Aziz Karimov", "aziz@viacall.local", "aziz1234"),
-        ("Nodira Raximova", "nodira@viacall.local", "nodira1234"),
-        ("Sardor Alimov", "sardor@viacall.local", "sardor1234"),
-        ("Jasur Qosimov", "jasur@viacall.local", "jasur1234"),
-        ("Malika Turdiyeva", "malika@viacall.local", "malika1234"),
+        ("Aziz Karimov", "aziz@suhbatdosh.local", "aziz1234"),
+        ("Nodira Raximova", "nodira@suhbatdosh.local", "nodira1234"),
+        ("Sardor Alimov", "sardor@suhbatdosh.local", "sardor1234"),
+        ("Jasur Qosimov", "jasur@suhbatdosh.local", "jasur1234"),
+        ("Malika Turdiyeva", "malika@suhbatdosh.local", "malika1234"),
     ]
     for name, email, password in managers:
         if not db.get_user_by_email(email):
             db.create_user(name, email, hash_password(password), role="manager")
             log.info("Seeded manager: %s", email)
 
-    if not db.get_user_by_email("dilnoza@viacall.local"):
-        db.create_user("Dilnoza Karimova", "dilnoza@viacall.local", hash_password("dilnoza1234"), role="receptionist")
-        log.info("Seeded receptionist: dilnoza@viacall.local")
-    if not db.get_user_by_email("nilufar@viacall.local"):
-        db.create_user("Nilufar Hamidova", "nilufar@viacall.local", hash_password("nilufar1234"), role="receptionist")
-        log.info("Seeded receptionist: nilufar@viacall.local")
+    if not db.get_user_by_email("dilnoza@suhbatdosh.local"):
+        db.create_user("Dilnoza Karimova", "dilnoza@suhbatdosh.local", hash_password("dilnoza1234"), role="receptionist")
+        log.info("Seeded receptionist: dilnoza@suhbatdosh.local")
+    if not db.get_user_by_email("nilufar@suhbatdosh.local"):
+        db.create_user("Nilufar Hamidova", "nilufar@suhbatdosh.local", hash_password("nilufar1234"), role="receptionist")
+        log.info("Seeded receptionist: nilufar@suhbatdosh.local")
 
-    if not db.get_user_by_email("admin@viacall.local"):
-        db.create_user("Admin", "admin@viacall.local", hash_password("admin1234"), role="admin")
-        log.info("Seeded admin: admin@viacall.local")
+    if not db.get_user_by_email("admin@suhbatdosh.local"):
+        db.create_user("Admin", "admin@suhbatdosh.local", hash_password("admin1234"), role="admin")
+        log.info("Seeded admin: admin@suhbatdosh.local")
 
-    aziz = db.get_user_by_email("aziz@viacall.local")
-    nodira = db.get_user_by_email("nodira@viacall.local")
-    sardor = db.get_user_by_email("sardor@viacall.local")
-    jasur = db.get_user_by_email("jasur@viacall.local")
-    malika = db.get_user_by_email("malika@viacall.local")
-    dilnoza = db.get_user_by_email("dilnoza@viacall.local")
-    nilufar = db.get_user_by_email("nilufar@viacall.local")
-    admin = db.get_user_by_email("admin@viacall.local")
+    aziz = db.get_user_by_email("aziz@suhbatdosh.local")
+    nodira = db.get_user_by_email("nodira@suhbatdosh.local")
+    sardor = db.get_user_by_email("sardor@suhbatdosh.local")
+    jasur = db.get_user_by_email("jasur@suhbatdosh.local")
+    malika = db.get_user_by_email("malika@suhbatdosh.local")
+    dilnoza = db.get_user_by_email("dilnoza@suhbatdosh.local")
+    nilufar = db.get_user_by_email("nilufar@suhbatdosh.local")
+    admin = db.get_user_by_email("admin@suhbatdosh.local")
 
     demo_clients_data = [
         ("TechSoft LLC", "998901234567", "TechSoft", "info@techsoft.uz", "IT xizmatlari bo'yicha doimiy mijoz"),
@@ -199,7 +199,7 @@ def _seed_demo_calls():
             "call_type": "manager",
             "duration_sec": 342,
             "language": "uz",
-            "transcript": "Sotuvchi: Assalomu alaykum, Aziz Karimovman. ViaCall kompaniyasidan qo'ng'iroq qilyapman.\nMijoz: Va alaykum assalom.\nSotuvchi: Bizning yangi CRM tizimimiz haqida gaplashmoqchi edim. Sizning kompaniyangiz uchun maxsus yechim tayyorladik.\nMijoz: Qiziq, qanday imkoniyatlar bor?\nSotuvchi: Barcha mijozlar bazasini bir joyda saqlash, avtomatik eslatmalar va hisobotlar. Sizning sotuv jamoangiz uchun juda qulay.\nMijoz: Narxi qancha?\nSotuvchi: Oylik 500,000 so'mdan boshlanadi. Birinchi oy bepul sinov muddati bor.\nMijoz: Yaxshi, sinab ko'raman.\nSotuvchi: Ajoyib! Ertaga demo uchun vaqtni belgilaylik.",
+            "transcript": "Sotuvchi: Assalomu alaykum, Aziz Karimovman. Suhbatdosh kompaniyasidan qo'ng'iroq qilyapman.\nMijoz: Va alaykum assalom.\nSotuvchi: Bizning yangi CRM tizimimiz haqida gaplashmoqchi edim. Sizning kompaniyangiz uchun maxsus yechim tayyorladik.\nMijoz: Qiziq, qanday imkoniyatlar bor?\nSotuvchi: Barcha mijozlar bazasini bir joyda saqlash, avtomatik eslatmalar va hisobotlar. Sizning sotuv jamoangiz uchun juda qulay.\nMijoz: Narxi qancha?\nSotuvchi: Oylik 500,000 so'mdan boshlanadi. Birinchi oy bepul sinov muddati bor.\nMijoz: Yaxshi, sinab ko'raman.\nSotuvchi: Ajoyib! Ertaga demo uchun vaqtni belgilaylik.",
             "analysis": {
                 "topic": "CRM tizimini joriy qilish bo'yicha dastlabki suhbat",
                 "language": "uz",
@@ -249,7 +249,7 @@ def _seed_demo_calls():
             "call_type": "manager",
             "duration_sec": 456,
             "language": "ru",
-            "transcript": "Менеджер: Здравствуйте, Сардор Алимов. Я звоню из ViaCall по поводу IT-услуг для вашего офиса.\nКлиент: Здравствуйте, слушаю вас.\nМенеджер: Мы предлагаем полное IT-обслуживание: настройка серверов, поддержка сети, установка программного обеспечения.\nКлиент: У нас уже есть системный администратор, но он не справляется.\nМенеджер: Понимаю. Мы можем взять на себя рутинные задачи, чтобы ваш администратор занимался стратегическими проектами.\nКлиент: Интересно. Сколько это стоит?\nМенеджер: Зависит от размера офиса. Для 10 человек — 2,000,000 в месяц. Включает 24/7 поддержку.\nКлиент: Дороговато. Можете скидку?\nМенеджер: При годовом договоре — 15% скидка.\nКлиент: Давайте попробуем на месяц, а потом решим.\nМенеджер: Хорошо, я подготовлю договор.",
+            "transcript": "Менеджер: Здравствуйте, Сардор Алимов. Я звоню из Suhbatdosh по поводу IT-услуг для вашего офиса.\nКлиент: Здравствуйте, слушаю вас.\nМенеджер: Мы предлагаем полное IT-обслуживание: настройка серверов, поддержка сети, установка программного обеспечения.\nКлиент: У нас уже есть системный администратор, но он не справляется.\nМенеджер: Понимаю. Мы можем взять на себя рутинные задачи, чтобы ваш администратор занимался стратегическими проектами.\nКлиент: Интересно. Сколько это стоит?\nМенеджер: Зависит от размера офиса. Для 10 человек — 2,000,000 в месяц. Включает 24/7 поддержку.\nКлиент: Дороговато. Можете скидку?\nМенеджер: При годовом договоре — 15% скидка.\nКлиент: Давайте попробуем на месяц, а потом решим.\nМенеджер: Хорошо, я подготовлю договор.",
             "analysis": {
                 "topic": "IT xizmatlari bo'yicha texnik maslahat",
                 "language": "ru",
@@ -273,7 +273,7 @@ def _seed_demo_calls():
             "call_type": "receptionist",
             "duration_sec": 120,
             "language": "uz",
-            "transcript": "Qabulxona: Assalomu alaykum! ViaCall qabulxonasi, Dilnoza Karimova sizga xizmat qilyapman.\nMijoz: Assalomu alaykum. Men manager bilan gaplashmoqchiman.\nQabulxona: Albatta, qaysi masla bo'yida?\nMijoz: CRM tizimi haqida.\nQabulxona: Tushundim. Aziz Karimov bilan boglaymi? U hozir bo'sh.\nMijoz: Ha, iltimos.\nQabulxona: Bir soniya kuting.\nQabulxona: Aziz aka, sizga qo'ng'iroq bor. CRM tizisi haqida.\nSotuvchi: Yaxshi, ulang.\nQabulxona: Bogladim. Yaxshi kun tilayman!\nMijoz: Rahmat!",
+            "transcript": "Qabulxona: Assalomu alaykum! Suhbatdosh qabulxonasi, Dilnoza Karimova sizga xizmat qilyapman.\nMijoz: Assalomu alaykum. Men manager bilan gaplashmoqchiman.\nQabulxona: Albatta, qaysi masla bo'yida?\nMijoz: CRM tizimi haqida.\nQabulxona: Tushundim. Aziz Karimov bilan boglaymi? U hozir bo'sh.\nMijoz: Ha, iltimos.\nQabulxona: Bir soniya kuting.\nQabulxona: Aziz aka, sizga qo'ng'iroq bor. CRM tizisi haqida.\nSotuvchi: Yaxshi, ulang.\nQabulxona: Bogladim. Yaxshi kun tilayman!\nMijoz: Rahmat!",
             "analysis": {
                 "topic": "Qabulxonada mijozni qarshilash va yo'naltirish",
                 "language": "uz",
@@ -323,7 +323,7 @@ def _seed_demo_calls():
             "call_type": "manager",
             "duration_sec": 410,
             "language": "uz",
-            "transcript": "Sotuvchi: Assalomu alaykum! ViaCall kompaniyasidan qo'ng'iroq qilyapman. Korporativ sotuv trening dasturimiz haqida gaplashmoqchi edim.\nMijoz: Ha, eshitaman. Bizda 20 tadan ortiq sotuvchi ishlaydi.\nSotuvchi: Bizning trening dasturimiz 4 haftalik, har hafta 2 marta to'liq sessiya. Amaliy vazifalar bilan.\nMijoz: Natijalar necha oyda ko'rinadi?\nSotuvchi: Birinchi 2 haftada already kuchli o'zgarishlar ko'rinadi. Sotuv hajmi o'rtacha 30% oshadi.\nMijoz: Narxi qancha?\nSotuvchi: Barcha 20 sotuvchi uchun 8,000,000 so'm. Bitta sotuvchi uchun 400,000 so'm.\nMijoz: Bu juda arzon! Peniya bermayman?\nSotuvchi: Albatta, dastur tugagandan keyin 30 kunlik qo'llab-quvvatlash mavjud.\nMijoz: Ajoyib! Qaysi sanada boshlaymiz?\nSotuvchi: Ertaga boshlashimiz mumkin.",
+            "transcript": "Sotuvchi: Assalomu alaykum! Suhbatdosh kompaniyasidan qo'ng'iroq qilyapman. Korporativ sotuv trening dasturimiz haqida gaplashmoqchi edim.\nMijoz: Ha, eshitaman. Bizda 20 tadan ortiq sotuvchi ishlaydi.\nSotuvchi: Bizning trening dasturimiz 4 haftalik, har hafta 2 marta to'liq sessiya. Amaliy vazifalar bilan.\nMijoz: Natijalar necha oyda ko'rinadi?\nSotuvchi: Birinchi 2 haftada already kuchli o'zgarishlar ko'rinadi. Sotuv hajmi o'rtacha 30% oshadi.\nMijoz: Narxi qancha?\nSotuvchi: Barcha 20 sotuvchi uchun 8,000,000 so'm. Bitta sotuvchi uchun 400,000 so'm.\nMijoz: Bu juda arzon! Peniya bermayman?\nSotuvchi: Albatta, dastur tugagandan keyin 30 kunlik qo'llab-quvvatlash mavjud.\nMijoz: Ajoyib! Qaysi sanada boshlaymiz?\nSotuvchi: Ertaga boshlashimiz mumkin.",
             "analysis": {
                 "topic": "Korporativ trening dasturini sotish",
                 "language": "uz",
@@ -348,7 +348,7 @@ def _seed_demo_calls():
             "call_type": "manager",
             "duration_sec": 165,
             "language": "ru",
-            "transcript": "Менеджер: Здравствуйте, Сергей! Я звоню из ViaCall. У нас есть интересное предложение.\nКлиент: Здравствуйте, слушаю вас.\nМенеджер: Мы расширяем линейку продуктов и хотели бы обсудить ваши потребности.\nКлиент: Интересно. Что у вас нового?\nМенеджер: У нас появилась система аналитики в реальном времени. Вы можете отслеживать все звонки ваших сотрудников.\nКлиент: Звучит интересно. Сколько это стоит?\nМенеджер: Для компаний до 50 человек — 50,000 рублей в месяц.\nКлиент: Может немного подешевле?\nМенеджер: Если подписать на год — 45,000 рублей.\nКлиент: Давайте, оформим пробный месяц.\nМенеджер: Отлично! Я подготовлю договор.",
+            "transcript": "Менеджер: Здравствуйте, Сергей! Я звоню из Suhbatdosh. У нас есть интересное предложение.\nКлиент: Здравствуйте, слушаю вас.\nМенеджер: Мы расширяем линейку продуктов и хотели бы обсудить ваши потребности.\nКлиент: Интересно. Что у вас нового?\nМенеджер: У нас появилась система аналитики в реальном времени. Вы можете отслеживать все звонки ваших сотрудников.\nКлиент: Звучит интересно. Сколько это стоит?\nМенеджер: Для компаний до 50 человек — 50,000 рублей в месяц.\nКлиент: Может немного подешевле?\nМенеджер: Если подписать на год — 45,000 рублей.\nКлиент: Давайте, оформим пробный месяц.\nМенеджер: Отлично! Я подготовлю договор.",
             "analysis": {
                 "topic": "Mahsulot yangilanishi haqida jarayon",
                 "language": "ru",
@@ -373,7 +373,7 @@ def _seed_demo_calls():
             "call_type": "manager",
             "duration_sec": 320,
             "language": "uz",
-            "transcript": "Sotuvchi: Salom! ViaCall kompaniyasidan qo'ng'iroq qilyapman. Bizning biznes rejalash xizmatimiz haqida gaplashmoqchi edim.\nMijoz: Assalomu alaykum. Yangi biznesim bor, ilk bosqichda ekanman.\nSotuvchi: Zafarlimiz! Bizda biznes rejalash va marketing strategiyasiga oid xizmatlar mavjud.\nMijoz: Qanday yordam berzadingiz?\nSotuvchi: Biz biznes rejasini, marketing strategiyasini va ilk 3 oylik action plan tayyorlaymiz.\nMijoz: Bu necha talab qiladi?\nSotuvchi: 10,000,000 so'm. Shuningdek, keyingi 2 oylik konsalting bepul.\nMijoz: Men shuncha pul yo'q, lekin kerak.\nSotuvchi: Tushunaman. Biz 3 aylik to'lov dasturi tayyorlaymiz: 3,500,000 so'm oylig.\nMijoz: Yaxshi, o'ylab ko'raman.",
+            "transcript": "Sotuvchi: Salom! Suhbatdosh kompaniyasidan qo'ng'iroq qilyapman. Bizning biznes rejalash xizmatimiz haqida gaplashmoqchi edim.\nMijoz: Assalomu alaykum. Yangi biznesim bor, ilk bosqichda ekanman.\nSotuvchi: Zafarlimiz! Bizda biznes rejalash va marketing strategiyasiga oid xizmatlar mavjud.\nMijoz: Qanday yordam berzadingiz?\nSotuvchi: Biz biznes rejasini, marketing strategiyasini va ilk 3 oylik action plan tayyorlaymiz.\nMijoz: Bu necha talab qiladi?\nSotuvchi: 10,000,000 so'm. Shuningdek, keyingi 2 oylik konsalting bepul.\nMijoz: Men shuncha pul yo'q, lekin kerak.\nSotuvchi: Tushunaman. Biz 3 aylik to'lov dasturi tayyorlaymiz: 3,500,000 so'm oylig.\nMijoz: Yaxshi, o'ylab ko'raman.",
             "analysis": {
                 "topic": "Boshlang'ich biznes rejalash maslahati",
                 "language": "uz",
@@ -398,7 +398,7 @@ def _seed_demo_calls():
             "call_type": "manager",
             "duration_sec": 250,
             "language": "ru",
-            "transcript": "Менеджер: Здравствуйте, Игорь! Я из ViaCall. Хотел обсудить условия контракта.\nКлиент: Здравствуйте. Да, мне перезвонили по этому поводу.\nМенеджер: Мы изучили ваши требования и готовы предложить оптимальные условия.\nКлиент: Нам важна гибкость условий.\nМенеджер: Понимаю. Мы можем разделить оплату на 4 квартала и добавить опцию расторжения.\nКлиент: Это интересно. А если мы хотим расширить сферу услуг?\nМенеджер: Конечно, расширение возможно с дополнительной скидкой 10%.\nКлиент: Хорошо, я согласен на предварительные условия.\nМенеджер: Отлично! Я направлю окончательный вариант контракта на ваш email.",
+            "transcript": "Менеджер: Здравствуйте, Игорь! Я из Suhbatdosh. Хотел обсудить условия контракта.\nКлиент: Здравствуйте. Да, мне перезвонили по этому поводу.\nМенеджер: Мы изучили ваши требования и готовы предложить оптимальные условия.\nКлиент: Нам важна гибкость условий.\nМенеджер: Понимаю. Мы можем разделить оплату на 4 квартала и добавить опцию расторжения.\nКлиент: Это интересно. А если мы хотим расширить сферу услуг?\nМенеджер: Конечно, расширение возможно с дополнительной скидкой 10%.\nКлиент: Хорошо, я согласен на предварительные условия.\nМенеджер: Отлично! Я направлю окончательный вариант контракта на ваш email.",
             "analysis": {
                 "topic": "Kontrakt shartnomasini muzokara qilish",
                 "language": "ru",
@@ -422,7 +422,7 @@ def _seed_demo_calls():
             "call_type": "receptionist",
             "duration_sec": 95,
             "language": "uz",
-            "transcript": "Qabulxona: Assalomu alaykum! ViaCall qabulxonasi, Dilnoza Karimova sizga xizmat qilyapman.\nMijoz: Salom, men yangi ishga qabul qilish haqida gaplashmoqchiman.\nQabulxona: Albatta, qaysi bo'lim uchun qidiraysiz?\nMijoz: Sotuv bo'limi uchun.\nQabulxona: Tushundim. Nodira Raximovaga bog'laman.\nMijoz: Ha, shaxsiy bilan gaplashishim kerak.\nQabulxona: Bir daqiqa kuting.\nQabulxona: Nodira, sizga yangi xabar bor - ishga qabul qilish.\nNodira: Yaxshi, ungleman.\nQabulxona: Ulang, Nodira. Mijoz kuting!\nMijoz: Rahmat, keling.",
+            "transcript": "Qabulxona: Assalomu alaykum! Suhbatdosh qabulxonasi, Dilnoza Karimova sizga xizmat qilyapman.\nMijoz: Salom, men yangi ishga qabul qilish haqida gaplashmoqchiman.\nQabulxona: Albatta, qaysi bo'lim uchun qidiraysiz?\nMijoz: Sotuv bo'limi uchun.\nQabulxona: Tushundim. Nodira Raximovaga bog'laman.\nMijoz: Ha, shaxsiy bilan gaplashishim kerak.\nQabulxona: Bir daqiqa kuting.\nQabulxona: Nodira, sizga yangi xabar bor - ishga qabul qilish.\nNodira: Yaxshi, ungleman.\nQabulxona: Ulang, Nodira. Mijoz kuting!\nMijoz: Rahmat, keling.",
             "analysis": {
                 "topic": "Ishga qabul qilish jarayoni",
                 "language": "uz",
@@ -446,7 +446,7 @@ def _seed_demo_calls():
             "call_type": "receptionist",
             "duration_sec": 75,
             "language": "uz",
-            "transcript": "Qabulxona: Assalomu alaykum! ViaCall qabulxonasi.\nMijoz: Salom, umumiy ma'lumot beraman.\nQabulxona: Albatta, qaysi bo'yicha qiziqdingiz?\nMijoz: Sizning barcha xizmatlaringiz haqida.\nQabulxona: Bizda CRM tizimi, sotuv treninglari, IT xizmatlar va biznes konsalting mavjud.\nMijoz: Qisqacha qisqacha gaplashasizmi?\nQabulxona: Tabii, yozing va biz 1 soat ichida javob beramiz.",
+            "transcript": "Qabulxona: Assalomu alaykum! Suhbatdosh qabulxonasi.\nMijoz: Salom, umumiy ma'lumot beraman.\nQabulxona: Albatta, qaysi bo'yicha qiziqdingiz?\nMijoz: Sizning barcha xizmatlaringiz haqida.\nQabulxona: Bizda CRM tizimi, sotuv treninglari, IT xizmatlar va biznes konsalting mavjud.\nMijoz: Qisqacha qisqacha gaplashasizmi?\nQabulxona: Tabii, yozing va biz 1 soat ichida javob beramiz.",
             "analysis": {
                 "topic": "Xizmatlar haqida umumiy ma'lumot",
                 "language": "uz",
@@ -496,7 +496,7 @@ def _seed_demo_calls():
             "call_type": "manager",
             "duration_sec": 185,
             "language": "uz",
-            "transcript": "Sotuvchi: Salom! ViaCall kompaniyasidan qo'ng'iroq qilyapman. Bu yerda Nodira Raximovaman.\nMijoz: Salom! Men avvalroq buyurtma qilganman. Mana, buni qayta ko'proq ko'rishim kerak.\nSotuvchi: Tushundim! Sizning oldingi buyurtmaingiz 350,000 so'm to'plam edi. Hozir yangi loyiha bor? Yangi taklifimiz bor.\nMijoz: Ha, hozir yangi loyihamiz bor. Boshqacha bo'lsa qanday?\nSotuvchi: Biz hozir yangi kompaniyalar uchun 30% chegirma taklif etamiz.\nMijoz: Yoqdi! Qanday yuboraman?\nSotuvchi: Bizning timurimizga yozing va men sizga to'liq taqdimot yuboraman.\nMijoz: Rahmat! Tezroq kelmasizmi?\nSotuvchi: Bugun kunga qadar yetkazib beramiz.",
+            "transcript": "Sotuvchi: Salom! Suhbatdosh kompaniyasidan qo'ng'iroq qilyapman. Bu yerda Nodira Raximovaman.\nMijoz: Salom! Men avvalroq buyurtma qilganman. Mana, buni qayta ko'proq ko'rishim kerak.\nSotuvchi: Tushundim! Sizning oldingi buyurtmaingiz 350,000 so'm to'plam edi. Hozir yangi loyiha bor? Yangi taklifimiz bor.\nMijoz: Ha, hozir yangi loyihamiz bor. Boshqacha bo'lsa qanday?\nSotuvchi: Biz hozir yangi kompaniyalar uchun 30% chegirma taklif etamiz.\nMijoz: Yoqdi! Qanday yuboraman?\nSotuvchi: Bizning timurimizga yozing va men sizga to'liq taqdimot yuboraman.\nMijoz: Rahmat! Tezroq kelmasizmi?\nSotuvchi: Bugun kunga qadar yetkazib beramiz.",
             "analysis": {
                 "topic": "Klient qayta murojaat qilish",
                 "language": "uz",
@@ -592,7 +592,7 @@ def _seed_demo_calls():
             "call_type": "manager",
             "duration_sec": 295,
             "language": "ru",
-            "transcript": "Менеджер: Здравствуйте, Ольга! Я из ViaCall. Мы обсуждаем маркетинговую кампанию.\nКлиент: Здравствуйте, слушаю.\nМенеджер: Мы готовы разработать комплексную маркетинговую стратегию для вашего бизнеса.\nКлиент: Сколько это будет стоить?\nМенеджер: Для среднего бизнеса от 80,000 до 120,000 рублей за проект.\nКлиент: Это слишком дорого.\nМенеджер: Мы можем начать с базового пакета за 60,000 рублей и расширять по мере роста.\nКлиент: Интересно. Что входит в базовый пакет?\nМенеджер: Аудит, SMM стратегия и 2 месяца продвижения.\nКлиент: Давайте, оформим базовый пакет.\nМенеджер: Отлично! Я подготовлю договор и начнем аудит.\nКлиент: Когда начнете?\nМенеджер: Завтра утром.",
+            "transcript": "Менеджер: Здравствуйте, Ольга! Я из Suhbatdosh. Мы обсуждаем маркетинговую кампанию.\nКлиент: Здравствуйте, слушаю.\nМенеджер: Мы готовы разработать комплексную маркетинговую стратегию для вашего бизнеса.\nКлиент: Сколько это будет стоить?\nМенеджер: Для среднего бизнеса от 80,000 до 120,000 рублей за проект.\nКлиент: Это слишком дорого.\nМенеджер: Мы можем начать с базового пакета за 60,000 рублей и расширять по мере роста.\nКлиент: Интересно. Что входит в базовый пакет?\nМенеджер: Аудит, SMM стратегия и 2 месяца продвижения.\nКлиент: Давайте, оформим базовый пакет.\nМенеджер: Отлично! Я подготовлю договор и начнем аудит.\nКлиент: Когда начнете?\nМенеджер: Завтра утром.",
             "analysis": {
                 "topic": "Marketing kampaniya muzokarasi",
                 "language": "ru",
@@ -617,7 +617,7 @@ def _seed_demo_calls():
             "call_type": "manager",
             "duration_sec": 380,
             "language": "uz",
-            "transcript": "Sotuvchi: Assalomu alaykum! Jasur Qosimovman. ViaCall dan qo'ng'iroq qilyapman.\nMijoz: Assalomu alaykum, ha eshitaman.\nSotuvchi: Sizning avto saloningiz uchun maxsus CRM tizimini taklif qilmoqchiman. Barcha mijozlaringizni, avtolarini va shartnomalarini bir joyda saqlash.\nMijoz: Bizda hozir Excel foydalanamiz, juda qiyin.\nSotuvchi: Tushundim. Bizning tizimimiz avtomatik eslatmalar, avtomobil bazasi va shartnoma generatsiyasini qiladi.\nMijoz: Integratsiya qilish qiyinmi?\nSotuvchi: Yo'q, bizning jamoamiz o'rnatib beradi. 2-3 kun ichida.\nMijoz: Narxi qancha?\nSotuvchi: Oylik 300,000 so'm. Yillik to'lovda 20% chegirma.\nMijoz: Yaxshi, sinab ko'raman.\nSotuvchi: Ajoyib! Ertaga o'rnatishni boshlaymiz.",
+            "transcript": "Sotuvchi: Assalomu alaykum! Jasur Qosimovman. Suhbatdosh dan qo'ng'iroq qilyapman.\nMijoz: Assalomu alaykum, ha eshitaman.\nSotuvchi: Sizning avto saloningiz uchun maxsus CRM tizimini taklif qilmoqchiman. Barcha mijozlaringizni, avtolarini va shartnomalarini bir joyda saqlash.\nMijoz: Bizda hozir Excel foydalanamiz, juda qiyin.\nSotuvchi: Tushundim. Bizning tizimimiz avtomatik eslatmalar, avtomobil bazasi va shartnoma generatsiyasini qiladi.\nMijoz: Integratsiya qilish qiyinmi?\nSotuvchi: Yo'q, bizning jamoamiz o'rnatib beradi. 2-3 kun ichida.\nMijoz: Narxi qancha?\nSotuvchi: Oylik 300,000 so'm. Yillik to'lovda 20% chegirma.\nMijoz: Yaxshi, sinab ko'raman.\nSotuvchi: Ajoyib! Ertaga o'rnatishni boshlaymiz.",
             "analysis": {
                 "topic": "Avto salon uchun CRM tizimi sotish",
                 "language": "uz",
@@ -667,7 +667,7 @@ def _seed_demo_calls():
             "call_type": "manager",
             "duration_sec": 420,
             "language": "ru",
-            "transcript": "Менеджер: Здравствуйте! Сардор Алимов из ViaCall. Хотел обсудить партнёрство.\nКлиент: Здравствуйте, слушаю. Какое партнёрство?\nМенеджер: Мы предлагаем интеграцию ViaCall с вашими стартапами. Каждый стартап получает CRM и аналитику звонков.\nКлиент: Интересно. Сколько стартапов у вас?\nМенеджер: Пока 5, но мы хотим масштабироваться. Для IT Park специальная цена.\nКлиент: Какая?\nМенеджер: Для каждого стартапа 200,000 сум вместо 500,000. Годовой контракт.\nКлиент: Это хорошее предложение. Я обсужу с руководством.\nМенеджер: Хорошо, я подготовлю презентацию.\nКлиент: Давайте на следующей неделе.\nМенеджер: Отлично!",
+            "transcript": "Менеджер: Здравствуйте! Сардор Алимов из Suhbatdosh. Хотел обсудить партнёрство.\nКлиент: Здравствуйте, слушаю. Какое партнёрство?\nМенеджер: Мы предлагаем интеграцию Suhbatdosh с вашими стартапами. Каждый стартап получает CRM и аналитику звонков.\nКлиент: Интересно. Сколько стартапов у вас?\nМенеджер: Пока 5, но мы хотим масштабироваться. Для IT Park специальная цена.\nКлиент: Какая?\nМенеджер: Для каждого стартапа 200,000 сум вместо 500,000. Годовой контракт.\nКлиент: Это хорошее предложение. Я обсужу с руководством.\nМенеджер: Хорошо, я подготовлю презентацию.\nКлиент: Давайте на следующей неделе.\nМенеджер: Отлично!",
             "analysis": {
                 "topic": "IT Park bilan hamkorlik haqida",
                 "language": "ru",
@@ -692,11 +692,11 @@ def _seed_demo_calls():
             "call_type": "manager",
             "duration_sec": 350,
             "language": "uz",
-            "transcript": "Sotuvchi: Assalomu alaykum! Jasur Qosimovman. SmartEducation platformangiz uchun ViaCall integratsiyasini taklif qilmoqchiman.\nMijoz: Assalomu alaykum. Qanday integratsiya?\nSotuvchi: O'quvchilar bilan telefon suhbatlaringizni avtomatik tahlil qiladi. Har bir suhbatdan keyin baho va tavsiyalar beradi.\nMijoz: Bizda 500 dan ortiq o'quvchi bor. Barchasini qila olasizmi?\nSotuvchi: Albatta. Bizning tizimimiz kuniga 1000+ suhbatni qayta ishlaydi.\nMijoz: Narxi qancha?\nSotuvchi: O'quvchi soniga qarab. 500 o'quvchi uchun oylik 800,000 so'm.\nMijoz: Bu juda qimmat!\nSotuvchi: Tushundim. 3 oylik sinov muddati bepul. Keyin qaraysiz.\nMijoz: Yaxshi, sinab ko'raman!\nSotuvchi: Ajoyib! Ertaga boshlaymiz.",
+            "transcript": "Sotuvchi: Assalomu alaykum! Jasur Qosimovman. SmartEducation platformangiz uchun Suhbatdosh integratsiyasini taklif qilmoqchiman.\nMijoz: Assalomu alaykum. Qanday integratsiya?\nSotuvchi: O'quvchilar bilan telefon suhbatlaringizni avtomatik tahlil qiladi. Har bir suhbatdan keyin baho va tavsiyalar beradi.\nMijoz: Bizda 500 dan ortiq o'quvchi bor. Barchasini qila olasizmi?\nSotuvchi: Albatta. Bizning tizimimiz kuniga 1000+ suhbatni qayta ishlaydi.\nMijoz: Narxi qancha?\nSotuvchi: O'quvchi soniga qarab. 500 o'quvchi uchun oylik 800,000 so'm.\nMijoz: Bu juda qimmat!\nSotuvchi: Tushundim. 3 oylik sinov muddati bepul. Keyin qaraysiz.\nMijoz: Yaxshi, sinab ko'raman!\nSotuvchi: Ajoyib! Ertaga boshlaymiz.",
             "analysis": {
                 "topic": "Ta'lim platformasi uchun integratsiya",
                 "language": "uz",
-                "summary": "Jasur SmartEducation platformasiga ViaCall integratsiyasini taklif qildi. Bepul sinov muddati mijozni qiziqtirdi.",
+                "summary": "Jasur SmartEducation platformasiga Suhbatdosh integratsiyasini taklif qildi. Bepul sinov muddati mijozni qiziqtirdi.",
                 "scorecard": {"opening": 88, "discovery": 84, "objection_handling": 87, "value_prop": 90, "closing": 85, "rapport": 86, "talk_ratio": 54, "overall": 86},
                 "rep_share_of_talk": 0.54,
                 "outcome": "win",

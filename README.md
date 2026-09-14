@@ -1,6 +1,6 @@
-# ViaCall — Call Analytics Platform
+# Suhbatdosh — Call Analytics Platform
 
-ViaCall is a full-stack call analytics platform that provides real-time transcription, analysis, and visualization of voice calls.
+Suhbatdosh is a full-stack call analytics platform that provides real-time transcription, analysis, and visualization of voice calls.
 
 ## Features
 
@@ -30,7 +30,7 @@ ViaCall is a full-stack call analytics platform that provides real-time transcri
 ```bash
 # Clone the repository
 git clone <repo-url>
-cd ViaCall
+cd Suhbatdosh
 
 # Copy environment template and configure secrets
 cp backend/.env.example backend/.env
@@ -57,7 +57,7 @@ chmod +x run.sh
 ## Project Structure
 
 ```
-ViaCall/
+Suhbatdosh/
 ├── backend/          # FastAPI backend application
 │   ├── app/          # Python source code
 │   ├── pyproject.toml

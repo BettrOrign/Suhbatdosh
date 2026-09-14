@@ -7,7 +7,7 @@ from google.genai import types
 
 from . import config
 
-logger = logging.getLogger("viacall.live")
+logger = logging.getLogger("suhbatdosh.live")
 
 
 class LiveTranscriber:

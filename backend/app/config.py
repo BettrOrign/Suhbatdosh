@@ -54,7 +54,7 @@ _data_dir = (
 DATA_DIR = Path(_data_dir).resolve()
 AUDIO_DIR = DATA_DIR / "audio"
 PCM_DIR = DATA_DIR / "pcm"
-DB_PATH = DATA_DIR / "viacall.db"
+DB_PATH = DATA_DIR / "suhbatdosh.db"
 
 # --- Admin bootstrap credentials -------------------------------------------
 # These are read from the environment (.env) only and never hardcoded in code,

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# run.sh — one-command launcher for ViaCall
+# run.sh — one-command launcher for Suhbatdosh
 #
 # Starts:
 #   - Backend API (FastAPI/uvicorn) on <host>:8123  (serves the built frontend)
 #   - Frontend dev server (Vite)        on <host>:5173  (hot reload, proxies /api → backend)
 #
-# Default login: admin@viacall.local / admin1234
+# Default login: admin@suhbatdosh.local / admin1234
 #
 # Usage:
 #   ./run.sh              # launch both, localhost only
@@ -20,8 +20,8 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$PROJECT_ROOT/backend"
 FRONTEND_DIR="$PROJECT_ROOT/frontend"
 
-BACKEND_PORT="${VIACALL_PORT:-8123}"
-FRONTEND_PORT="${VIACALL_FRONTEND_PORT:-5173}"
+BACKEND_PORT="${SUHBATDOSH_PORT:-8123}"
+FRONTEND_PORT="${SUHBATDOSH_FRONTEND_PORT:-5173}"
 
 BACKEND_LOG="$PROJECT_ROOT/logs/server.log"
 FRONTEND_LOG="$PROJECT_ROOT/logs/vite.log"
@@ -34,32 +34,32 @@ NET_LAN=false
 # ---------- usage ----------
 usage() {
     cat <<EOF
-ViaCall — Call Analytics Platform
+Suhbatdosh — Call Analytics Platform
 
 Usage:
   ./run.sh [OPTIONS]
 
 Options:
   --netLAN       Listen on 0.0.0.0 — accessible from any device on the local network
-  --stop         Stop running ViaCall servers
+  --stop         Stop running Suhbatdosh servers
   --help, -h     Show this help message
 
 Environment variables:
-  VIACALL_PORT              Backend port  (default: 8123)
-  VIACALL_FRONTEND_PORT     Frontend port (default: 5173)
+  SUHBATDOSH_PORT              Backend port  (default: 8123)
+  SUHBATDOSH_FRONTEND_PORT     Frontend port (default: 5173)
 
 Examples:
   ./run.sh                  Start on localhost only (127.0.0.1)
   ./run.sh --netLAN         Start accessible to everyone on the LAN
-  ./run.sh --stop           Stop all ViaCall servers
+  ./run.sh --stop           Stop all Suhbatdosh servers
 
-Default login: admin@viacall.local / admin1234
+Default login: admin@suhbatdosh.local / admin1234
 EOF
 }
 
 # ---------- stop helper ----------
 stop_servers() {
-    echo "Stopping ViaCall servers..."
+    echo "Stopping Suhbatdosh servers..."
     pkill -f "uvicorn app.main:app" 2>/dev/null || true
     pkill -f "vite" 2>/dev/null || true
     sleep 1
@@ -170,7 +170,7 @@ fi
 if $NET_LAN; then
     echo ""
     echo "============================================================"
-    echo "  ViaCall is up!  (LAN mode)"
+    echo "  Suhbatdosh is up!  (LAN mode)"
     echo ""
     echo "  This machine's IP:  $LAN_IP"
     echo ""
@@ -180,7 +180,7 @@ if $NET_LAN; then
     echo "  On THIS machine:"
     echo "    → http://127.0.0.1:${BACKEND_PORT}"
     echo "============================================================"
-    echo "  Default login: admin@viacall.local / admin1234"
+    echo "  Default login: admin@suhbatdosh.local / admin1234"
     echo "  Logs:  backend  $BACKEND_LOG"
     echo "         frontend $FRONTEND_LOG"
     echo "  Stop:  ./run.sh --stop"
@@ -189,14 +189,14 @@ if $NET_LAN; then
 else
     echo ""
     echo "============================================================"
-    echo "  ViaCall is up!  (localhost only)"
+    echo "  Suhbatdosh is up!  (localhost only)"
     echo ""
     echo "  → http://127.0.0.1:${BACKEND_PORT}"
     echo ""
     echo "  To make it accessible on the LAN:"
     echo "    ./run.sh --stop && ./run.sh --netLAN"
     echo "============================================================"
-    echo "  Default login: admin@viacall.local / admin1234"
+    echo "  Default login: admin@suhbatdosh.local / admin1234"
     echo "  Logs:  backend  $BACKEND_LOG"
     echo "         frontend $FRONTEND_LOG"
     echo "  Stop:  ./run.sh --stop"

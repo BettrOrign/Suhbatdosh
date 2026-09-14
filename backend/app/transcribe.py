@@ -8,7 +8,7 @@ from google.genai import types
 
 from . import audio, config
 
-logger = logging.getLogger("viacall.transcribe")
+logger = logging.getLogger("suhbatdosh.transcribe")
 
 TRANSCRIBE_PROMPT = (
     "Transcribe this phone call verbatim. The call may contain English, Russian and Uzbek speech "

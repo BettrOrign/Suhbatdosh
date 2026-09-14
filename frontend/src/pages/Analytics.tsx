@@ -10,12 +10,10 @@ import {
   BarChart3,
   Clock,
   Gauge,
-  Mic,
   PhoneCall,
   TrendingUp,
   Users,
   AlertTriangle,
-  Play,
 } from 'lucide-react'
 import {
   BarChart,
@@ -25,9 +23,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  LineChart,
-  Line,
-  CartesianGrid,
 } from 'recharts'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -38,7 +33,7 @@ import { useAuth } from '@/lib/auth'
 import { api } from '@/lib/api'
 import { useI18n } from '@/i18n/i18n'
 import { StatCard } from '@/components/StatCard'
-import { formatDuration, scoreColor, scoreLabel } from '@/lib/format'
+import { formatDuration, scoreColor } from '@/lib/format'
 import type { Call } from '@/lib/types'
 
 type OverviewStats = Awaited<ReturnType<typeof api.getOverviewStats>>
@@ -79,7 +74,7 @@ export function Analytics() {
   const [dayOverDay, setDayOverDay] = useState<DayOverDay | null>(null)
   const [weeklyTrend, setWeeklyTrend] = useState<WeeklyTrend>([])
   const [problemCalls, setProblemCalls] = useState<ProblemCall>([])
-  const [rankings, setRankings] = useState<ManagerRanking[]>([])
+  const [rankings, setRankings] = useState<ManagerRanking>([])
   const [sources, setSources] = useState<SourceBreakdown>({})
   const [calls, setCalls] = useState<Call[]>([])
   const [loading, setLoading] = useState(true)

@@ -10,7 +10,6 @@ import {
   FileAudio2,
   KeyRound,
   Loader2,
-  Mic,
   Search,
   Upload,
   UploadCloud,

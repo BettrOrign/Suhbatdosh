@@ -18,6 +18,8 @@ import {
 import {
   BarChart,
   Bar,
+  Area,
+  AreaChart,
   XAxis,
   YAxis,
   Tooltip,
@@ -223,15 +225,29 @@ export function Analytics() {
           <CardContent className="pt-0">
             {weeklyData.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={weeklyData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                <AreaChart data={weeklyData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                  <defs>
+                    <linearGradient id="callsGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
                   <XAxis dataKey="day" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} axisLine={false} tickLine={false} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} axisLine={false} tickLine={false} />
                   <Tooltip
-                    cursor={{ fill: 'var(--color-muted)', opacity: 0.5 }}
+                    cursor={{ stroke: 'var(--color-chart-1)', strokeWidth: 1, strokeDasharray: '4 4' }}
                     contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-card)' }}
                   />
-                  <Bar dataKey="calls" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} maxBarSize={32} fillOpacity={0.85} />
-                </BarChart>
+                  <Area
+                    type="monotone"
+                    dataKey="calls"
+                    stroke="var(--color-chart-1)"
+                    strokeWidth={2.5}
+                    fill="url(#callsGradient)"
+                    dot={{ r: 3, fill: 'var(--color-chart-1)', strokeWidth: 0 }}
+                    activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--color-card)' }}
+                  />
+                </AreaChart>
               </ResponsiveContainer>
             ) : (
               <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">{t('analytics.no_problems')}</div>

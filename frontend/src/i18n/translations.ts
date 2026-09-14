@@ -251,6 +251,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     'managers.recent_for': 'Recent calls for {name}',
     'managers.no_calls': 'No calls for this manager.',
     'managers.edit_via_team': 'Edit via Team page',
+    'managers.most_calls': 'Most Calls',
+    'managers.most_successful': 'Most Successful',
+    'managers.most_effective': 'Most Effective',
 
     // generic
     'common.are_you_sure': 'Are you sure?',
@@ -570,6 +573,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     'managers.recent_for': '{name} uchun soʻnggi chatlar',
     'managers.no_calls': 'Bu menejer uchun chatlar yoʻq.',
     'managers.edit_via_team': 'Jamoa sahifasidan tahrirlang',
+    'managers.most_calls': 'Koʻp chatlar',
+    'managers.most_successful': 'Eng muvaffaqiyatli',
+    'managers.most_effective': 'Eng samarali',
 
     // generic
     'common.are_you_sure': 'Ishonchingiz komilmi?',

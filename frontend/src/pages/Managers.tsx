@@ -11,7 +11,19 @@ import {
   Clock,
   BarChart3,
   ExternalLink,
+  Trophy,
+  Target,
+  PhoneCall,
 } from 'lucide-react'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -35,6 +47,8 @@ import { TokenControl } from '@/components/TokenControl'
 import type { Call, Manager } from '@/lib/types'
 import { formatDate, formatDuration, scoreColor, scoreLabel, statusVariant } from '@/lib/format'
 import type { CallStatus } from '@/lib/types'
+
+type Ranking = Awaited<ReturnType<typeof api.getManagerRankings>>[number]
 
 function pct(n: number | null): string {
   if (n == null) return '—'
@@ -60,6 +74,68 @@ function StatMini({
           <p className="text-xs font-medium text-muted-foreground">{label}</p>
           <p className="text-xl font-bold leading-tight tabular-nums">{value}</p>
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function RankingChart({
+  data,
+  dataKey,
+  label,
+  icon: Icon,
+  color,
+  unit,
+}: {
+  data: { name: string; value: number }[]
+  dataKey: string
+  label: string
+  icon: typeof BarChart3
+  color: string
+  unit?: string
+}) {
+  return (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-sm font-medium">
+          <Icon className="size-4" style={{ color }} />
+          {label}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {data.length > 0 ? (
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart
+              data={data}
+              layout="vertical"
+              margin={{ top: 4, right: 4, bottom: 4, left: 0 }}
+            >
+              <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} axisLine={false} tickLine={false} />
+              <YAxis
+                type="category"
+                dataKey="name"
+                width={80}
+                tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                cursor={{ fill: 'var(--color-muted)', opacity: 0.3 }}
+                contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-card)' }}
+                formatter={(value) => [`${value}${unit ?? ''}`, label]}
+              />
+              <Bar dataKey={dataKey} radius={[0, 4, 4, 0]} maxBarSize={24}>
+                {data.map((_, i) => (
+                  <Cell key={i} fill={color} fillOpacity={0.85 - i * 0.08} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
+            No data
+          </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -146,10 +222,8 @@ function ManagerCard({
   onDelete,
   onSelect,
   onChanged,
-  selected,
 }: {
   mgr: Manager
-  selected: boolean
   onEdit: (m: Manager) => void
   onDelete: (m: Manager) => void
   onSelect: (m: Manager) => void
@@ -225,11 +299,11 @@ function ManagerCard({
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1.5 border-t pt-3">
             <Button
-              variant={selected ? 'secondary' : 'outline'}
+              variant="outline"
               size="sm"
               onClick={() => onSelect(mgr)}
             >
-              {selected ? t('managers.hide_calls') : t('managers.show_calls')}
+              {t('managers.show_calls')}
             </Button>
             <Button variant="outline" size="sm" onClick={() => onEdit(mgr)} aria-label={t('managers.edit_btn')}>
               {t('managers.edit')}
@@ -259,13 +333,17 @@ export function ManagersPage() {
   const [managers, setManagers] = useState<Manager[]>([])
   const [loading, setLoading] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [callsDialogOpen, setCallsDialogOpen] = useState(false)
+  const [selectedManager, setSelectedManager] = useState<Manager | null>(null)
   const [calls, setCalls] = useState<Call[]>([])
   const [callsLoading, setCallsLoading] = useState(false)
+  const [rankings, setRankings] = useState<Ranking[]>([])
 
   const loadManagers = useCallback(async () => {
     try {
-      setManagers(await api.listManagers())
+      const [mgrs, ranks] = await Promise.all([api.listManagers(), api.getManagerRankings()])
+      setManagers(mgrs)
+      setRankings(ranks)
     } catch (e) {
       toast.error(t('managers.load_failed', { error: (e as Error).message }))
     } finally {
@@ -277,11 +355,12 @@ export function ManagersPage() {
     loadManagers()
   }, [loadManagers])
 
-  const loadCalls = useCallback(async (id: number) => {
-    setSelectedId(id)
+  const loadCalls = useCallback(async (mgr: Manager) => {
+    setSelectedManager(mgr)
+    setCallsDialogOpen(true)
     setCallsLoading(true)
     try {
-      setCalls(await api.listManagerCalls(id))
+      setCalls(await api.listManagerCalls(mgr.id))
     } catch (e) {
       toast.error(t('managers.calls_load_failed', { error: (e as Error).message }))
       setCalls([])
@@ -295,17 +374,11 @@ export function ManagersPage() {
     try {
       await api.deleteUser(m.id)
       toast.success(t('managers.deleted'))
-      if (selectedId === m.id) {
-        setSelectedId(null)
-        setCalls([])
-      }
       loadManagers()
     } catch (e) {
        toast.error(t('managers.delete_failed', { error: (e as Error).message }))
     }
   }
-
-  const selectedManager = selectedId ? managers.find((m) => m.id === selectedId) : null
 
   if (!isAdmin) {
     return (
@@ -331,6 +404,30 @@ export function ManagersPage() {
     .filter((m) => m.avg_score != null)
     .map((m) => m.avg_score!)
   const orgAvg = doneScores.length ? Math.round(doneScores.reduce((a, b) => a + b, 0) / doneScores.length) : null
+
+  const chartColors = {
+    calls: 'var(--color-chart-1)',
+    score: 'var(--color-score-good)',
+    talk: 'var(--color-chart-3)',
+  }
+
+  const mostCallsData = rankings
+    .filter((r) => r.total_calls > 0)
+    .sort((a, b) => b.total_calls - a.total_calls)
+    .slice(0, 6)
+    .map((r) => ({ name: r.name.split(' ')[0], value: r.total_calls }))
+
+  const mostSuccessfulData = rankings
+    .filter((r) => r.avg_score != null)
+    .sort((a, b) => (b.avg_score ?? 0) - (a.avg_score ?? 0))
+    .slice(0, 6)
+    .map((r) => ({ name: r.name.split(' ')[0], value: r.avg_score ?? 0 }))
+
+  const mostEffectiveData = rankings
+    .filter((r) => r.avg_talk_ratio != null)
+    .sort((a, b) => (b.avg_talk_ratio ?? 0) - (a.avg_talk_ratio ?? 0))
+    .slice(0, 6)
+    .map((r) => ({ name: r.name.split(' ')[0], value: Math.round((r.avg_talk_ratio ?? 0) * 100) }))
 
   return (
     <div>
@@ -370,20 +467,49 @@ export function ManagersPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <motion.div key="managers" variants={fadeUp}>
-            <StatMini icon={UserRound} label={t('managers.title')} value={managers.length} />
-          </motion.div>
-          <motion.div key="calls" variants={fadeUp}>
-            <StatMini icon={BarChart3} label={t('managers.calls_label')} value={totalCalls} />
-          </motion.div>
-          <motion.div key="avg" variants={fadeUp}>
-            <StatMini icon={Clock} label={t('managers.org_avg')} value={orgAvg != null ? `${orgAvg}/100` : '—'} />
-          </motion.div>
-          <motion.div key="key" variants={fadeUp}>
-            <StatMini icon={KeyRound} label={t('managers.api_access')} value={managers.filter((m) => m.api_token).length} />
-          </motion.div>
-        </div>
+        <>
+          <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <motion.div key="managers" variants={fadeUp}>
+              <StatMini icon={UserRound} label={t('managers.title')} value={managers.length} />
+            </motion.div>
+            <motion.div key="calls" variants={fadeUp}>
+              <StatMini icon={BarChart3} label={t('managers.calls_label')} value={totalCalls} />
+            </motion.div>
+            <motion.div key="avg" variants={fadeUp}>
+              <StatMini icon={Clock} label={t('managers.org_avg')} value={orgAvg != null ? `${orgAvg}/100` : '—'} />
+            </motion.div>
+            <motion.div key="key" variants={fadeUp}>
+              <StatMini icon={KeyRound} label={t('managers.api_access')} value={managers.filter((m) => m.api_token).length} />
+            </motion.div>
+          </div>
+
+          {/* Ranking Charts */}
+          <div className="mb-6 grid gap-4 md:grid-cols-3">
+            <RankingChart
+              data={mostCallsData}
+              dataKey="value"
+              label={t('managers.most_calls')}
+              icon={PhoneCall}
+              color={chartColors.calls}
+            />
+            <RankingChart
+              data={mostSuccessfulData}
+              dataKey="value"
+              label={t('managers.most_successful')}
+              icon={Trophy}
+              color={chartColors.score}
+              unit="/100"
+            />
+            <RankingChart
+              data={mostEffectiveData}
+              dataKey="value"
+              label={t('managers.most_effective')}
+              icon={Target}
+              color={chartColors.talk}
+              unit="%"
+            />
+          </div>
+        </>
       )}
 
       {loading ? (
@@ -398,11 +524,10 @@ export function ManagersPage() {
             <ManagerCard
               key={m.id}
               mgr={m}
-              selected={selectedId === m.id}
               onEdit={() => toast.info(t('managers.edit_via_team'))}
               onDelete={() => handleDelete(m)}
               onChanged={loadManagers}
-              onSelect={() => (selectedId === m.id ? setSelectedId(null) : loadCalls(m.id))}
+              onSelect={() => loadCalls(m)}
             />
           ))}
         </div>
@@ -412,67 +537,73 @@ export function ManagersPage() {
             <ManagerCard
               key={m.id}
               mgr={m}
-              selected={selectedId === m.id}
               onEdit={() => toast.info(t('managers.edit_via_team'))}
               onDelete={() => handleDelete(m)}
               onChanged={loadManagers}
-              onSelect={() => (selectedId === m.id ? setSelectedId(null) : loadCalls(m.id))}
+              onSelect={() => loadCalls(m)}
             />
           ))}
         </Stagger>
       )}
 
-      {selectedId && selectedManager && (
-        <div className="mt-8">
-          <h2 className="mb-3 text-lg font-semibold">
-            {t('managers.recent_for', { name: selectedManager.name })}
-          </h2>
-          {callsLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-14 rounded-lg" />
-              ))}
-            </div>
-          ) : calls.length === 0 ? (
-            <Card>
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">
+      {/* Floating Calls Dialog */}
+      <Dialog open={callsDialogOpen} onOpenChange={setCallsDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedManager ? t('managers.recent_for', { name: selectedManager.name }) : ''}
+            </DialogTitle>
+            <DialogDescription>
+              {calls.length} {t('managers.calls_label').toLowerCase()}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto -mx-6 px-6">
+            {callsLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-14 rounded-lg" />
+                ))}
+              </div>
+            ) : calls.length === 0 ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">
                 {t('managers.no_calls')}
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="divide-y rounded-lg border">
-              {calls.map((c) => (
-                <div key={c.id} className="flex items-center justify-between p-3 text-sm">
-                  <div className="min-w-0">
-                    <Link
-                      to={`/calls/${c.id}`}
-                      className="font-medium text-foreground hover:underline"
-                    >
-                      {c.name}
-                    </Link>
-                    {c.client_name && <span className="text-xs text-muted-foreground"> · {c.client_name}</span>}
-                    <div className="text-xs text-muted-foreground">
-                      {c.duration_sec != null && formatDuration(c.duration_sec)}
-                      {c.created_at && ` · ${formatDate(c.created_at)}`}
+              </div>
+            ) : (
+              <div className="divide-y rounded-lg border">
+                {calls.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between p-3 text-sm">
+                    <div className="min-w-0">
+                      <Link
+                        to={`/calls/${c.id}`}
+                        className="font-medium text-foreground hover:underline"
+                        onClick={() => setCallsDialogOpen(false)}
+                      >
+                        {c.name}
+                      </Link>
+                      {c.client_name && <span className="text-xs text-muted-foreground"> · {c.client_name}</span>}
+                      <div className="text-xs text-muted-foreground">
+                        {c.duration_sec != null && formatDuration(c.duration_sec)}
+                        {c.created_at && ` · ${formatDate(c.created_at)}`}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant={statusVariant(c.status as CallStatus)}>
+                        {t(`status.${c.status}`)}
+                      </Badge>
+                      {c.status === 'done' && c.analysis.scorecard?.overall != null && (
+                        <span className={scoreColor(c.analysis.scorecard.overall)}>
+                          {c.analysis.scorecard.overall}/100
+                        </span>
+                      )}
+                      <ExternalLink className="size-3.5 text-muted-foreground" />
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Badge variant={statusVariant(c.status as CallStatus)}>
-                      {t(`status.${c.status}`)}
-                    </Badge>
-                    {c.status === 'done' && c.analysis.scorecard?.overall != null && (
-                      <span className={scoreColor(c.analysis.scorecard.overall)}>
-                        {c.analysis.scorecard.overall}/100
-                      </span>
-                    )}
-                    <ExternalLink className="size-3.5 text-muted-foreground" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -58,7 +58,7 @@ app = FastAPI(title="viacall - AI sales call coaching", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:8123", "http://127.0.0.1:5173", "http://127.0.0.1:8123"],
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )

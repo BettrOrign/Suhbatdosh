@@ -121,7 +121,7 @@ def _seed_demo_calls():
 
     with db.get_db() as conn:
         count = conn.execute("SELECT COUNT(*) FROM calls").fetchone()[0]
-    if count >= 140:
+    if count >= 30:
         return
 
     managers = [
@@ -784,7 +784,7 @@ def _seed_demo_calls():
         return max(20, min(98, base + rng.randint(-20, 15)))
 
     now = datetime.now(timezone.utc)
-    total_procedural = 110
+    total_procedural = 4
 
     day_weights = []
     for d in range(60, 0, -1):

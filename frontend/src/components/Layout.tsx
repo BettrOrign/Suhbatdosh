@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LogOut, Mic, Users, BarChart3, Menu, X } from 'lucide-react'
+import { LogOut, Mic, Users, BarChart3, Menu, X, LayoutDashboard } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState } from 'react'
 import { useAuth } from '@/lib/auth'
@@ -16,7 +16,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const links: { to: string; labelKey: string; icon: typeof Mic; show: boolean }[] = [
-    { to: '/', labelKey: 'nav.calls', icon: Mic, show: true },
+    { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard, show: true },
+    { to: '/calls', labelKey: 'nav.calls', icon: Mic, show: true },
     { to: '/clients', labelKey: 'nav.clients', icon: Users, show: true },
     { to: '/managers', labelKey: 'nav.managers', icon: BarChart3, show: user?.role === 'admin' },
     { to: '/users', labelKey: 'nav.team', icon: Users, show: user?.role === 'admin' },

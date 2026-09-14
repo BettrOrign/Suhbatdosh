@@ -3,6 +3,7 @@ export type Lang = 'en' | 'uz'
 export const translations: Record<Lang, Record<string, string>> = {
   en: {
     // layout / nav
+    'nav.dashboard': 'Dashboard',
     'nav.calls': 'Calls',
     'nav.clients': 'Clients',
     'nav.managers': 'Managers',
@@ -297,9 +298,31 @@ export const translations: Record<Lang, Record<string, string>> = {
     'notifications.priority_low': 'Low',
     'notifications.due': 'Due: {date}',
     'notifications.assignee': 'Assignee: {assignee}',
+
+    // analytics
+    'analytics.title': 'Analytics Overview',
+    'analytics.total_calls': 'Total Calls',
+    'analytics.avg_score': 'Average Score',
+    'analytics.today_calls': 'Today',
+    'analytics.active_managers': 'Active Managers',
+    'analytics.day_comparison': 'Day Comparison',
+    'analytics.today': 'Today',
+    'analytics.yesterday': 'Yesterday',
+    'analytics.calls': 'Calls',
+    'analytics.score': 'Score',
+    'analytics.duration': 'Duration',
+    'analytics.talk_ratio': 'Talk Ratio',
+    'analytics.weekly_trend': 'Weekly Trend',
+    'analytics.problem_calls': 'Problem Calls',
+    'analytics.problem_calls_desc': 'Calls with score below 50',
+    'analytics.no_problems': 'No problem calls found',
+    'analytics.manager_rankings': 'Manager Rankings',
+    'analytics.source_breakdown': 'Call Sources',
+    'analytics.score_distribution': 'Score Distribution',
   },
   uz: {
     // layout / nav
+    'nav.dashboard': 'Boshqaruv paneli',
     'nav.calls': 'Chatlar',
     'nav.clients': 'Mijozlar',
     'nav.managers': 'Menejerlar',
@@ -594,5 +617,26 @@ export const translations: Record<Lang, Record<string, string>> = {
     'notifications.priority_low': 'Past',
     'notifications.due': 'Muddat: {date}',
     'notifications.assignee': 'Masʼul: {assignee}',
+
+    // analytics
+    'analytics.title': 'Statistika',
+    'analytics.total_calls': 'Jami chatlar',
+    'analytics.avg_score': 'O\'rtacha baho',
+    'analytics.today_calls': 'Bugun',
+    'analytics.active_managers': 'Faol menejerlar',
+    'analytics.day_comparison': 'Kunlik taqqoslash',
+    'analytics.today': 'Bugun',
+    'analytics.yesterday': 'Kecha',
+    'analytics.calls': 'Chatlar',
+    'analytics.score': 'Baho',
+    'analytics.duration': 'Davomiylik',
+    'analytics.talk_ratio': 'Gap nisbati',
+    'analytics.weekly_trend': 'Haftalik trend',
+    'analytics.problem_calls': 'Muammoli chatlar',
+    'analytics.problem_calls_desc': 'Bahosi 50 dan past bo\'lgan chatlar',
+    'analytics.no_problems': 'Muammoli chatlar topilmadi',
+    'analytics.manager_rankings': 'Menejerlar reytingi',
+    'analytics.source_breakdown': 'Chat manbalari',
+    'analytics.score_distribution': 'Baholar taqsimoti',
   },
 }

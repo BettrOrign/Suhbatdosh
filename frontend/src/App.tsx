@@ -7,7 +7,8 @@ import { I18nProvider } from '@/i18n/i18n'
 import { AuthProvider, useAuth } from '@/lib/auth'
 import { Layout } from '@/components/Layout'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
-import { Dashboard } from '@/pages/Dashboard'
+import { Analytics } from '@/pages/Analytics'
+import { Calls } from '@/pages/Calls'
 import { CallDetail } from '@/pages/CallDetail'
 import { Clients } from '@/pages/Clients'
 import { ManagersPage } from '@/pages/Managers'
@@ -28,7 +29,8 @@ function AnimatedRoutes() {
         <Layout>
             <ErrorBoundary>
               <Routes location={location}>
-                <Route path="/" element={<Dashboard />} />
+                <Route path="/" element={<Analytics />} />
+                <Route path="/calls" element={<Calls />} />
                 <Route path="/calls/:id" element={<CallDetail />} />
                 <Route path="/clients" element={<Clients />} />
                 <Route path="/managers" element={<ManagersPage />} />

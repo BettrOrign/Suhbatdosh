@@ -139,4 +139,21 @@ export const api = {
     request<{ ok: boolean }>(`/api/youtube/whitelist/${id}`, { method: 'DELETE' }),
   processYoutube: (url: string) =>
     request<{ ok: boolean; call_id: number }>('/api/youtube/process', jsonBody('POST', { url })),
+
+  // analytics
+  getOverviewStats: () => request<{
+    total_calls: number; done_calls: number; error_calls: number; processing_calls: number;
+    avg_score: number | null; total_managers: number; total_clients: number;
+    calls_today: number; top_managers: { name: string; email: string; call_count: number; avg_score: number | null }[];
+  }>('/api/stats/overview'),
+  getDayOverDay: () => request<{
+    today: { calls: number; done: number; avg_score: number | null; avg_duration: number | null; avg_talk_ratio: number | null };
+    yesterday: { calls: number; done: number; avg_score: number | null; avg_duration: number | null; avg_talk_ratio: number | null };
+    date_today: string; date_yesterday: string;
+  }>('/api/stats/day-over-day'),
+  getWeeklyTrend: () => request<{ day: string; total_calls: number; done_calls: number; avg_score: number | null; avg_duration: number | null }[]>('/api/stats/weekly-trend'),
+  getMonthlyTrend: () => request<{ week: string; total_calls: number; done_calls: number; avg_score: number | null }[]>('/api/stats/monthly-trend'),
+  getProblemCalls: () => request<{ id: number; name: string; duration_sec: number; source_type: string; created_at: string; score: number | null; outcome: string; summary: string; uploader_name: string | null }[]>('/api/stats/problem-calls'),
+  getManagerRankings: () => request<{ id: number; name: string; email: string; total_calls: number; avg_score: number | null; avg_talk_ratio: number | null; calls_today: number; calls_yesterday: number; trend: string; best_score: number | null }[]>('/api/stats/manager-rankings'),
+  getSourceBreakdown: () => request<Record<string, number>>('/api/stats/source-breakdown'),
 }

@@ -376,3 +376,43 @@ def start_reanalysis_task():
     import threading
     t = threading.Thread(target=_reanalyse_done_calls, daemon=True, name="reanalyse-done")
     t.start()
+
+
+# ---------------------------------------------------------------------------
+# Analytics endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/stats/overview")
+def stats_overview(user: dict = Depends(get_current_user)):
+    return db.get_org_stats()
+
+
+@router.get("/stats/day-over-day")
+def stats_day_over_day(user: dict = Depends(get_current_user)):
+    return db.get_day_over_day_stats()
+
+
+@router.get("/stats/weekly-trend")
+def stats_weekly_trend(user: dict = Depends(get_current_user)):
+    return db.get_weekly_trend()
+
+
+@router.get("/stats/monthly-trend")
+def stats_monthly_trend(user: dict = Depends(get_current_user)):
+    return db.get_monthly_trend()
+
+
+@router.get("/stats/problem-calls")
+def stats_problem_calls(user: dict = Depends(get_current_user)):
+    return db.get_problem_calls()
+
+
+@router.get("/stats/manager-rankings")
+def stats_manager_rankings(user: dict = Depends(get_current_user)):
+    return db.get_manager_rankings()
+
+
+@router.get("/stats/source-breakdown")
+def stats_source_breakdown(user: dict = Depends(get_current_user)):
+    return db.get_source_breakdown()

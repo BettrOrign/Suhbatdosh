@@ -178,41 +178,101 @@ export function Analytics() {
 
       {/* Day-over-Day Comparison */}
       {dayOverDay && (
-        <Card className="mb-6">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">{t('analytics.day_comparison')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">{t('analytics.calls')}</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl font-bold tabular-nums">{dayOverDay.today.calls}</span>
-                  <DiffBadge current={dayOverDay.today.calls} previous={dayOverDay.yesterday.calls} />
-                </div>
-                <p className="text-[11px] text-muted-foreground">{t('analytics.yesterday')}: {dayOverDay.yesterday.calls}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">{t('analytics.score')}</p>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xl font-bold tabular-nums ${scoreColor(dayOverDay.today.avg_score ?? 0)}`}>{dayOverDay.today.avg_score ?? '—'}</span>
-                  <DiffBadge current={dayOverDay.today.avg_score} previous={dayOverDay.yesterday.avg_score} />
-                </div>
-                <p className="text-[11px] text-muted-foreground">{t('analytics.yesterday')}: {dayOverDay.yesterday.avg_score ?? '—'}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">{t('analytics.duration')}</p>
-                <p className="text-xl font-bold tabular-nums">{dayOverDay.today.avg_duration != null ? formatDuration(dayOverDay.today.avg_duration) : '—'}</p>
-                <p className="text-[11px] text-muted-foreground">{t('analytics.yesterday')}: {dayOverDay.yesterday.avg_duration != null ? formatDuration(dayOverDay.yesterday.avg_duration) : '—'}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">{t('analytics.talk_ratio')}</p>
-                <p className="text-xl font-bold tabular-nums">{dayOverDay.today.avg_talk_ratio != null ? `${Math.round(dayOverDay.today.avg_talk_ratio * 100)}%` : '—'}</p>
-                <p className="text-[11px] text-muted-foreground">{t('analytics.yesterday')}: {dayOverDay.yesterday.avg_talk_ratio != null ? `${Math.round(dayOverDay.yesterday.avg_talk_ratio * 100)}%` : '—'}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[
+            {
+              label: t('analytics.calls'),
+              today: dayOverDay.today.calls,
+              yesterday: dayOverDay.yesterday.calls,
+              icon: PhoneCall,
+              gradient: 'from-blue-500/10 to-indigo-500/10 dark:from-blue-500/5 dark:to-indigo-500/5',
+              iconBg: 'bg-blue-100 dark:bg-blue-900/30',
+              iconColor: 'text-blue-600 dark:text-blue-400',
+              barColor: 'bg-blue-500',
+              format: (v: number | null) => v != null ? String(v) : '—',
+            },
+            {
+              label: t('analytics.score'),
+              today: dayOverDay.today.avg_score,
+              yesterday: dayOverDay.yesterday.avg_score,
+              icon: Gauge,
+              gradient: 'from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/5 dark:to-teal-500/5',
+              iconBg: 'bg-emerald-100 dark:bg-emerald-900/30',
+              iconColor: 'text-emerald-600 dark:text-emerald-400',
+              barColor: 'bg-emerald-500',
+              format: (v: number | null) => v != null ? String(v) : '—',
+              scoreBased: true,
+            },
+            {
+              label: t('analytics.duration'),
+              today: dayOverDay.today.avg_duration,
+              yesterday: dayOverDay.yesterday.avg_duration,
+              icon: Clock,
+              gradient: 'from-amber-500/10 to-orange-500/10 dark:from-amber-500/5 dark:to-orange-500/5',
+              iconBg: 'bg-amber-100 dark:bg-amber-900/30',
+              iconColor: 'text-amber-600 dark:text-amber-400',
+              barColor: 'bg-amber-500',
+              format: (v: number | null) => v != null ? formatDuration(v) : '—',
+            },
+            {
+              label: t('analytics.talk_ratio'),
+              today: dayOverDay.today.avg_talk_ratio,
+              yesterday: dayOverDay.yesterday.avg_talk_ratio,
+              icon: Users,
+              gradient: 'from-purple-500/10 to-pink-500/10 dark:from-purple-500/5 dark:to-pink-500/5',
+              iconBg: 'bg-purple-100 dark:bg-purple-900/30',
+              iconColor: 'text-purple-600 dark:text-purple-400',
+              barColor: 'bg-purple-500',
+              format: (v: number | null) => v != null ? `${Math.round(v * 100)}%` : '—',
+            },
+          ].map((item) => {
+            const todayVal = typeof item.today === 'number' ? item.today : null
+            const yestVal = typeof item.yesterday === 'number' ? item.yesterday : null
+            const maxVal = Math.max(todayVal ?? 0, yestVal ?? 0, 1)
+            const todayPct = ((todayVal ?? 0) / maxVal) * 100
+            const yestPct = ((yestVal ?? 0) / maxVal) * 100
+            const Icon = item.icon
+
+            return (
+              <Card key={item.label} className={`overflow-hidden bg-gradient-to-br ${item.gradient} border-border/50`}>
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className={`flex size-8 items-center justify-center rounded-lg ${item.iconBg}`}>
+                      <Icon className={`size-4 ${item.iconColor}`} />
+                    </div>
+                    <DiffBadge current={todayVal} previous={yestVal} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">{item.label}</p>
+                    <p className={`text-2xl font-bold tabular-nums ${
+                      item.scoreBased ? scoreColor(todayVal ?? 0) : 'text-foreground'
+                    }`}>
+                      {item.format(item.today)}
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted/50">
+                        <div className={`h-full rounded-full ${item.barColor} opacity-20`} style={{ width: `${yestPct}%` }} />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground tabular-nums w-12 text-right">
+                        {t('analytics.yesterday')}: {item.format(item.yesterday)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted/50">
+                        <div className={`h-full rounded-full ${item.barColor}`} style={{ width: `${todayPct}%` }} />
+                      </div>
+                      <span className="text-[10px] font-medium tabular-nums w-12 text-right">
+                        {t('analytics.today')}: {item.format(item.today)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
       )}
 
       {/* Charts Row */}

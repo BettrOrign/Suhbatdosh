@@ -793,7 +793,7 @@ def get_day_over_day_stats() -> dict:
                 "AND json_extract(analysis, '$.rep_share_of_talk') IS NOT NULL",
                 (date_str,),
             ).fetchone()
-            avg_talk = round(avg_talk_row[0], 3) if avg_talk_row and avg_talk_row[0] is not None else None
+            avg_talk = round(avg_talk_row[0], 2) if avg_talk_row and avg_talk_row[0] is not None else None
             return {
                 "calls": calls, "done": done, "avg_score": avg_score,
                 "avg_duration": avg_duration, "avg_talk_ratio": avg_talk,

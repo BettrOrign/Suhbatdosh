@@ -336,7 +336,7 @@ function Dropzone({ file, onFile }: { file: File | null; onFile: (f: File | null
         const f = e.dataTransfer.files?.[0]
         if (f) handleFile(f)
       }}
-      className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-10 text-center outline-none transition-all duration-300 focus-visible:border-indigo-500 focus-visible:ring-3 focus-visible:ring-indigo-500/40 ${
+      className={`flex w-full cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-xl border-2 border-dashed px-6 py-10 text-center outline-none transition-all duration-300 focus-visible:border-indigo-500 focus-visible:ring-3 focus-visible:ring-indigo-500/40 ${
         dragOver ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/20' : 'border-indigo-200 dark:border-indigo-900/50 hover:border-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20'
       }`}
     >
@@ -352,7 +352,7 @@ function Dropzone({ file, onFile }: { file: File | null; onFile: (f: File | null
         <>
           <FileAudio2 className="size-7 text-primary" />
           <div className="flex max-w-full flex-col items-center gap-0.5">
-            <span className="max-w-full truncate text-sm font-medium">{file.name}</span>
+            <span className="max-w-full truncate text-sm font-medium" title={file.name}>{file.name}</span>
             <span className="text-xs text-muted-foreground">{formatBytes(file.size)}</span>
           </div>
           <Button

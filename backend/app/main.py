@@ -114,16 +114,16 @@ def _seed_default_users():
 
 def _seed_demo_calls():
     """Seed demo calls so the dashboard is never empty."""
+    import random
     import time as _time
 
     log = logging.getLogger("viacall.main")
 
     with db.get_db() as conn:
         count = conn.execute("SELECT COUNT(*) FROM calls").fetchone()[0]
-    if count >= 20:
+    if count >= 140:
         return
 
-    # Get or create users
     managers = [
         ("Aziz Karimov", "aziz@viacall.local", "aziz1234"),
         ("Nodira Raximova", "nodira@viacall.local", "nodira1234"),
@@ -156,7 +156,6 @@ def _seed_demo_calls():
     nilufar = db.get_user_by_email("nilufar@viacall.local")
     admin = db.get_user_by_email("admin@viacall.local")
 
-    # Seed demo clients
     demo_clients_data = [
         ("TechSoft LLC", "998901234567", "TechSoft", "info@techsoft.uz", "IT xizmatlari bo'yicha doimiy mijoz"),
         ("Green Valley", "998907654321", "Green Valley", "contact@greenvalley.uz", "Kosmetika optom savdosi"),
@@ -181,11 +180,8 @@ def _seed_demo_calls():
                     client_map[name] = c["id"]
                     break
 
-    users = [aziz, nodira, sardor, jasur, malika, dilnoza, nilufar, admin]
-
     audio_dir = config.AUDIO_DIR
     wav_files = sorted(audio_dir.glob("*.wav")) if audio_dir.exists() else []
-
     if not wav_files and audio_dir.exists():
         wav_files = list(audio_dir.glob("*"))
 
@@ -740,10 +736,214 @@ def _seed_demo_calls():
             created_at=ts,
             updated_at=ts,
         )
-        log.info("Seeded demo call #%d: %s", call_id, call_data["name"][:50])
+        log.info("Seeded hand-crafted call #%d: %s", call_id, call_data["name"][:50])
 
-    total = conn.execute("SELECT COUNT(*) FROM calls").fetchone()[0]
-    log.info("Total demo calls: %d", total)
+    # ─── Procedurally generated calls (spread over last 60 days) ───────────
+    rng = random.Random(42)
+
+    manager_users = [(u, "manager") for u in [aziz, nodira, sardor, jasur, malika] if u]
+    receptionist_users = [(u, "receptionist") for u in [dilnoza, nilufar] if u]
+    all_users = manager_users + receptionist_users
+
+    client_names = list(client_map.keys())
+
+    topics_manager = [
+        "CRM tizimini sotish", "IT xizmatlari bo'yicha muzokara", "Marketing strategiyasi",
+        "Korporativ trening sotish", "Biznes rejalash maslahati", "Logistika tizimini sotish",
+        "Avtomatlashtirish yechimi", "Moliyaviy konsalting xizmati", "HR tizimini joriy qilish",
+        "Veb-sayt yaratish xizmati", "SEO optimallashtirish", "SMM xizmatlari",
+        "Call markaz tizimini sotish", "ERP tizimini joriy qilish", "Video surveillance tizimi",
+        "Cloud xizmatlari", "Cybersecurity audit", "Mobile ilova yaratish",
+        "E-commerce platformasi", "Data analytics xizmati", "Bog'chalar uchun tizim",
+        "Klinika uchun CRM", "Ombor boshqaruv tizimi", "Transport logistikasi",
+        "Kosmetika optom savdosi", "Mebel ishlab chiqarish", "Gastro biznes konsalting",
+        "Sug'urta xizmatlari", "Yuridik maslahat xizmati", "Tibbiyot markazi sotish",
+    ]
+    topics_receptionist = [
+        "Mijozni qabul qilish", "Telefon orqali ma'lumot berish", "Uchrashuvni belgilash",
+        "Shikayatni qabul qilish", "Texnik yordam yo'naltirish", "Yangi mijozni ro'yxatdan o'tkazish",
+        "Qo'ng'iroqni qayta ulash", "Ma'lumot so'rovini qayta ishlash",
+    ]
+
+    summaries = [
+        "Mijoz qiziqish bildirdi, kelishuvga tayyor.",
+        "Professional taqdimot, mijoz ijobiy javob berdi.",
+        "Narx bo'yicha muzokara olib borildi, kompromissga kelindi.",
+        "Mijoz ehtiyojini aniqladik, maxsus yechim taklif qildik.",
+        "Tez va samarali suhbat o'tkazildi.",
+        "Mijozning shikayatini hal qildik, qoniqish bildirdi.",
+        "Yangi mahsulotni taqdim etdik, sinov muddatiga rozi bo'ldi.",
+        "Uzoq muzokaralar natijasida shartnoma imzolandi.",
+        "Mijoz qo'shimcha xizmatlar haqida so'radi.",
+        "Bepul sinov muddatini taklif qildik.",
+    ]
+    outcomes = ["win", "likely", "likely", "likely", "lost", "win", "win"]
+    languages = ["uz", "uz", "uz", "ru"]
+
+    def random_score(base):
+        return max(20, min(98, base + rng.randint(-20, 15)))
+
+    now = datetime.now(timezone.utc)
+    total_procedural = 110
+
+    day_weights = []
+    for d in range(60, 0, -1):
+        day = now - timedelta(days=d)
+        base_weight = max(1, 5 - (d // 15))
+        if day.weekday() in (5, 6):
+            base_weight = max(1, base_weight - 2)
+        day_weights.append((d, base_weight))
+
+    total_weight = sum(w for _, w in day_weights)
+    calls_per_day = {}
+    remaining = total_procedural
+    for d, w in day_weights:
+        n = max(0, round(total_procedural * w / total_weight))
+        n = min(n, remaining)
+        calls_per_day[d] = n
+        remaining -= n
+    for d in sorted(calls_per_day.keys(), reverse=True)[:remaining]:
+        calls_per_day[d] += 1
+
+    call_counter = 0
+    for days_ago in sorted(calls_per_day.keys(), reverse=True):
+        n_calls = calls_per_day[days_ago]
+        if n_calls == 0:
+            continue
+
+        day_base = now - timedelta(days=days_ago)
+
+        for _ in range(n_calls):
+            if rng.random() < 0.80:
+                user, utype = rng.choice(manager_users)
+                topic = rng.choice(topics_manager)
+                call_type = "manager"
+                client_name = rng.choice(client_names) if rng.random() < 0.85 else None
+                duration = rng.randint(120, 600)
+            else:
+                user, utype = rng.choice(receptionist_users)
+                topic = rng.choice(topics_receptionist)
+                call_type = "receptionist"
+                client_name = None
+                duration = rng.randint(45, 180)
+
+            hour = rng.randint(9, 17)
+            minute = rng.randint(0, 59)
+            ts = day_base.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+            lang = rng.choice(languages)
+            score_base = rng.randint(55, 88)
+            overall = random_score(score_base)
+            talk_ratio = round(rng.uniform(0.30, 0.65), 2)
+            outcome = rng.choice(outcomes)
+
+            scorecard = {
+                "opening": random_score(overall + rng.randint(-5, 5)),
+                "discovery": random_score(overall + rng.randint(-10, 5)),
+                "objection_handling": random_score(overall + rng.randint(-10, 5)),
+                "value_prop": random_score(overall + rng.randint(-5, 5)),
+                "closing": random_score(overall + rng.randint(-5, 5)),
+                "rapport": random_score(overall + rng.randint(-5, 5)),
+                "talk_ratio": round(talk_ratio * 100),
+                "overall": overall,
+            }
+
+            rep_name = user["name"].split(" ")[0] if user else "Manager"
+            analysis = {
+                "topic": topic,
+                "language": lang,
+                "summary": rng.choice(summaries),
+                "scorecard": scorecard,
+                "rep_share_of_talk": talk_ratio,
+                "outcome": outcome,
+                "key_metrics": [
+                    {"name": "Narx", "value": f"{rng.randint(100, 800)}K so'm"},
+                    {"name": "Muddat", "value": f"{rng.randint(1, 12)} oy"},
+                ],
+                "strengths": ["Professional munosabat", "Aniq taqdimot"],
+                "weaknesses": ["Ko'proq savol berish kerak edi"],
+                "coaching_points": ["Mijoz ehtiyojini chuqurroq o'rganing"],
+                "next_steps": ["Keyingi suhbatni belgilash"],
+                "action_items": [{"description": "Keyingi qadamni belgilash", "due_date": None, "assignee": "manager", "priority": "medium"}],
+            }
+
+            call_name = f"{topic} — {rng.choice(['qo\'ng\'iroq', 'suhbat', 'muzokara', 'konsultatsiya'])} #{call_counter + 1}"
+            if call_name in existing_names:
+                call_counter += 1
+                continue
+
+            call_id = db.create_call(
+                name=call_name,
+                audio_path=str(wav_files[rng.randint(0, len(wav_files) - 1)]) if wav_files else "",
+                duration_sec=duration,
+                call_type=call_type,
+                user_id=user["id"],
+                client_id=client_map.get(client_name) if client_name else None,
+                source_type="upload",
+            )
+            ts_iso = ts.isoformat()
+            db.update_call(
+                call_id,
+                status="done",
+                transcript=f"[Demo suhbat — {topic}]\nSotuvchi: {rep_name}.\nMijoz: Ha, eshitaman.\nSotuvchi: Bizning xizmatimiz haqida gaplashmoqchi edim.\nMijoz: Qiziq, davom eting.\nSotuvchi: Professional yechimlar taklif qilamiz.\nMijoz: Narxi qancha?\nSotuvchi: Sizga mos narxni belgilaymiz.\nMijoz: Yaxshi, o'ylab ko'raman.",
+                language=lang,
+                analysis=json.dumps(analysis, ensure_ascii=False),
+                created_at=ts_iso,
+                updated_at=ts_iso,
+            )
+            call_counter += 1
+
+    # ─── A few "processing" and "error" calls for today ────────────────────
+    today_users = [u for u, _ in all_users]
+    processing_calls = [
+        ("Yangi mijoz bilan dastlabki suhbat", today_users[0]["id"], "manager", "upload", 220),
+        ("Texnik yordam so'rovi — javob kutmoqda", today_users[2]["id"], "manager", "upload", 180),
+        ("Qo'ng'iroq transkripsiyasi", today_users[5]["id"], "receptionist", "upload", 90),
+        ("Xizmat haqida ma'lumot", today_users[1]["id"], "manager", "upload", 150),
+        ("Mijoz bilan muzokara — tahlil jarayonda", today_users[3]["id"], "manager", "upload", 310),
+    ]
+
+    for name_text, uid, ctype, stype, dur in processing_calls:
+        if name_text in existing_names:
+            continue
+        ts_now = now.isoformat()
+        call_id = db.create_call(
+            name=name_text,
+            audio_path="",
+            duration_sec=dur,
+            call_type=ctype,
+            user_id=uid,
+            client_id=client_map.get(rng.choice(client_names)) if rng.random() < 0.5 else None,
+            source_type=stype,
+        )
+        db.update_call(call_id, status="transcribing", created_at=ts_now, updated_at=ts_now)
+        existing_names.add(name_text)
+        log.info("Seeded processing call: %s", name_text)
+
+    error_calls = [
+        ("Suvonly buzilgan audio fayl", today_users[0]["id"], "manager", "upload", 45),
+        ("Tarmoq xatosi — qayta yuklash kerak", today_users[4]["id"], "manager", "telegram", 120),
+    ]
+    for name_text, uid, ctype, stype, dur in error_calls:
+        if name_text in existing_names:
+            continue
+        ts_now = now.isoformat()
+        call_id = db.create_call(
+            name=name_text,
+            audio_path="",
+            duration_sec=dur,
+            call_type=ctype,
+            user_id=uid,
+            source_type=stype,
+        )
+        db.update_call(call_id, status="error", created_at=ts_now, updated_at=ts_now)
+        existing_names.add(name_text)
+        log.info("Seeded error call: %s", name_text)
+
+    with db.get_db() as conn:
+        total = conn.execute("SELECT COUNT(*) FROM calls").fetchone()[0]
+    log.info("Total demo calls after seeding: %d (+%d procedural, +%d processing, +%d error)",
+             total, call_counter, len(processing_calls), len(error_calls))
 
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"

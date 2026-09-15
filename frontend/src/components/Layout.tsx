@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LogOut, Mic, Users, BarChart3, Menu, X, LayoutDashboard } from 'lucide-react'
+import { LogOut, Mic, Users, BarChart3, Menu, X, LayoutDashboard, ChevronDown } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useState } from 'react'
 import { useAuth } from '@/lib/auth'
@@ -14,15 +14,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { t } = useI18n()
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [managersOpen, setManagersOpen] = useState(false)
 
   const links: { to: string; labelKey: string; icon: any; show: boolean }[] = [
     { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard, show: true },
     { to: '/calls', labelKey: 'nav.calls', icon: Mic, show: true },
     { to: '/clients', labelKey: 'nav.clients', icon: Users, show: true },
-    { to: '/managers', labelKey: 'nav.managers', icon: BarChart3, show: user?.role === 'admin' },
-    { to: '/managers/admin', labelKey: 'nav.submenu.admin', icon: BarChart3, show: user?.role === 'admin' },
-    { to: '/managers/directions', labelKey: 'nav.submenu.directions', icon: BarChart3, show: user?.role === 'admin' },
     { to: '/users', labelKey: 'nav.team', icon: Users, show: user?.role === 'admin' },
+  ]
+
+  const subItems = [
+    { label: t('nav.submenu.admin'), to: '/managers/admin' },
+    { label: t('nav.submenu.managers'), to: '/managers' },
+    { label: t('nav.submenu.directions'), to: '/managers/directions' },
   ]
 
   return (
@@ -70,33 +74,77 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
           {/* Nav links */}
           <nav className="flex flex-1 flex-col gap-0.5 px-3">
-            {links
-              .filter((l) => l.show)
-              .map((l) => {
-                const isActive = location.pathname === l.to
-                return (
-                  <Link
-                    key={l.to}
-                    to={l.to}
-                    onClick={() => setSidebarOpen(false)}
-                    className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
-                      isActive
-                        ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-400 shadow-sm'
-                        : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground cursor-pointer'
-                    }`}
-                  >
-                    {isActive && (
-                      <motion.div
-                        layoutId="sidebar-pill"
-                        className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-indigo-500"
-                        transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-                      />
-                    )}
-                    <l.icon className="size-4 shrink-0" />
-                    {t(l.labelKey)}
-                  </Link>
-                )
-              })}
+              {links
+                .filter((l) => l.show)
+                .map((l) => {
+                  const isActive = location.pathname === l.to
+                  return (
+                    <Link
+                      key={l.to}
+                      to={l.to}
+                      onClick={() => setSidebarOpen(false)}
+                      className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                        isActive
+                          ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-400 shadow-sm'
+                          : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground cursor-pointer'
+                      }`}
+                    >
+                      {isActive && (
+                        <motion.div
+                          layoutId="sidebar-pill"
+                          className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-indigo-500"
+                          transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                        />
+                      )}
+                      <l.icon className="size-4 shrink-0" />
+                      {t(l.labelKey)}
+                    </Link>
+                  )
+                })}
+
+            {/* Managers dropdown */}
+            {user?.role === 'admin' && (
+              <div>
+                <button
+                  onClick={() => setManagersOpen(!managersOpen)}
+                  className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                    location.pathname === '/managers' || location.pathname.startsWith('/managers/')
+                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-400 shadow-sm'
+                      : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground cursor-pointer'
+                  }`}
+                >
+                  {location.pathname === '/managers' || location.pathname.startsWith('/managers/') ? (
+                    <motion.div
+                      layoutId="sidebar-pill"
+                      className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-indigo-500"
+                      transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                    />
+                  ) : null}
+                  <BarChart3 className="size-4 shrink-0" />
+                  {t('nav.managers')}
+                  <ChevronDown className={`ml-auto size-4 transition-transform duration-200 ${managersOpen ? 'rotate-180' : ''}`} />
+                </button>
+                 <motion.div layout transition={{ duration: 0.2 }} className="flex flex-col gap-0.5 pl-8 pr-2 py-1">
+                       {subItems.map((item) => {
+                         const isActive = location.pathname === item.to
+                         return (
+                           <Link
+                             key={item.to}
+                             to={item.to}
+                             onClick={() => setSidebarOpen(false)}
+                             className={`rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+                               isActive
+                                 ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50'
+                                 : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground cursor-pointer'
+                             }`}
+                           >
+                             {item.label}
+                           </Link>
+                         )
+                       })}
+                     </motion.div>
+              </div>
+            )}
           </nav>
 
           {/* Bottom section */}

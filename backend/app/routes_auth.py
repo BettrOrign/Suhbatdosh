@@ -60,8 +60,8 @@ def regenerate_own_token(user: dict = Depends(get_current_user)):
 
 
 @router.get("/users")
-def list_users(user: dict = Depends(require_role("admin"))):
-    """Return all users (admin-only); admins can see everyone's API token."""
+def list_users(user: dict = Depends(require_role("admin", "yonalish"))):
+    """Return all users; admins and yonalish can see users."""
     return [
         {
             "id": u["id"],
@@ -83,8 +83,8 @@ def create_user(payload: dict, user: dict = Depends(require_role("admin"))):
     role = payload.get("role") or "manager"
     if not name or not email or not password:
         raise HTTPException(400, "name, email and password are required")
-    if role not in ("admin", "manager", "receptionist"):
-        raise HTTPException(400, "role must be admin, manager or receptionist")
+    if role not in ("admin", "manager", "receptionist", "yonalish"):
+        raise HTTPException(400, "role must be admin, manager, receptionist or yonalish")
     if db.get_user_by_email(email):
         raise HTTPException(409, "Email already exists")
     user_id = db.create_user(name, email, hash_password(password), role)

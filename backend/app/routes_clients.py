@@ -8,8 +8,8 @@ router = APIRouter(prefix="/api")
 
 @router.get("/clients")
 def list_clients(user: dict = Depends(get_current_user)):
-    # receptionist sees all clients; manager sees own + unassigned
-    if user["role"] == "receptionist":
+    # receptionist and yonalish see all clients; manager sees own + unassigned
+    if user["role"] == "receptionist" or user["role"] == "yonalish":
         view = None
     elif user["role"] == "manager":
         view = user["id"]
@@ -19,7 +19,7 @@ def list_clients(user: dict = Depends(get_current_user)):
 
 
 @router.post("/clients")
-def create_client(payload: dict, user: dict = Depends(get_current_user)):
+def create_client(payload: dict, user: dict = Depends(require_role("admin", "manager", "receptionist"))):
     name = (payload.get("name") or "").strip()
     if not name:
         raise HTTPException(400, "name is required")
@@ -46,7 +46,7 @@ def get_client(client_id: int, user: dict = Depends(get_current_user)):
 
 
 @router.patch("/clients/{client_id}")
-def update_client(client_id: int, payload: dict, user: dict = Depends(get_current_user)):
+def update_client(client_id: int, payload: dict, user: dict = Depends(require_role("admin", "manager", "receptionist"))):
     c = db.get_client(client_id)
     if c is None:
         raise HTTPException(404, "Client not found")

@@ -14,7 +14,6 @@ import {
   Trophy,
   Target,
   PhoneCall,
-  ChevronDown,
   Crown,
   Users,
   Compass,
@@ -450,128 +449,139 @@ export function ManagersPage() {
 
       <AddManagerDialog open={addOpen} onClose={() => setAddOpen(false)} onSaved={loadManagers} />
 
-      {/* Expandable Sections */}
-      <div className="mb-6 space-y-3">
-        {/* Admin Section */}
-        <Card className="overflow-hidden">
-          <button
-            onClick={() => setExpandedSection(expandedSection === 'admin' ? null : 'admin')}
-            className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-muted/50"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/25">
-                <Crown className="size-5" />
-              </div>
-              <div>
-                <h3 className="font-semibold">{t('managers.admin_section')}</h3>
-                <p className="text-sm text-muted-foreground">{t('managers.admin_section_desc')}</p>
-              </div>
-            </div>
-            <ChevronDown className={`size-5 text-muted-foreground transition-transform duration-200 ${expandedSection === 'admin' ? 'rotate-180' : ''}`} />
-          </button>
-          {expandedSection === 'admin' && (
-            <div className="border-t bg-muted/30 p-4">
-              <div className="flex items-center gap-4">
-                <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-muted">
-                  <UserRound className="size-6 text-muted-foreground" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold">{user?.name}</p>
-                  <p className="text-sm text-muted-foreground">{user?.email}</p>
-                  <Badge variant="default" className="mt-1">{t('nav.role.admin')}</Badge>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-muted-foreground">{t('managers.total_system_calls')}</p>
-                  <p className="text-2xl font-bold">{totalCalls}</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </Card>
+      {/* Quick Access Panels */}
+      <div className="mb-6 grid grid-cols-3 gap-3">
+        <button
+          onClick={() => setExpandedSection('admin')}
+          className="group flex items-center gap-3 rounded-xl border bg-gradient-to-br from-amber-500/10 to-orange-500/10 p-4 text-left transition-all hover:shadow-lg hover:shadow-amber-500/10 hover:-translate-y-0.5"
+        >
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/25">
+            <Crown className="size-5" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-semibold">{t('managers.admin_section')}</h3>
+            <p className="text-xs text-muted-foreground">{t('managers.admin_section_desc')}</p>
+          </div>
+        </button>
 
-        {/* Managers Section */}
-        <Card className="overflow-hidden">
-          <button
-            onClick={() => setExpandedSection(expandedSection === 'managers' ? null : 'managers')}
-            className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-muted/50"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25">
-                <Users className="size-5" />
-              </div>
-              <div>
-                <h3 className="font-semibold">{t('managers.managers_section')}</h3>
-                <p className="text-sm text-muted-foreground">{t('managers.managers_section_desc')}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary">{managers.length}</Badge>
-              <ChevronDown className={`size-5 text-muted-foreground transition-transform duration-200 ${expandedSection === 'managers' ? 'rotate-180' : ''}`} />
-            </div>
-          </button>
-          {expandedSection === 'managers' && (
-            <div className="border-t bg-muted/30 p-4">
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {managers.slice(0, 6).map((m) => (
-                  <div key={m.id} className="flex items-center gap-3 rounded-lg border bg-background p-3">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                      <UserRound className="size-4 text-muted-foreground" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium truncate">{m.name}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{m.total_calls} {t('managers.calls_label').toLowerCase()}</span>
-                        {m.avg_score != null && (
-                          <span className={scoreColor(m.avg_score)}>· {m.avg_score}</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </Card>
+        <button
+          onClick={() => setExpandedSection('managers')}
+          className="group flex items-center gap-3 rounded-xl border bg-gradient-to-br from-indigo-500/10 to-purple-500/10 p-4 text-left transition-all hover:shadow-lg hover:shadow-indigo-500/10 hover:-translate-y-0.5"
+        >
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25">
+            <Users className="size-5" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-semibold">{t('managers.managers_section')}</h3>
+            <p className="text-xs text-muted-foreground">{managers.length} {t('managers.calls_label').toLowerCase()}</p>
+          </div>
+        </button>
 
-        {/* Direction Responsibilities Section */}
-        <Card className="overflow-hidden">
-          <button
-            onClick={() => setExpandedSection(expandedSection === 'directions' ? null : 'directions')}
-            className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-muted/50"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25">
-                <Compass className="size-5" />
-              </div>
-              <div>
-                <h3 className="font-semibold">{t('managers.directions_section')}</h3>
-                <p className="text-sm text-muted-foreground">{t('managers.directions_section_desc')}</p>
-              </div>
-            </div>
-            <ChevronDown className={`size-5 text-muted-foreground transition-transform duration-200 ${expandedSection === 'directions' ? 'rotate-180' : ''}`} />
-          </button>
-          {expandedSection === 'directions' && (
-            <div className="border-t bg-muted/30 p-4">
-              <div className="grid gap-3 md:grid-cols-2">
-                {[
-                  { name: t('managers.direction_sales'), icon: '📈', count: 12, color: 'text-blue-600' },
-                  { name: t('managers.direction_support'), icon: '🎧', count: 8, color: 'text-green-600' },
-                  { name: t('managers.direction_marketing'), icon: '📢', count: 6, color: 'text-purple-600' },
-                  { name: t('managers.direction_hr'), icon: '👥', count: 4, color: 'text-orange-600' },
-                ].map((dir) => (
-                  <div key={dir.name} className="flex items-center gap-3 rounded-lg border bg-background p-3">
-                    <span className="text-2xl">{dir.icon}</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium">{dir.name}</p>
-                      <p className="text-sm text-muted-foreground">{dir.count} {t('managers.responsible_managers')}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </Card>
+        <button
+          onClick={() => setExpandedSection('directions')}
+          className="group flex items-center gap-3 rounded-xl border bg-gradient-to-br from-emerald-500/10 to-teal-500/10 p-4 text-left transition-all hover:shadow-lg hover:shadow-emerald-500/10 hover:-translate-y-0.5"
+        >
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25">
+            <Compass className="size-5" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-semibold">{t('managers.directions_section')}</h3>
+            <p className="text-xs text-muted-foreground">{t('managers.directions_section_desc')}</p>
+          </div>
+        </button>
       </div>
+
+      {/* Admin Panel */}
+      <Dialog open={expandedSection === 'admin'} onOpenChange={(o) => { if (!o) setExpandedSection(null) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Crown className="size-5 text-amber-500" />
+              {t('managers.admin_section')}
+            </DialogTitle>
+            <DialogDescription>{t('managers.admin_section_desc')}</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-4 rounded-lg border bg-muted/30 p-4">
+            <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-muted">
+              <UserRound className="size-7 text-muted-foreground" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-lg font-semibold">{user?.name}</p>
+              <p className="text-sm text-muted-foreground">{user?.email}</p>
+              <Badge variant="default" className="mt-2">{t('nav.role.admin')}</Badge>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground">{t('managers.total_system_calls')}</p>
+              <p className="text-3xl font-bold">{totalCalls}</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Managers Panel */}
+      <Dialog open={expandedSection === 'managers'} onOpenChange={(o) => { if (!o) setExpandedSection(null) }}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="size-5 text-indigo-500" />
+              {t('managers.managers_section')}
+            </DialogTitle>
+            <DialogDescription>{managers.length} {t('managers.managers_section_desc')}</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto -mx-6 px-6">
+            <div className="grid gap-3 md:grid-cols-2">
+              {managers.map((m) => (
+                <div key={m.id} className="flex items-center gap-3 rounded-lg border bg-background p-3">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <UserRound className="size-4 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium truncate">{m.name}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{m.total_calls} {t('managers.calls_label').toLowerCase()}</span>
+                      {m.avg_score != null && (
+                        <span className={scoreColor(m.avg_score)}>· {m.avg_score}</span>
+                      )}
+                    </div>
+                  </div>
+                  <Badge variant={m.active ? 'default' : 'secondary'}>
+                    {m.active ? t('users.active') : t('users.inactive')}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Directions Panel */}
+      <Dialog open={expandedSection === 'directions'} onOpenChange={(o) => { if (!o) setExpandedSection(null) }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Compass className="size-5 text-emerald-500" />
+              {t('managers.directions_section')}
+            </DialogTitle>
+            <DialogDescription>{t('managers.directions_section_desc')}</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 md:grid-cols-2">
+            {[
+              { name: t('managers.direction_sales'), icon: '📈', count: 12 },
+              { name: t('managers.direction_support'), icon: '🎧', count: 8 },
+              { name: t('managers.direction_marketing'), icon: '📢', count: 6 },
+              { name: t('managers.direction_hr'), icon: '👥', count: 4 },
+            ].map((dir) => (
+              <div key={dir.name} className="flex items-center gap-3 rounded-lg border bg-background p-4">
+                <span className="text-3xl">{dir.icon}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">{dir.name}</p>
+                  <p className="text-sm text-muted-foreground">{dir.count} {t('managers.responsible_managers')}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {loading ? (
         <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">

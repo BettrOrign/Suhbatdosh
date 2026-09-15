@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { LogOut, Mic, Users, BarChart3, Menu, X, LayoutDashboard, ChevronDown, Crown, UserRound, Compass } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState } from 'react'
@@ -13,7 +13,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
   const { t } = useI18n()
   const location = useLocation()
-  const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [managersOpen, setManagersOpen] = useState(false)
 
@@ -140,28 +139,33 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       transition={{ duration: 0.15 }}
                       className="flex flex-col gap-0.5 pl-8 pr-2 py-1"
                     >
-                      {subItems.map((item) => {
-                        const Icon = item.icon
-                        const isActive = location.pathname === '/managers'
-                        return (
-                          <button
-                            key={item.label}
-                            onClick={() => {
-                              setManagersOpen(false)
-                              setSidebarOpen(false)
-                              navigate('/managers', { state: item.state })
-                            }}
-                            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all ${
-                              isActive
-                                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50'
-                                : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground cursor-pointer'
-                            }`}
-                          >
-                            <Icon className="size-3.5 shrink-0" />
-                            {item.label}
-                          </button>
-                        )
-                      })}
+                       {subItems.map((item) => {
+                         const Icon = item.icon
+                         const isActive = location.pathname === '/managers'
+                         return (
+                           <Link
+                             key={item.label}
+                             to="/managers"
+                             state={item.state}
+                             onClick={() => { setManagersOpen(false); setSidebarOpen(false) }}
+                             className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                               isActive
+                                 ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-400 shadow-sm'
+                                 : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground cursor-pointer'
+                             }`}
+                           >
+                             {isActive && (
+                               <motion.div
+                                 layoutId="sidebar-pill"
+                                 className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-indigo-500"
+                                 transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                               />
+                             )}
+                             <Icon className="size-4 shrink-0" />
+                             {item.label}
+                           </Link>
+                         )
+                       })}
                     </motion.div>
                   )}
                 </AnimatePresence>

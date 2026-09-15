@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
@@ -342,6 +342,16 @@ export function ManagersPage() {
   const [callsLoading, setCallsLoading] = useState(false)
   const [rankings, setRankings] = useState<Ranking[]>([])
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const state = location.state as { openPanel?: string } | null
+    if (state?.openPanel) {
+      setExpandedSection(state.openPanel)
+      navigate('/managers', { replace: true, state: {} })
+    }
+  }, [location.state, navigate])
 
   const loadManagers = useCallback(async () => {
     try {

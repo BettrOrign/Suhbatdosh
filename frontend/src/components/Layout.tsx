@@ -1,5 +1,5 @@
-import { Link, useLocation } from 'react-router-dom'
-import { LogOut, Mic, Users, BarChart3, Menu, X, LayoutDashboard } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { LogOut, Mic, Users, BarChart3, Menu, X, LayoutDashboard, ChevronDown, Crown, UserRound, Compass } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState } from 'react'
 import { useAuth } from '@/lib/auth'
@@ -13,14 +13,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
   const { t } = useI18n()
   const location = useLocation()
+  const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [managersOpen, setManagersOpen] = useState(false)
 
   const links: { to: string; labelKey: string; icon: typeof Mic; show: boolean }[] = [
     { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard, show: true },
     { to: '/calls', labelKey: 'nav.calls', icon: Mic, show: true },
     { to: '/clients', labelKey: 'nav.clients', icon: Users, show: true },
-    { to: '/managers', labelKey: 'nav.managers', icon: BarChart3, show: user?.role === 'admin' },
     { to: '/users', labelKey: 'nav.team', icon: Users, show: user?.role === 'admin' },
+  ]
+
+  const subItems = [
+    { label: t('nav.submenu.admin'), icon: Crown, state: { openPanel: 'admin' } },
+    { label: t('nav.submenu.managers'), icon: UserRound, state: { openPanel: 'managers' } },
+    { label: t('nav.submenu.directions'), icon: Compass, state: { openPanel: 'directions' } },
   ]
 
   return (
@@ -102,6 +109,64 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </Link>
                 )
               })}
+
+            {/* Managers dropdown */}
+            {user?.role === 'admin' && (
+              <div className="relative">
+                <button
+                  onClick={() => setManagersOpen(!managersOpen)}
+                  className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                    location.pathname === '/managers' || location.pathname.startsWith('/managers/')
+                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-400 shadow-sm'
+                      : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground cursor-pointer'
+                  }`}
+                >
+                  <motion.div
+                    layoutId="sidebar-pill"
+                    className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-indigo-500"
+                    transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                    style={{ display: location.pathname === '/managers' || location.pathname.startsWith('/managers/') ? 'block' : 'none' }}
+                  />
+                  <BarChart3 className="size-4 shrink-0" />
+                  {t('nav.managers')}
+                  <ChevronDown className={`ml-auto size-4 transition-transform duration-200 ${managersOpen ? 'rotate-180' : ''}`} />
+                </button>
+                <AnimatePresence>
+                  {managersOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="flex flex-col gap-0.5 pl-8 pr-2 py-1"
+                    >
+                      {subItems.map((item) => {
+                        const Icon = item.icon
+                        const isActive = location.pathname === '/managers'
+                        return (
+                          <button
+                            key={item.label}
+                            onClick={() => {
+                              setManagersOpen(false)
+                              setSidebarOpen(false)
+                              navigate('/managers', { state: item.state })
+                            }}
+                            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all ${
+                              isActive
+                                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50'
+                                : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground cursor-pointer'
+                            }`}
+                          >
+                            <Icon className="size-3.5 shrink-0" />
+                            {item.label}
+                          </button>
+                        )
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
           </nav>
 
           {/* Bottom section */}

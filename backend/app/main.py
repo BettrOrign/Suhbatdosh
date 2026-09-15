@@ -117,9 +117,9 @@ def _seed_default_users():
         ("Rustam Zoirov", "rustam@suhbatdosh.local", "rustam1234"),
         ("Murod Abdullayev", "murod@suhbatdosh.local", "murod1234"),
         ("Bakhtiyor Karimov", "bakhtiyor@suhbatdosh.local", "bakhtiyor1234"),
-        ("Jasur Raximov", "jasur@suhbatdosh.local", "jasur1234"),
+        ("Jasur Raximov", "jasur.yonalish@suhbatdosh.local", "jasur1234"),
         ("Davron Mirzayev", "davron@suhbatdosh.local", "davron1234"),
-        ("Sardor Alimov", "sardor@suhbatdosh.local", "sardor1234"),
+        ("Sardor Alimov", "sardor.yonalish@suhbatdosh.local", "sardor1234"),
         ("Bobur Turgunov", "bobur@suhbatdosh.local", "bobur1234"),
         ("Akbar Normatov", "akbar@suhbatdosh.local", "akbar1234"),
     ]
@@ -178,9 +178,9 @@ def _seed_demo_calls():
     rustam = db.get_user_by_email("rustam@suhbatdosh.local")
     murod = db.get_user_by_email("murod@suhbatdosh.local")
     bakhtiyor = db.get_user_by_email("bakhtiyor@suhbatdosh.local")
-    jasur_yon = db.get_user_by_email("jasur@suhbatdosh.local")
+    jasur_yon = db.get_user_by_email("jasur.yonalish@suhbatdosh.local")
     davron = db.get_user_by_email("davron@suhbatdosh.local")
-    sardor_yon = db.get_user_by_email("sardor@suhbatdosh.local")
+    sardor_yon = db.get_user_by_email("sardor.yonalish@suhbatdosh.local")
     bobur = db.get_user_by_email("bobur@suhbatdosh.local")
     akbar = db.get_user_by_email("akbar@suhbatdosh.local")
 

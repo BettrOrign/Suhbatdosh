@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { LogOut, Mic, Users, BarChart3, Menu, X, LayoutDashboard, ChevronDown } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/i18n/i18n'
@@ -124,25 +124,36 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   {t('nav.managers')}
                   <ChevronDown className={`ml-auto size-4 transition-transform duration-200 ${managersOpen ? 'rotate-180' : ''}`} />
                 </button>
-                 <motion.div layout transition={{ duration: 0.2 }} className="flex flex-col gap-0.5 pl-8 pr-2 py-1">
-                       {subItems.map((item) => {
-                         const isActive = location.pathname === item.to
-                         return (
-                           <Link
-                             key={item.to}
-                             to={item.to}
-                             onClick={() => setSidebarOpen(false)}
-                             className={`rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-                               isActive
-                                 ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50'
-                                 : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground cursor-pointer'
-                             }`}
-                           >
-                             {item.label}
-                           </Link>
-                         )
-                       })}
-                     </motion.div>
+                  <AnimatePresence>
+                    {managersOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, maxHeight: 0 }}
+                        animate={{ opacity: 1, maxHeight: 300 }}
+                        exit={{ opacity: 0, maxHeight: 0 }}
+                        transition={{ duration: 0.2 }}
+                        style={{ overflow: 'hidden' }}
+                        className="flex flex-col gap-0.5 pl-8 pr-2 py-1"
+                      >
+                        {subItems.map((item) => {
+                          const isActive = location.pathname === item.to
+                          return (
+                            <Link
+                              key={item.to}
+                              to={item.to}
+                              onClick={() => setSidebarOpen(false)}
+                              className={`rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+                                isActive
+                                  ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50'
+                                  : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground cursor-pointer'
+                              }`}
+                            >
+                              {item.label}
+                            </Link>
+                          )
+                        })}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
               </div>
             )}
           </nav>

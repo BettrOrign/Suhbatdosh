@@ -9,6 +9,7 @@ export interface User {
 }
 
 export interface Client {
+  role: string
   id: number
   name: string
   phone: string

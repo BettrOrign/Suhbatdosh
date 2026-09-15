@@ -159,7 +159,7 @@ function AdminManagerDialog({ mode, adminManager, managers, showManagerField, on
 function AdminManagerRow({ adminManager, onEdit, onChanged }: {
   adminManager: Client
   onEdit: (a: Client) => void
-  onChanged: () => void
+  onChanged: () => Promise<void>
 }) {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
@@ -170,7 +170,7 @@ function AdminManagerRow({ adminManager, onEdit, onChanged }: {
     try {
       await api.deleteClient(adminManager.id)
       toast.success(t('managers.deleted'))
-      onChanged()
+      await onChanged()
     } catch (e) {
       toast.error(t('managers.delete_failed', { error: (e as Error).message }))
     }
@@ -254,7 +254,8 @@ export function ManagersAdminPage() {
 
   const refresh = useCallback(async () => {
     try {
-      setAdminManagers(await api.listUsers() as unknown as Client[])
+      const data = await api.listUsers()
+      setAdminManagers(data.filter((a) => a.role === 'admin') as unknown as Client[])
     } catch (e) {
       toast.error(t('managers.load_failed', { error: (e as Error).message }))
     } finally {
@@ -276,9 +277,9 @@ export function ManagersAdminPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return adminManagers
+    if (!q) return adminManagers.filter((a) => a.role === 'admin')
     return adminManagers.filter(
-      (a) =>
+      (a) => a.role === 'admin' &&
         a.name.toLowerCase().includes(q) ||
         a.company.toLowerCase().includes(q) ||
         (a.email?.toLowerCase().includes(q) ?? false),
@@ -367,3 +368,4 @@ export function ManagersAdminPage() {
 }
 
 export default ManagersAdminPage
+

@@ -449,48 +449,6 @@ export function ManagersPage() {
 
       <AddManagerDialog open={addOpen} onClose={() => setAddOpen(false)} onSaved={loadManagers} />
 
-      {/* Quick Access Panels */}
-      <div className="mb-6 grid grid-cols-3 gap-3">
-        <button
-          onClick={() => setExpandedSection('admin')}
-          className="group flex items-center gap-3 rounded-xl border bg-gradient-to-br from-amber-500/10 to-orange-500/10 p-4 text-left transition-all hover:shadow-lg hover:shadow-amber-500/10 hover:-translate-y-0.5"
-        >
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/25">
-            <Crown className="size-5" />
-          </div>
-          <div className="min-w-0">
-            <h3 className="font-semibold">{t('managers.admin_section')}</h3>
-            <p className="text-xs text-muted-foreground">{t('managers.admin_section_desc')}</p>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setExpandedSection('managers')}
-          className="group flex items-center gap-3 rounded-xl border bg-gradient-to-br from-indigo-500/10 to-purple-500/10 p-4 text-left transition-all hover:shadow-lg hover:shadow-indigo-500/10 hover:-translate-y-0.5"
-        >
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25">
-            <Users className="size-5" />
-          </div>
-          <div className="min-w-0">
-            <h3 className="font-semibold">{t('managers.managers_section')}</h3>
-            <p className="text-xs text-muted-foreground">{managers.length} {t('managers.calls_label').toLowerCase()}</p>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setExpandedSection('directions')}
-          className="group flex items-center gap-3 rounded-xl border bg-gradient-to-br from-emerald-500/10 to-teal-500/10 p-4 text-left transition-all hover:shadow-lg hover:shadow-emerald-500/10 hover:-translate-y-0.5"
-        >
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25">
-            <Compass className="size-5" />
-          </div>
-          <div className="min-w-0">
-            <h3 className="font-semibold">{t('managers.directions_section')}</h3>
-            <p className="text-xs text-muted-foreground">{t('managers.directions_section_desc')}</p>
-          </div>
-        </button>
-      </div>
-
       {/* Admin Panel */}
       <Dialog open={expandedSection === 'admin'} onOpenChange={(o) => { if (!o) setExpandedSection(null) }}>
         <DialogContent className="sm:max-w-md">
@@ -683,6 +641,48 @@ export function ManagersPage() {
           ))}
         </Stagger>
       )}
+
+      {/* Quick Access Panels */}
+      <div className="mt-8 mb-6 grid grid-cols-3 gap-3">
+        <button
+          onClick={() => setExpandedSection('admin')}
+          className="group flex items-center gap-3 rounded-xl border bg-gradient-to-br from-amber-500/10 to-orange-500/10 p-4 text-left transition-all hover:shadow-lg hover:shadow-amber-500/10 hover:-translate-y-0.5"
+        >
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/25">
+            <Crown className="size-5" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-semibold">{t('managers.admin_section')}</h3>
+            <p className="text-xs text-muted-foreground">{t('managers.admin_section_desc')}</p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => setExpandedSection('managers')}
+          className="group flex items-center gap-3 rounded-xl border bg-gradient-to-br from-indigo-500/10 to-purple-500/10 p-4 text-left transition-all hover:shadow-lg hover:shadow-indigo-500/10 hover:-translate-y-0.5"
+        >
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25">
+            <Users className="size-5" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-semibold">{t('managers.managers_section')}</h3>
+            <p className="text-xs text-muted-foreground">{managers.length} {t('managers.managers_section_desc')}</p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => setExpandedSection('directions')}
+          className="group flex items-center gap-3 rounded-xl border bg-gradient-to-br from-emerald-500/10 to-teal-500/10 p-4 text-left transition-all hover:shadow-lg hover:shadow-emerald-500/10 hover:-translate-y-0.5"
+        >
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25">
+            <Compass className="size-5" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-semibold">{t('managers.directions_section')}</h3>
+            <p className="text-xs text-muted-foreground">{t('managers.directions_section_desc')}</p>
+          </div>
+        </button>
+      </div>
 
       {/* Floating Calls Dialog */}
       <Dialog open={callsDialogOpen} onOpenChange={setCallsDialogOpen}>

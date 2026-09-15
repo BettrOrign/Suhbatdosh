@@ -350,8 +350,12 @@ export function ManagersPage() {
     if (state?.openPanel) {
       setExpandedSection(state.openPanel)
       navigate('/managers', { replace: true, state: {} })
+    } else if (location.pathname === '/managers/admin') {
+      setExpandedSection('admin')
+    } else if (location.pathname === '/managers/directions') {
+      setExpandedSection('directions')
     }
-  }, [location.state, navigate])
+  }, [location.state, location.pathname, navigate])
 
   const loadManagers = useCallback(async () => {
     try {

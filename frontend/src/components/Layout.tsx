@@ -24,9 +24,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   ]
 
   const subItems = [
-    { label: t('nav.submenu.admin'), icon: Crown, state: { openPanel: 'admin' } },
-    { label: t('nav.submenu.managers'), icon: UserRound, state: { openPanel: 'managers' } },
-    { label: t('nav.submenu.directions'), icon: Compass, state: { openPanel: 'directions' } },
+    { label: t('nav.submenu.admin'), icon: Crown, to: '/managers/admin' },
+    { label: t('nav.submenu.managers'), icon: UserRound, to: '/managers' },
+    { label: t('nav.submenu.directions'), icon: Compass, to: '/managers/directions' },
   ]
 
   return (
@@ -141,12 +141,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     >
                        {subItems.map((item) => {
                          const Icon = item.icon
-                         const isActive = location.pathname === '/managers'
+                         const isActive = location.pathname === item.to || (item.to === '/managers' && location.pathname.startsWith('/managers/'))
                          return (
                            <Link
-                             key={item.label}
-                             to="/managers"
-                             state={item.state}
+                             key={item.to}
+                             to={item.to}
                              onClick={() => { setManagersOpen(false); setSidebarOpen(false) }}
                              className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                                isActive

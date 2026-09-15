@@ -33,6 +33,8 @@ function Shell() {
           <Route path="/calls/:id" element={<CallDetail />} />
           <Route path="/clients" element={<Clients />} />
           <Route path="/managers" element={<ManagersPage />} />
+          <Route path="/managers/admin" element={<ManagersPage />} />
+          <Route path="/managers/directions" element={<ManagersPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -335,8 +335,8 @@ export function Analytics() {
         {/* clients */}
         <Card>
           <CardHeader className="pb-10">
-            <CardTitle className="text-2xl font-medium flex items-center gap-2">
-              <BarChart3 className="size-4 text-indigo-500 text-center" />
+            <CardTitle className="text-2xl font-medium items-center gap-2">
+              <BarChart3 className="size-4" />
               {t('analytics.manager_rankings')}
             </CardTitle>
           </CardHeader>

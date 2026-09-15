@@ -212,6 +212,7 @@ function ManagerCard({
 }) {
   const { t } = useI18n()
   return (
+    /* Manager card content */
     <motion.div variants={fadeUp}>
       <Card className="h-full transition-all duration-200 ease-smooth hover:-translate-y-0.5 hover:shadow-lg hover:shadow-foreground/5">
         <CardHeader className="pb-3">
@@ -438,7 +439,7 @@ export function ManagersDirectionsPage() {
           {managers.map((m) => <ManagerCard key={m.id} mgr={m} onEdit={() => toast.info(t('managers.edit_via_team'))} onDelete={handleDelete} onChanged={loadManagers} onSelect={loadCalls} />)}
         </div>
       ) : (
-        <Stagger className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <Stagger className="grid gap-5 md:grid-cols-1 xl:grid-cols-2">
           {managers.map((m) => <ManagerCard key={m.id} mgr={m} onEdit={() => toast.info(t('managers.edit_via_team'))} onDelete={handleDelete} onChanged={loadManagers} onSelect={loadCalls} />)}
         </Stagger>
       )}

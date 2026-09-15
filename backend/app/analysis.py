@@ -51,8 +51,6 @@ class CallAnalysis(BaseModel):
     rep_share_of_talk: float
     outcome: str
     key_metrics: list[KeyMetric]
-    strengths: list[str]
-    weaknesses: list[str]
     coaching_points: list[str]
     next_steps: list[str]
     action_items: list[ActionItem]

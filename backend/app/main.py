@@ -236,8 +236,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.55,
                 "outcome": "likely",
                 "key_metrics": [{"name": "Narx", "value": "500,000 so'm/oy"}, {"name": "Sinov muddati", "value": "1 oy bepul"}],
-                "strengths": ["Aniq va professional kirish", "Mijoz ehtiyojini tushundi", "Narxni ochiq aytdi"],
-                "weaknesses": ["Batafsil ehtiyoj aniqlash savollari kam", "Raqobatchilar haqida gapirmadi"],
                 "coaching_points": ["Raqobatchilar haqida oldindan tayyorlang", "Mijozning shaxsiy ehtiyojlarini ko'proq oching"],
                 "next_steps": ["Demo uchun vaqt belgilash", "CRM tizimi haqida batafsil taqdimot yuborish"],
                 "action_items": [{"description": "Demo uchun kalendarga sana qo'shish", "due_date": None, "assignee": "manager", "priority": "high"}]
@@ -261,8 +259,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.48,
                 "outcome": "win",
                 "key_metrics": [{"name": "Narx", "value": "350,000 so'm (20% chegirma)"}, {"name": "Yetkazish", "value": "Bepul, 2-3 kun"}],
-                "strengths": ["Tez va aniq taqdimot", "Chegirmani to'g'ri vaqtda aytdi", "Buyurtmani darhol qabul qildi"],
-                "weaknesses": ["Mijoz ehtiyojini chuqur o'rganmadi", "Ko'proq mahsulot taklif qilmadi"],
                 "coaching_points": ["Qo'shimcha mahsulotlar haqida gapiring", "Mijozning oldingi buyurtmalarini eslang"],
                 "next_steps": ["Buyurtmani tasdiqlash", "Yetkazish haqida xabar berish"],
                 "action_items": [{"description": "Buyurtmani tizimga kiritish", "due_date": None, "assignee": "manager", "priority": "high"}]
@@ -286,8 +282,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.52,
                 "outcome": "likely",
                 "key_metrics": [{"name": "Цена", "value": "2,000,000 сум/мес"}, {"name": "Скидка", "value": "15% при годовом договоре"}, {"name": "Офис", "value": "10 человек"}],
-                "strengths": ["Профессиональная подача", "Понял потребность клиента", "Предложил компромисс"],
-                "weaknesses": ["Не показал ROI", "Не привёл кейсы успеха"],
                 "coaching_points": ["Подготовьте кейсы успешных клиентов", "Покажите экономию от аутсорсинга"],
                 "next_steps": ["Подготовить договор на пробный месяц", "Отправить презентацию"],
                 "action_items": [{"description": "Подготовить договор", "due_date": None, "assignee": "manager", "priority": "high"}]
@@ -310,8 +304,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.40,
                 "outcome": "win",
                 "key_metrics": [{"name": "Javob vaqti", "value": "3 soniya"}, {"name": "Yo'naltirish", "value": "To'g'ri mutaxassisga"}],
-                "strengths": ["Juda tez va professional", "Mijozni sabr bilan tingladi", "To'g'ri odamga bog'ladi"],
-                "weaknesses": [],
                 "coaching_points": ["Davom eting! Bu juda yaxshi sifat"],
                 "next_steps": [],
                 "action_items": []
@@ -335,8 +327,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.58,
                 "outcome": "win",
                 "key_metrics": [{"name": "Soni", "value": "15 stul"}, {"name": "Narx", "value": "700,000 so'm/ta"}, {"name": "Jami", "value": "10,500,000 so'm"}],
-                "strengths": ["Qiymatni aniq ko'rsatdi", "Narx muzokaralarini yuritdi", "Yetkazish bepulligini aytdi"],
-                "weaknesses": ["Mijozning byudjetini to'liq o'rganmadi", "Variantlarni ko'proq taklif qilmadi"],
                 "coaching_points": ["Mijozning byudjetini oldindan aniqlang", "Ko'proq variant tayyorlang"],
                 "next_steps": ["Shartnomani tayyorlash", "Yetkazish sanasini belgilash"],
                 "action_items": [{"description": "Shartnomani tayyorlash va yuborish", "due_date": None, "assignee": "manager", "priority": "high"}]
@@ -360,8 +350,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.50,
                 "outcome": "win",
                 "key_metrics": [{"name": "Sotuvchilar", "value": "20 kishi"}, {"name": "Narx", "value": "8,000,000 so'm"}, {"name": "O'sish", "value": "30% o'sish"}],
-                "strengths": ["Aniq raqamlar va natijalar ko'rsatdi", "Peniya taklifini o'z vaqtida aytdi", "Profesional darajada"],
-                "weaknesses": ["Raqobatchilarni eslatmadi", "Mijozning vaqtini to'liq o'rganmadi"],
                 "coaching_points": ["Raqobatchi tahlili qo'shing", "Qo'shimcha xizmatlarni taklif qiling"],
                 "next_steps": ["Shartnoma imzolash", "Trening dasturini tayyorlash"],
                 "action_items": [{"description": "Shartnoma tayyorlash", "due_date": None, "assignee": "manager", "priority": "high"}]
@@ -385,8 +373,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.46,
                 "outcome": "likely",
                 "key_metrics": [{"name": "Цена", "value": "50,000 руб/мес"}, {"name": "Скидка", "value": "45,000 руб/год"}, {"name": "Пробный", "value": "1 месяц"}],
-                "strengths": ["Чётко обозначил ценность", "Гибко шёл к сделке", "Правильно ответил на возражение"],
-                "weaknesses": ["Не использовал кейсы", "Не спросил про текущую аналитику клиента"],
                 "coaching_points": ["Подготовьте кейсы клиентов из вашей отрасли", "Спросите про текущее решение клиента"],
                 "next_steps": ["Подготовить договор на пробный месяц", "Организовать демонстрацию"],
                 "action_items": [{"description": "Подготовить демонстрацию", "due_date": None, "assignee": "manager", "priority": "medium"}]
@@ -410,8 +396,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.54,
                 "outcome": "likely",
                 "key_metrics": [{"name": "Narx", "value": "3,500,000 so'm/oy"}, {"name": "Xizmat", "value": "3 oylik rejalash + 2 oy konsalting"}, {"name": "Mijoz", "value": "Yangi biznes"}],
-                "strengths": ["Ehtiyojni tushundi", "Moslashuvchan to'lov sharti taklif qildi", "Rapport yaxshi"],
-                "weaknesses": ["Closing qattiq emas", "Mijozning byudjetini aniq o'rganmadi"],
                 "coaching_points": ["Qaror qabul qiluvchiga to'g'ri murojaat qiling", "Closing jarayonini kuchaytiring"],
                 "next_steps": ["Taklifnoma yuborish", "Kelishuv sanasini belgilash"],
                 "action_items": [{"description": "Taklifnoma tayyorlash", "due_date": None, "assignee": "manager", "priority": "high"}]
@@ -435,8 +419,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.45,
                 "outcome": "win",
                 "key_metrics": [{"name": "Оплата", "value": "4 квартала"}, {"name": "Скидка", "value": "10% при расширении"}, {"name": "Расторжение", "value": "Опция доступна"}],
-                "strengths": ["Гибко подошёл к условиям", "Ответил на дополнительный вопрос", "Предложил расторжение"],
-                "weaknesses": ["Не уточнил сроки контракта", "Не предложил бонус за раннее подписание"],
                 "coaching_points": ["Уточните сроки и штрафные условия", "Предложите early-bird скидку"],
                 "next_steps": ["Направить окончательный контракт", "Согласовать дату подписания"],
                 "action_items": [{"description": "Подготовить окончательный контракт", "due_date": None, "assignee": "manager", "priority": "high"}]
@@ -459,8 +441,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.38,
                 "outcome": "win",
                 "key_metrics": [{"name": "Javob", "value": "Professional"}, {"name": "Yo'naltirish", "value": "Sotuv bo'limi"}],
-                "strengths": ["Juda tez va ishonchli", "To'g'ri bo'limga bog'лади", "Saber bilan xizmat qildi"],
-                "weaknesses": [],
                 "coaching_points": ["Davom eting! Judan yaxshi ishlayapsiz"],
                 "next_steps": [],
                 "action_items": []
@@ -483,8 +463,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.35,
                 "outcome": "win",
                 "key_metrics": [{"name": "Xizmatlar", "value": "4 ta tur"}, {"name": "Javob", "value": "1 soat ichida"}],
-                "strengths": ["Barcha xizmatlarni tez aytdi", "Professional va samimiy"],
-                "weaknesses": [],
                 "coaching_points": ["Davom eting! Juda yaxshi"],
                 "next_steps": [],
                 "action_items": []
@@ -508,8 +486,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.56,
                 "outcome": "win",
                 "key_metrics": [{"name": "Xodimlar", "value": "100+ kishi"}, {"name": "Narx", "value": "350,000 so'm/oy"}, {"name": "Jami", "value": "38,000,000 so'm"}],
-                "strengths": ["AI qimmatli funksiyani aniq tushuntirdi", "Mijozning qarorini kuchli qo'llab-quvvatlashda", "Bepul integratsiya taklif qildi"],
-                "weaknesses": ["Dastlab juda yuqori narx qo'ydi", "Mijozning tanlovi uchun yanada ilovalarni ko'rsatmadi"],
                 "coaching_points": ["Avval mantiqiy narxni qo'yishga harakat qiling", "Raqobatchi afzalliklarni taqqoslash qo'shing"],
                 "next_steps": ["Shartnoma imzolash", "Integratsiyani boshlash"],
                 "action_items": [{"description": "Shartnoma tayyorlash", "due_date": None, "assignee": "manager", "priority": "high"}]
@@ -533,8 +509,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.52,
                 "outcome": "win",
                 "key_metrics": [{"name": "Chegirma", "value": "30% yangi kompaniyalar uchun"}, {"name": "Oldingi", "value": "350,000 so'm"}, {"name": "Yetkazish", "value": "Bugun"}],
-                "strengths": ["Avvalgi munosabatlardan foydalandi", "Yangilik tezda aytdi", "Chegirma tez aytdi"],
-                "weaknesses": ["Mijozning yangi ehtiyojlarini chuqur o'rganmadi", "Natijalar ko'rsatkichlari yo'q"],
                 "coaching_points": ["Mijozning yangi loyihasini batafsil o'rganing", "Natijalarni ko'rsatish uchun kichik hikoya qo'shing"],
                 "next_steps": ["Taqdimotni tayyorlash", "Chegirma sharti tasdiqlash"],
                 "action_items": [{"description": "Taqdimotni tayyorlash va yuborish", "due_date": None, "assignee": "manager", "priority": "high"}]
@@ -557,8 +531,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.42,
                 "outcome": "likely",
                 "key_metrics": [{"name": "Диагностика", "value": "Бесплатно"}, {"name": "Ремонт", "value": "50,000-150,000 руб"}, {"name": "Время", "value": "Сегодня 18:00"}],
-                "strengths": ["Быстро отреагировал", "Профессионально диагностировал", "Бесплатную диагностику предложил"],
-                "weaknesses": ["Не уточнил сроки ремонта", "Не предложил гарантию"],
                 "coaching_points": ["Уточните сроки и гарантийные обязательства", "Предложите пакет услуг со скидкой"],
                 "next_steps": ["Направить специалиста на диагностику", "Подготовить смету"],
                 "action_items": [{"description": "Направить специалиста", "due_date": None, "assignee": "manager", "priority": "high"}]
@@ -581,8 +553,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.53,
                 "outcome": "win",
                 "key_metrics": [{"name": "Narx", "value": "250,000 so'm/oy"}, {"name": "Qaytarish", "value": "100,000 so'm"}, {"name": "Sotuvchilar", "value": "2 kishi"}],
-                "strengths": ["Performance-based pricing taklif qildi", "Tayyor dastur ko'rsatdi", "Tez karor qabul qildi"],
-                "weaknesses": ["Batafsiz dastur rejasini ko'rsatmadi", "Rivojlanish choralari yo'q"],
                 "coaching_points": ["Tayyor dastur rejasini vizual qiling", "Success stories qo'shing"],
                 "next_steps": ["Shartnoma imzolash", "Dastur boshlash"],
                 "action_items": [{"description": "Shartnoma tayyorlash", "due_date": None, "assignee": "manager", "priority": "high"}]
@@ -605,8 +575,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.48,
                 "outcome": "likely",
                 "key_metrics": [{"name": "Chegirma", "value": "20% keyingi oy uchun"}, {"name": "Yangi hisobot", "value": "24 soat ichida"}, {"name": "Mijoz", "value": "Maxsus kompaniya"}],
-                "strengths": ["Tushunarli javob berdi", "Kompensatsiya taklif qildi", "Mijozning ehtiyojini tingladi"],
-                "weaknesses": ["Oldinroq qanday bo'lganini o'rganmadi", "Boshqa mijozlarni qo'llab-quvvatladi"],
                 "coaching_points": ["Oldingi xatoliklarni tahlil qiling", "Preventiv choralar tayyorlang"],
                 "next_steps": ["Yangi hisobot tayyorlash", "Chegirma shartnomasini belgilash"],
                 "action_items": [{"description": "Yangi hisobot tayyorlash", "due_date": None, "assignee": "manager", "priority": "high"}]
@@ -629,8 +597,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.44,
                 "outcome": "win",
                 "key_metrics": [{"name": "Цена", "value": "60,000 руб (базовый)"}, {"name": "Включает", "value": "Аудит + SMM + 2 мес"}, {"name": "Начало", "value": "Завтра"}],
-                "strengths": ["Доступную стартовую цену предложил", "Четко описал пакет услуг", "Быстро начал процесс"],
-                "weaknesses": ["Долгосрочные планы не обсудил", "Не предложил кейсы успеха"],
                 "coaching_points": ["Подготовьте кейсы из вашей отрасли", "Обсудите долгосрочное сотрудничество"],
                 "next_steps": ["Подготовить договор", "Начать аудит"],
                 "action_items": [{"description": "Подготовить договор и начать аудит", "due_date": None, "assignee": "manager", "priority": "high"}]
@@ -654,8 +620,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.52,
                 "outcome": "win",
                 "key_metrics": [{"name": "Narx", "value": "300,000 so'm/oy"}, {"name": "Chegirma", "value": "20% yillik"}, {"name": "O'rn.", "value": "2-3 kun"}],
-                "strengths": ["Mijozning muammosini tushundi", "Integratsiya haqida aytdi", "Narxni aniq belgiladi"],
-                "weaknesses": ["Demo ko'rsatmadi", "Boshqa funksiyalarni aytmadi"],
                 "coaching_points": ["Demo tayyorlang", "Qo'shimcha funksiyalarni taqdim qiling"],
                 "next_steps": ["CRM o'rnatishni boshlash", "Mijozga kirish treningini berish"],
                 "action_items": [{"description": "O'rnatish uchun jamoani yuborish", "due_date": None, "assignee": "manager", "priority": "high"}]
@@ -679,8 +643,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.50,
                 "outcome": "win",
                 "key_metrics": [{"name": "Paket", "value": "Baz - 150,000 so'm"}, {"name": "Natija", "value": "2 haftada"}, {"name": "Kanal", "value": "Instagram + Telegram"}],
-                "strengths": ["Strategiyani aniq tushuntirdi", "Narx variantlarini ko'rsatdi", "Tez boshlash vaqtini aytdi"],
-                "weaknesses": ["ROI ko'rsatmadi", "Raqobatchilar haqida gapirmadi"],
                 "coaching_points": ["ROI hisobini tayyorlang", "Raqobatchi tahlili qo'shing"],
                 "next_steps": ["Akkаунтlar so'rash", "Reklama kampaniyasini boshlash"],
                 "action_items": [{"description": "Akkаунтlarini olish va audit qilish", "due_date": None, "assignee": "manager", "priority": "high"}]
@@ -704,8 +666,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.48,
                 "outcome": "likely",
                 "key_metrics": [{"name": "Стартапы", "value": "5 шт"}, {"name": "Цена", "value": "200,000 сум/мес"}, {"name": "Контракт", "value": "1 год"}],
-                "strengths": ["Специальную цену предложил", "Масштабируемость показал", "Профессионально подошёл"],
-                "weaknesses": ["Презентацию не показал", "ROI не рассчитал"],
                 "coaching_points": ["Подготовьте презентацию", "Покажите ROI для стартапов"],
                 "next_steps": ["Подготовить презентацию", "Встреча на следующей неделе"],
                 "action_items": [{"description": "Презентацию подготовить", "due_date": None, "assignee": "manager", "priority": "high"}]
@@ -729,8 +689,6 @@ def _seed_demo_calls():
                 "rep_share_of_talk": 0.54,
                 "outcome": "win",
                 "key_metrics": [{"name": "O'quvchilar", "value": "500+"}, {"name": "Narx", "value": "800,000 so'm/oy"}, {"name": "Sinov", "value": "3 oy bepul"}],
-                "strengths": ["Aniq qiymat ko'rsatdi", "Bepul sinov taklif qildi", "Mijoz soniga moslashdi"],
-                "weaknesses": ["Texnik detallarni kam aytdi", "Raqobatchilar haqida gapirmadi"],
                 "coaching_points": ["Texnik arxitekturani tushuntiring", "Raqobatchi afzalliklarni taqqoslang"],
                 "next_steps": ["Integratsiyani boshlash", "Texnik jamoani tanishtirish"],
                 "action_items": [{"description": "Texnik jamoani tayyorlash", "due_date": None, "assignee": "manager", "priority": "high"}]
@@ -796,8 +754,6 @@ def _seed_demo_calls():
             "rep_share_of_talk": 0.38,
             "outcome": "lost",
             "key_metrics": [{"name": "Muammo", "value": "Past balandlik"}],
-            "strengths": [],
-            "weaknesses": ["Mijozni tushunmadi", "Raqobatchi haqida gapirmadi", "Narxni ochiq aytmadi"],
             "coaching_points": ["Mijoz ehtiyojlarini aniqlang", "Raqobatchi haqida suhbat boring", "Narni ochiq ayting"],
             "next_steps": ["Mijoz bilan qayta suhbat"],
             "action_items": [{"description": "Muammo yechish", "due_date": None, "assignee": "yonalish", "priority": "high"}]
@@ -928,8 +884,6 @@ def _seed_demo_calls():
                     {"name": "Narx", "value": f"{rng.randint(100, 800)}K so'm"},
                     {"name": "Muddat", "value": f"{rng.randint(1, 12)} oy"},
                 ],
-                "strengths": ["Professional munosabat", "Aniq taqdimot"],
-                "weaknesses": ["Ko'proq savol berish kerak edi"],
                 "coaching_points": ["Mijoz ehtiyojini chuqurroq o'rganing"],
                 "next_steps": ["Keyingi suhbatni belgilash"],
                 "action_items": [{"description": "Keyingi qadamni belgilash", "due_date": None, "assignee": "manager", "priority": "medium"}],

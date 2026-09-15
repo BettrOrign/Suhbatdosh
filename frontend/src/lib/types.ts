@@ -77,8 +77,6 @@ export interface CallAnalysis {
   rep_share_of_talk: number
   outcome: string
   key_metrics: KeyMetric[]
-  strengths: string[]
-  weaknesses: string[]
   coaching_points: string[]
   next_steps: string[]
 }

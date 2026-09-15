@@ -6,8 +6,6 @@ import { motion } from 'framer-motion'
 import {
   ArrowLeft,
   Check,
-  CircleCheck,
-  CircleX,
   Clock,
   Copy,
   FilePenLine,
@@ -17,8 +15,6 @@ import {
   PhoneCall,
   RefreshCw,
   Target,
-  ThumbsDown,
-  ThumbsUp,
   TriangleAlert,
   Trash2,
 } from 'lucide-react'
@@ -217,7 +213,7 @@ export function CallDetail() {
 
   useEffect(() => {
     if (!id || isNaN(callId)) {
-      navigate('/')
+      navigate('/calls/')
     }
   }, [id, callId, navigate])
 
@@ -642,90 +638,36 @@ export function CallDetail() {
               </TabsList>
 
               <TabsContent value="coaching">
-                <div className="grid gap-4 lg:grid-cols-2 mb-4">
-                  {/* Strengths */}
+                <div className="space-y-4">
+                  {/* Coaching Points */}
                   <Card className="overflow-hidden">
-                    <div className="h-1.5 w-full bg-gradient-to-r from-emerald-400 to-green-500" />
+                    <div className="h-1.5 w-full bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400" />
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-lg text-emerald-600 dark:text-emerald-400">
-                        <ThumbsUp className="size-5" />
-                        {t('call.strengths')}
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Lightbulb className="size-5 text-amber-500" />
+                        {t('call.coaching_points')}
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <ul className="space-y-2.5">
-                        {analysis.strengths?.map((s, i) => (
-                          <motion.li
+                      <div className="grid gap-3">
+                        {analysis.coaching_points?.map((s, i) => (
+                          <motion.div
                             key={i}
-                            className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 text-sm dark:border-emerald-800/30 dark:bg-emerald-950/20"
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: i * 0.05 }}
+                            className="flex items-start gap-4 rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/50 to-purple-50/50 p-4 dark:border-indigo-800/30 dark:from-indigo-950/20 dark:to-purple-950/20"
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.06 }}
                           >
-                            <CircleCheck className="size-4 mt-0.5 shrink-0 text-emerald-500" />
-                            <span>{s}</span>
-                          </motion.li>
+                            <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-400">
+                              {i + 1}
+                            </div>
+                            <span className="text-sm leading-relaxed">{s}</span>
+                          </motion.div>
                         ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-
-                  {/* Weaknesses */}
-                  <Card className="overflow-hidden">
-                    <div className="h-1.5 w-full bg-gradient-to-r from-red-400 to-rose-500" />
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-lg text-red-600 dark:text-red-400">
-                        <ThumbsDown className="size-5" />
-                        {t('call.weaknesses')}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ul className="space-y-2.5">
-                        {analysis.weaknesses?.map((s, i) => (
-                          <motion.li
-                            key={i}
-                            className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50/50 p-3 text-sm dark:border-red-800/30 dark:bg-red-950/20"
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: i * 0.05 }}
-                          >
-                            <CircleX className="size-4 mt-0.5 shrink-0 text-red-500" />
-                            <span>{s}</span>
-                          </motion.li>
-                        ))}
-                      </ul>
+                      </div>
                     </CardContent>
                   </Card>
                 </div>
-
-                {/* Coaching Points */}
-                <Card className="overflow-hidden">
-                  <div className="h-1.5 w-full bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400" />
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Lightbulb className="size-5 text-amber-500" />
-                      {t('call.coaching_points')}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-3">
-                      {analysis.coaching_points?.map((s, i) => (
-                        <motion.div
-                          key={i}
-                          className="flex items-start gap-4 rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/50 to-purple-50/50 p-4 dark:border-indigo-800/30 dark:from-indigo-950/20 dark:to-purple-950/20"
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: i * 0.06 }}
-                        >
-                          <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-400">
-                            {i + 1}
-                          </div>
-                          <span className="text-sm leading-relaxed">{s}</span>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
               </TabsContent>
 
               <TabsContent value="next-steps">

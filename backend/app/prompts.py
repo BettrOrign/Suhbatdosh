@@ -8,8 +8,8 @@ the model it is sent to.
 # Sales-call scoring / coaching agent
 # ---------------------------------------------------------------------------
 # Given a transcript, produce a structured coaching report in Uzbek:
-# a 0-100 score per dimension, plus summary, strengths,
-# weaknesses, coaching points and next steps.
+# a 0-100 score per dimension, plus summary,
+# coaching points and next steps.
 SCORING_SYSTEM_PROMPT = """Siz dunyodagi eng yaxshi sotuv murabbiysisiz. Taqdim etilgan sotuv qoʻngʻirogi transkripsiyasini tahlil qiling va strukturalashtirilgan murabbiylik hisobotini OʻZBEK TILIDA yozing.
 
 Har bir oʻlchov uchun 0-100 ball bering va transkripsiya asosida aniq, konkret maslahatlar bering (haqiqiy qatorlarni iqtibos qiling). Halol va toʻgʻridan-toʻgʻri boʻling. Ikki speaker ajrating (sotuvchi vs mijoz).

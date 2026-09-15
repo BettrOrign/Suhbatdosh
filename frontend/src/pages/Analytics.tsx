@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
-  ArrowRight,
   ArrowUp,
   ArrowDown,
   Minus,
@@ -13,7 +11,6 @@ import {
   PhoneCall,
   TrendingUp,
   Users,
-  AlertTriangle,
 } from 'lucide-react'
 import {
   BarChart,
@@ -41,9 +38,7 @@ import type { Call } from '@/lib/types'
 type OverviewStats = Awaited<ReturnType<typeof api.getOverviewStats>>
 type DayOverDay = Awaited<ReturnType<typeof api.getDayOverDay>>
 type WeeklyTrend = Awaited<ReturnType<typeof api.getWeeklyTrend>>
-type ProblemCall = Awaited<ReturnType<typeof api.getProblemCalls>>
 type ManagerRanking = Awaited<ReturnType<typeof api.getManagerRankings>>
-type SourceBreakdown = Awaited<ReturnType<typeof api.getSourceBreakdown>>
 
 const SCORE_COLORS = [
   { range: '0-20', min: 0, max: 20, color: 'var(--color-score-bad)' },
@@ -75,29 +70,23 @@ export function Analytics() {
   const [overview, setOverview] = useState<OverviewStats | null>(null)
   const [dayOverDay, setDayOverDay] = useState<DayOverDay | null>(null)
   const [weeklyTrend, setWeeklyTrend] = useState<WeeklyTrend>([])
-  const [problemCalls, setProblemCalls] = useState<ProblemCall>([])
   const [rankings, setRankings] = useState<ManagerRanking>([])
-  const [sources, setSources] = useState<SourceBreakdown>({})
   const [calls, setCalls] = useState<Call[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     try {
-      const [ov, dod, wt, pc, mr, sb, cl] = await Promise.all([
+      const [ov, dod, wt, mr, cl] = await Promise.all([
         api.getOverviewStats(),
         api.getDayOverDay(),
         api.getWeeklyTrend(),
-        api.getProblemCalls(),
         api.getManagerRankings(),
-        api.getSourceBreakdown(),
         api.listCalls(),
       ])
       setOverview(ov)
       setDayOverDay(dod)
       setWeeklyTrend(wt)
-      setProblemCalls(pc)
       setRankings(mr)
-      setSources(sb)
       setCalls(cl)
     } catch {
       toast.error('Failed to load analytics')
@@ -123,9 +112,6 @@ export function Analytics() {
     score: d.avg_score,
   }))
 
-  const sourceData = Object.entries(sources).map(([name, value]) => ({ name, value }))
-  const sourceColors = ['var(--color-chart-1)', 'var(--color-chart-2)', 'var(--color-chart-3)', 'var(--color-chart-4)']
-
   if (loading) {
     return (
       <div>
@@ -146,7 +132,7 @@ export function Analytics() {
         initial={reduceMotion ? false : { opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="mb-6"
+        className="mb-10"
       >
         <div className="flex items-center gap-4 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-6 text-white shadow-lg shadow-indigo-500/25">
           <div className="flex size-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur">
@@ -161,24 +147,24 @@ export function Analytics() {
 
       {/* KPI Cards */}
       {reduceMotion ? (
-        <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard icon={PhoneCall} label={t('analytics.total_calls')} value={overview?.total_calls ?? 0} variant="solid" />
           <StatCard icon={Gauge} label={t('analytics.avg_score')} value={overview?.avg_score ?? 0} valueClass={scoreColor(overview?.avg_score ?? 0)} variant="accent" progress={overview?.avg_score ?? 0} progressClass={(overview?.avg_score ?? 0) >= 70 ? 'bg-emerald-500' : (overview?.avg_score ?? 0) >= 40 ? 'bg-amber-500' : 'bg-red-500'} />
-          <StatCard icon={Clock} label={t('analytics.today_calls')} value={overview?.calls_today ?? 0} variant="gradient" />
+          <StatCard icon={Clock} label={t('analytics.today_calls')} value={overview?.calls_today ?? 0} variant="solid" />
           <StatCard icon={Users} label={t('analytics.active_managers')} value={overview?.total_managers ?? 0} variant="outline" />
         </div>
       ) : (
-        <Stagger className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stagger className="mb-10 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <motion.div variants={fadeUp}><StatCard icon={PhoneCall} label={t('analytics.total_calls')} value={overview?.total_calls ?? 0} variant="solid" /></motion.div>
           <motion.div variants={fadeUp}><StatCard icon={Gauge} label={t('analytics.avg_score')} value={overview?.avg_score ?? 0} valueClass={scoreColor(overview?.avg_score ?? 0)} variant="accent" progress={overview?.avg_score ?? 0} progressClass={(overview?.avg_score ?? 0) >= 70 ? 'bg-emerald-500' : (overview?.avg_score ?? 0) >= 40 ? 'bg-amber-500' : 'bg-red-500'} /></motion.div>
-          <motion.div variants={fadeUp}><StatCard icon={Clock} label={t('analytics.today_calls')} value={overview?.calls_today ?? 0} variant="gradient" /></motion.div>
+          <motion.div variants={fadeUp}><StatCard icon={Clock} label={t('analytics.today_calls')} value={overview?.calls_today ?? 0} variant="solid" /></motion.div>
           <motion.div variants={fadeUp}><StatCard icon={Users} label={t('analytics.active_managers')} value={overview?.total_managers ?? 0} variant="outline" /></motion.div>
         </Stagger>
       )}
 
       {/* Day-over-Day Comparison */}
       {dayOverDay && (
-        <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="mb-10 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
             {
               label: t('analytics.calls'),
@@ -186,7 +172,7 @@ export function Analytics() {
               yesterday: dayOverDay.yesterday.calls,
               icon: PhoneCall,
               gradient: 'from-blue-500/10 to-indigo-500/10 dark:from-blue-500/5 dark:to-indigo-500/5',
-              iconBg: 'bg-blue-100 dark:bg-blue-900/30',
+              iconBg: 'bg-blue-200 dark:bg-blue-900/30',
               iconColor: 'text-blue-600 dark:text-blue-400',
               barColor: 'bg-blue-500',
               format: (v: number | null) => v != null ? String(v) : '—',
@@ -197,7 +183,7 @@ export function Analytics() {
               yesterday: dayOverDay.yesterday.avg_score,
               icon: Gauge,
               gradient: 'from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/5 dark:to-teal-500/5',
-              iconBg: 'bg-emerald-100 dark:bg-emerald-900/30',
+              iconBg: 'bg-emerald-200 dark:bg-emerald-900/30',
               iconColor: 'text-emerald-600 dark:text-emerald-400',
               barColor: 'bg-emerald-500',
               format: (v: number | null) => v != null ? String(v) : '—',
@@ -209,7 +195,7 @@ export function Analytics() {
               yesterday: dayOverDay.yesterday.avg_duration,
               icon: Clock,
               gradient: 'from-amber-500/10 to-orange-500/10 dark:from-amber-500/5 dark:to-orange-500/5',
-              iconBg: 'bg-amber-100 dark:bg-amber-900/30',
+              iconBg: 'bg-amber-200 dark:bg-amber-900/30',
               iconColor: 'text-amber-600 dark:text-amber-400',
               barColor: 'bg-amber-500',
               format: (v: number | null) => v != null ? formatDuration(v) : '—',
@@ -279,8 +265,8 @@ export function Analytics() {
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         {/* Weekly Trend */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{t('analytics.weekly_trend')}</CardTitle>
+          <CardHeader className="mb-5">
+            <CardTitle className="text-center text-xl font-medium">{t('analytics.weekly_trend')}</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
             {weeklyData.length > 0 ? (
@@ -317,8 +303,8 @@ export function Analytics() {
 
         {/* Score Distribution */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{t('analytics.score_distribution')}</CardTitle>
+          <CardHeader className="pb-5">
+            <CardTitle className="text-xl text-center font-medium">{t('analytics.score_distribution')}</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
             {scoreDistData.some((d) => d.count > 0) ? (
@@ -344,66 +330,21 @@ export function Analytics() {
         </Card>
       </div>
 
-      {/* Problem Calls + Manager Rankings */}
-      <div className="mb-6 grid gap-4 md:grid-cols-2">
-        {/* Problem Calls */}
+      {/* Problems */}
+      <div className="block">
+        {/* clients */}
         <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <AlertTriangle className="size-4 text-amber-500" />
-                {t('analytics.problem_calls')}
-              </CardTitle>
-              <Badge variant="secondary">{problemCalls.length}</Badge>
-            </div>
-            <p className="text-xs text-muted-foreground">{t('analytics.problem_calls_desc')}</p>
-          </CardHeader>
-          <CardContent>
-            {problemCalls.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">{t('analytics.no_problems')}</p>
-            ) : (
-              <div className="space-y-2 max-h-72 overflow-y-auto">
-                {problemCalls.map((pc) => (
-                  <Link
-                    key={pc.id}
-                    to={`/calls/${pc.id}`}
-                    className="flex items-center justify-between rounded-lg border p-3 text-sm transition-colors hover:bg-muted/50"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium truncate">{pc.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{pc.summary}</p>
-                      <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                        <Clock className="size-3" />
-                        {formatDuration(pc.duration_sec)}
-                        {pc.uploader_name && <span>· {pc.uploader_name}</span>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-3">
-                      <span className={`text-lg font-bold tabular-nums ${scoreColor(pc.score ?? 0)}`}>{pc.score}</span>
-                      <ArrowRight className="size-3 text-muted-foreground" />
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Manager Rankings */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <BarChart3 className="size-4 text-indigo-500" />
+          <CardHeader className="pb-10">
+            <CardTitle className="text-2xl font-medium flex items-center gap-2">
+              <BarChart3 className="size-4 text-indigo-500 text-center" />
               {t('analytics.manager_rankings')}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {rankings.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">{t('analytics.no_problems')}</p>
-            ) : (
-              <div className="space-y-2 max-h-72 overflow-y-auto">
+            <div className="flex">
+              <div className="space-y-2 max-h-72 overflow-y-auto mr-10">
                 {rankings.map((r, i) => (
-                  <div key={r.id} className="flex items-center gap-3 rounded-lg border p-3 text-sm">
+                  <div key={r.id} className="flex items-center gap-3 rounded-lg border p-3 text-sm bg-current/5">
                     <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold tabular-nums">
                       {i + 1}
                     </span>
@@ -423,30 +364,11 @@ export function Analytics() {
                   </div>
                 ))}
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Source Breakdown */}
-      {sourceData.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{t('analytics.source_breakdown')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-4">
-              {sourceData.map((s, i) => (
-                <div key={s.name} className="flex items-center gap-2">
-                  <span className="size-3 rounded-full" style={{ backgroundColor: sourceColors[i % sourceColors.length] }} />
-                  <span className="text-sm text-muted-foreground">{s.name}</span>
-                  <span className="text-sm font-semibold tabular-nums">{s.value}</span>
-                </div>
-              ))}
+              <div className="size-full h-auto max-w-192 border-1 border-sky-500 rounded-2xl bg-current/5"></div>
             </div>
           </CardContent>
         </Card>
-      )}
+      </div>
     </div>
   )
 }

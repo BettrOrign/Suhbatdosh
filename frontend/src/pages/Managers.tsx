@@ -14,6 +14,10 @@ import {
   Trophy,
   Target,
   PhoneCall,
+  ChevronDown,
+  Crown,
+  Users,
+  Compass,
 } from 'lucide-react'
 import {
   BarChart,
@@ -338,6 +342,7 @@ export function ManagersPage() {
   const [calls, setCalls] = useState<Call[]>([])
   const [callsLoading, setCallsLoading] = useState(false)
   const [rankings, setRankings] = useState<Ranking[]>([])
+  const [expandedSection, setExpandedSection] = useState<string | null>(null)
 
   const loadManagers = useCallback(async () => {
     try {
@@ -444,6 +449,129 @@ export function ManagersPage() {
       </header>
 
       <AddManagerDialog open={addOpen} onClose={() => setAddOpen(false)} onSaved={loadManagers} />
+
+      {/* Expandable Sections */}
+      <div className="mb-6 space-y-3">
+        {/* Admin Section */}
+        <Card className="overflow-hidden">
+          <button
+            onClick={() => setExpandedSection(expandedSection === 'admin' ? null : 'admin')}
+            className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-muted/50"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/25">
+                <Crown className="size-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold">{t('managers.admin_section')}</h3>
+                <p className="text-sm text-muted-foreground">{t('managers.admin_section_desc')}</p>
+              </div>
+            </div>
+            <ChevronDown className={`size-5 text-muted-foreground transition-transform duration-200 ${expandedSection === 'admin' ? 'rotate-180' : ''}`} />
+          </button>
+          {expandedSection === 'admin' && (
+            <div className="border-t bg-muted/30 p-4">
+              <div className="flex items-center gap-4">
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-muted">
+                  <UserRound className="size-6 text-muted-foreground" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">{user?.name}</p>
+                  <p className="text-sm text-muted-foreground">{user?.email}</p>
+                  <Badge variant="default" className="mt-1">{t('nav.role.admin')}</Badge>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">{t('managers.total_system_calls')}</p>
+                  <p className="text-2xl font-bold">{totalCalls}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* Managers Section */}
+        <Card className="overflow-hidden">
+          <button
+            onClick={() => setExpandedSection(expandedSection === 'managers' ? null : 'managers')}
+            className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-muted/50"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25">
+                <Users className="size-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold">{t('managers.managers_section')}</h3>
+                <p className="text-sm text-muted-foreground">{t('managers.managers_section_desc')}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">{managers.length}</Badge>
+              <ChevronDown className={`size-5 text-muted-foreground transition-transform duration-200 ${expandedSection === 'managers' ? 'rotate-180' : ''}`} />
+            </div>
+          </button>
+          {expandedSection === 'managers' && (
+            <div className="border-t bg-muted/30 p-4">
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {managers.slice(0, 6).map((m) => (
+                  <div key={m.id} className="flex items-center gap-3 rounded-lg border bg-background p-3">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <UserRound className="size-4 text-muted-foreground" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{m.name}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>{m.total_calls} {t('managers.calls_label').toLowerCase()}</span>
+                        {m.avg_score != null && (
+                          <span className={scoreColor(m.avg_score)}>· {m.avg_score}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* Direction Responsibilities Section */}
+        <Card className="overflow-hidden">
+          <button
+            onClick={() => setExpandedSection(expandedSection === 'directions' ? null : 'directions')}
+            className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-muted/50"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25">
+                <Compass className="size-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold">{t('managers.directions_section')}</h3>
+                <p className="text-sm text-muted-foreground">{t('managers.directions_section_desc')}</p>
+              </div>
+            </div>
+            <ChevronDown className={`size-5 text-muted-foreground transition-transform duration-200 ${expandedSection === 'directions' ? 'rotate-180' : ''}`} />
+          </button>
+          {expandedSection === 'directions' && (
+            <div className="border-t bg-muted/30 p-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                {[
+                  { name: t('managers.direction_sales'), icon: '📈', count: 12, color: 'text-blue-600' },
+                  { name: t('managers.direction_support'), icon: '🎧', count: 8, color: 'text-green-600' },
+                  { name: t('managers.direction_marketing'), icon: '📢', count: 6, color: 'text-purple-600' },
+                  { name: t('managers.direction_hr'), icon: '👥', count: 4, color: 'text-orange-600' },
+                ].map((dir) => (
+                  <div key={dir.name} className="flex items-center gap-3 rounded-lg border bg-background p-3">
+                    <span className="text-2xl">{dir.icon}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium">{dir.name}</p>
+                      <p className="text-sm text-muted-foreground">{dir.count} {t('managers.responsible_managers')}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </Card>
+      </div>
 
       {loading ? (
         <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">

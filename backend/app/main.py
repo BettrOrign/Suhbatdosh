@@ -111,6 +111,19 @@ def _seed_default_users():
         db.create_user(name, email, hash_password(password), role="receptionist")
         log.info("Seeded receptionist: %s", email)
 
+    yonalish = [
+        ("Shoxrux Bobojonov", "shoxrux@suhbatdosh.local", "shoxrux1234"),
+        ("Farhod Toshpulatov", "farhod@suhbatdosh.local", "farhod1234"),
+        ("Rustam Zoirov", "rustam@suhbatdosh.local", "rustam1234"),
+        ("Murod Abdullayev", "murod@suhbatdosh.local", "murod1234"),
+        ("Bakhtiyor Karimov", "bakhtiyor@suhbatdosh.local", "bakhtiyor1234"),
+    ]
+    for name, email, password in yonalish:
+        if db.get_user_by_email(email):
+            continue
+        db.create_user(name, email, hash_password(password), role="yonalish")
+        log.info("Seeded yonalish: %s", email)
+
 
 def _seed_demo_calls():
     """Seed demo calls so the dashboard is never empty."""
@@ -155,6 +168,11 @@ def _seed_demo_calls():
     dilnoza = db.get_user_by_email("dilnoza@suhbatdosh.local")
     nilufar = db.get_user_by_email("nilufar@suhbatdosh.local")
     admin = db.get_user_by_email("admin@suhbatdosh.local")
+    shoxrux = db.get_user_by_email("shoxrux@suhbatdosh.local")
+    farhod = db.get_user_by_email("farhod@suhbatdosh.local")
+    rustam = db.get_user_by_email("rustam@suhbatdosh.local")
+    murod = db.get_user_by_email("murod@suhbatdosh.local")
+    bakhtiyor = db.get_user_by_email("bakhtiyor@suhbatdosh.local")
 
     demo_clients_data = [
         ("TechSoft LLC", "998901234567", "TechSoft", "info@techsoft.uz", "IT xizmatlari bo'yicha doimiy mijoz"),
@@ -738,12 +756,52 @@ def _seed_demo_calls():
         )
         log.info("Seeded hand-crafted call #%d: %s", call_id, call_data["name"][:50])
 
+    # ─── Yonalish problem calls (calls with problems that were solved) ──
+    yonalish_problem_calls = [
+        (shoxrux, "Telefon orqali mijozni yo'qotish", client_map.get("MegaMarket"), 200, "uz"),
+        (farhod, "Mijozning shikayati: sotuv haqida gapirmadi", client_map.get("TechSoft LLC"), 180, "uz"),
+        (rustam, "Raqobatchi haqida gapirmadi", client_map.get("Green Valley"), 150, "uz"),
+        (murod, "Narxni ochiq aytmadi", client_map.get("AutoPrime"), 170, "uz"),
+        (bakhtiyor, "Mijozni to'g'ri yo'nallatmadi", client_map.get("IT Park"), 160, "uz"),
+    ]
+    for yuser, name, cid, dur, lang in yonalish_problem_calls:
+        if name in existing_names:
+            continue
+        ts_now = (datetime.now(timezone.utc) - timedelta(seconds=3600)).isoformat()
+        call_id = db.create_call(
+            name=name,
+            audio_path="",
+            duration_sec=dur,
+            call_type="manager",
+            user_id=yuser["id"] if yuser else None,
+            client_id=cid,
+            source_type="upload",
+        )
+        problem_scorecard = {"opening": 35, "discovery": 40, "objection_handling": 25, "value_prop": 30, "closing": 20, "rapport": 45, "talk_ratio": 38, "overall": 30}
+        analysis = {
+            "topic": name,
+            "language": lang,
+            "summary": "Bu suhbatda ko'p qat'iy muammolar bor — sotuvchi ijtimoiy xususiyatlarni ko'rsatmadi, mijozni to'g'ri yo'nallatmadi.",
+            "scorecard": problem_scorecard,
+            "rep_share_of_talk": 0.38,
+            "outcome": "lost",
+            "key_metrics": [{"name": "Muammo", "value": "Past balandlik"}],
+            "strengths": [],
+            "weaknesses": ["Mijozni tushunmadi", "Raqobatchi haqida gapirmadi", "Narxni ochiq aytmadi"],
+            "coaching_points": ["Mijoz ehtiyojlarini aniqlang", "Raqobatchi haqida suhbat boring", "Narni ochiq ayting"],
+            "next_steps": ["Mijoz bilan qayta suhbat"],
+            "action_items": [{"description": "Muammo yechish", "due_date": None, "assignee": "yonalish", "priority": "high"}]
+        }
+        db.update_call(call_id, status="done", transcript="", language=lang, analysis=json.dumps(analysis, ensure_ascii=False), created_at=ts_now, updated_at=ts_now)
+        log.info("Seeded yonalish problem call: %s", name)
+
     # ─── Procedurally generated calls (spread over last 60 days) ───────────
     rng = random.Random(42)
 
     manager_users = [(u, "manager") for u in [aziz, nodira, sardor, jasur, malika] if u]
     receptionist_users = [(u, "receptionist") for u in [dilnoza, nilufar] if u]
-    all_users = manager_users + receptionist_users
+    yonalish_users = [(u, "yonalish") for u in [shoxrux, farhod, rustam, murod, bakhtiyor] if u]
+    all_users = manager_users + receptionist_users + yonalish_users
 
     client_names = list(client_map.keys())
 
@@ -922,7 +980,7 @@ def _seed_demo_calls():
 
     error_calls = [
         ("Suvonly buzilgan audio fayl", today_users[0]["id"], "manager", "upload", 45),
-        ("Tarmoq xatosi — qayta yuklash kerak", today_users[4]["id"], "manager", "telegram", 120),
+        ("Tarmoq xatosi — qayta yuklash kerak", today_users[1]["id"], "manager", "telegram", 120),
     ]
     for name_text, uid, ctype, stype, dur in error_calls:
         if name_text in existing_names:

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Building2, Mail, Pencil, Phone, Plus, Search, Trash2, UserRound } from 'lucide-react'
+import { Building2, Filter, Mail, Pencil, Phone, Plus, Search, Trash2, UserRound, Users } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -209,6 +209,7 @@ function AdminManagerRow({ adminManager, onEdit, onChanged }: {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <Badge variant="secondary" className="capitalize">{adminManager.role}</Badge>
             <Badge variant="secondary" className="max-w-40 truncate">
               {adminManager.manager_name ?? t('clients.unassigned')}
             </Badge>
@@ -248,20 +249,21 @@ export function ManagersAdminPage() {
 
   const [adminManagers, setAdminManagers] = useState<Client[]>([])
   const [managers, setManagers] = useState<User[]>([])
+  const [showYonalish, setShowYonalish] = useState(true)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [dialog, setDialog] = useState<{ mode: 'create' } | { mode: 'edit'; adminManager: Client } | null>(null)
 
   const refresh = useCallback(async () => {
     try {
-      const data = await api.listUsers()
-      setAdminManagers(data.filter((a) => a.role === 'admin') as unknown as Client[])
+      const data = await api.listUsers() as unknown as Client[]
+      setAdminManagers(data.filter((a) => showYonalish ? a.role === 'yonalish' : a.role === 'admin'))
     } catch (e) {
       toast.error(t('managers.load_failed', { error: (e as Error).message }))
     } finally {
       setLoading(false)
     }
-  }, [t])
+  }, [t, showYonalish])
 
   useEffect(() => {
     refresh()
@@ -307,6 +309,12 @@ export function ManagersAdminPage() {
             <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('clients.search_placeholder')} className="w-full pl-8 sm:w-56" />
           </div>
+          <Button variant={showYonalish ? 'default' : 'outline'} onClick={() => setShowYonalish(true)} className="shrink-0">
+            <Users /> Yonalish
+          </Button>
+          <Button variant={!showYonalish ? 'default' : 'outline'} onClick={() => setShowYonalish(false)} className="shrink-0">
+            <Filter /> Barchasi
+          </Button>
           <Button onClick={openCreate} className="shrink-0">
             <Plus /> {t('managers.add')}
           </Button>

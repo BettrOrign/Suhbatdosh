@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
@@ -14,9 +14,6 @@ import {
   Trophy,
   Target,
   PhoneCall,
-  Crown,
-  Users,
-  Compass,
 } from 'lucide-react'
 import {
   BarChart,
@@ -31,14 +28,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -190,23 +180,11 @@ function AddManagerDialog({
           </div>
           <div className="space-y-2">
             <Label htmlFor="mgr-email">{t('users.email')}</Label>
-            <Input
-              id="mgr-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder={t('users.email_placeholder')}
-            />
+            <Input id="mgr-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('users.email_placeholder')} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="mgr-password">{t('users.password')}</Label>
-            <Input
-              id="mgr-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={t('app.password_placeholder')}
-            />
+            <Input id="mgr-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('app.password_placeholder')} />
           </div>
         </div>
         <DialogFooter>
@@ -301,23 +279,13 @@ function ManagerCard({
             />
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1.5 border-t pt-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onSelect(mgr)}
-            >
+            <Button variant="outline" size="sm" onClick={() => onSelect(mgr)}>
               {t('managers.show_calls')}
             </Button>
             <Button variant="outline" size="sm" onClick={() => onEdit(mgr)} aria-label={t('managers.edit_btn')}>
               {t('managers.edit')}
             </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => onDelete(mgr)}
-              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-              aria-label={t('managers.delete_btn')}
-            >
+            <Button variant="ghost" size="icon-sm" onClick={() => onDelete(mgr)} className="text-destructive hover:bg-destructive/10 hover:text-destructive" aria-label={t('managers.delete_btn')}>
               <Trash2 className="size-4" />
             </Button>
           </div>
@@ -341,21 +309,6 @@ export function ManagersPage() {
   const [calls, setCalls] = useState<Call[]>([])
   const [callsLoading, setCallsLoading] = useState(false)
   const [rankings, setRankings] = useState<Ranking[]>([])
-  const [expandedSection, setExpandedSection] = useState<string | null>(null)
-  const location = useLocation()
-  const navigate = useNavigate()
-
-  useEffect(() => {
-    const state = location.state as { openPanel?: string } | null
-    if (state?.openPanel) {
-      setExpandedSection(state.openPanel)
-      navigate('/managers', { replace: true, state: {} })
-    } else if (location.pathname === '/managers/admin') {
-      setExpandedSection('admin')
-    } else if (location.pathname === '/managers/directions') {
-      setExpandedSection('directions')
-    }
-  }, [location.state, location.pathname, navigate])
 
   const loadManagers = useCallback(async () => {
     try {
@@ -394,7 +347,7 @@ export function ManagersPage() {
       toast.success(t('managers.deleted'))
       loadManagers()
     } catch (e) {
-       toast.error(t('managers.delete_failed', { error: (e as Error).message }))
+      toast.error(t('managers.delete_failed', { error: (e as Error).message }))
     }
   }
 
@@ -418,9 +371,7 @@ export function ManagersPage() {
   }
 
   const totalCalls = managers.reduce((s, m) => s + m.total_calls, 0)
-  const doneScores = managers
-    .filter((m) => m.avg_score != null)
-    .map((m) => m.avg_score!)
+  const doneScores = managers.filter((m) => m.avg_score != null).map((m) => m.avg_score!)
   const orgAvg = doneScores.length ? Math.round(doneScores.reduce((a, b) => a + b, 0) / doneScores.length) : null
 
   const chartColors = {
@@ -429,32 +380,16 @@ export function ManagersPage() {
     talk: 'var(--color-chart-3)',
   }
 
-  const mostCallsData = rankings
-    .filter((r) => r.total_calls > 0)
-    .sort((a, b) => b.total_calls - a.total_calls)
-    .slice(0, 6)
-    .map((r) => ({ name: r.name.split(' ')[0], value: r.total_calls }))
-
-  const mostSuccessfulData = rankings
-    .filter((r) => r.avg_score != null)
-    .sort((a, b) => (b.avg_score ?? 0) - (a.avg_score ?? 0))
-    .slice(0, 6)
-    .map((r) => ({ name: r.name.split(' ')[0], value: r.avg_score ?? 0 }))
-
-  const mostEffectiveData = rankings
-    .filter((r) => r.avg_talk_ratio != null)
-    .sort((a, b) => (b.avg_talk_ratio ?? 0) - (a.avg_talk_ratio ?? 0))
-    .slice(0, 6)
-    .map((r) => ({ name: r.name.split(' ')[0], value: Math.round((r.avg_talk_ratio ?? 0) * 100) }))
+  const mostCallsData = rankings.filter((r) => r.total_calls > 0).sort((a, b) => b.total_calls - a.total_calls).slice(0, 6).map((r) => ({ name: r.name.split(' ')[0], value: r.total_calls }))
+  const mostSuccessfulData = rankings.filter((r) => r.avg_score != null).sort((a, b) => (b.avg_score ?? 0) - (a.avg_score ?? 0)).slice(0, 6).map((r) => ({ name: r.name.split(' ')[0], value: r.avg_score ?? 0 }))
+  const mostEffectiveData = rankings.filter((r) => r.avg_talk_ratio != null).sort((a, b) => (b.avg_talk_ratio ?? 0) - (a.avg_talk_ratio ?? 0)).slice(0, 6).map((r) => ({ name: r.name.split(' ')[0], value: Math.round((r.avg_talk_ratio ?? 0) * 100) }))
 
   return (
     <div>
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{t('managers.title')}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t('managers.desc')}
-          </p>
+          <p className="text-sm text-muted-foreground">{t('managers.desc')}</p>
         </div>
         <Button onClick={() => setAddOpen(true)}>
           <Plus /> {t('managers.add')}
@@ -463,275 +398,64 @@ export function ManagersPage() {
 
       <AddManagerDialog open={addOpen} onClose={() => setAddOpen(false)} onSaved={loadManagers} />
 
-      {/* Admin Panel */}
-      <Dialog open={expandedSection === 'admin'} onOpenChange={(o) => { if (!o) setExpandedSection(null) }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Crown className="size-5 text-amber-500" />
-              {t('managers.admin_section')}
-            </DialogTitle>
-            <DialogDescription>{t('managers.admin_section_desc')}</DialogDescription>
-          </DialogHeader>
-          <div className="flex items-center gap-4 rounded-lg border bg-muted/30 p-4">
-            <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-muted">
-              <UserRound className="size-7 text-muted-foreground" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-lg font-semibold">{user?.name}</p>
-              <p className="text-sm text-muted-foreground">{user?.email}</p>
-              <Badge variant="default" className="mt-2">{t('nav.role.admin')}</Badge>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">{t('managers.total_system_calls')}</p>
-              <p className="text-3xl font-bold">{totalCalls}</p>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Managers Panel */}
-      <Dialog open={expandedSection === 'managers'} onOpenChange={(o) => { if (!o) setExpandedSection(null) }}>
-        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Users className="size-5 text-indigo-500" />
-              {t('managers.managers_section')}
-            </DialogTitle>
-            <DialogDescription>{managers.length} {t('managers.managers_section_desc')}</DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto -mx-6 px-6">
-            <div className="grid gap-3 md:grid-cols-2">
-              {managers.map((m) => (
-                <div key={m.id} className="flex items-center gap-3 rounded-lg border bg-background p-3">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <UserRound className="size-4 text-muted-foreground" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate">{m.name}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{m.total_calls} {t('managers.calls_label').toLowerCase()}</span>
-                      {m.avg_score != null && (
-                        <span className={scoreColor(m.avg_score)}>· {m.avg_score}</span>
-                      )}
-                    </div>
-                  </div>
-                  <Badge variant={m.active ? 'default' : 'secondary'}>
-                    {m.active ? t('users.active') : t('users.inactive')}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Directions Panel */}
-      <Dialog open={expandedSection === 'directions'} onOpenChange={(o) => { if (!o) setExpandedSection(null) }}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Compass className="size-5 text-emerald-500" />
-              {t('managers.directions_section')}
-            </DialogTitle>
-            <DialogDescription>{t('managers.directions_section_desc')}</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3 md:grid-cols-2">
-            {[
-              { name: t('managers.direction_sales'), icon: '📈', count: 12 },
-              { name: t('managers.direction_support'), icon: '🎧', count: 8 },
-              { name: t('managers.direction_marketing'), icon: '📢', count: 6 },
-              { name: t('managers.direction_hr'), icon: '👥', count: 4 },
-            ].map((dir) => (
-              <div key={dir.name} className="flex items-center gap-3 rounded-lg border bg-background p-4">
-                <span className="text-3xl">{dir.icon}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium">{dir.name}</p>
-                  <p className="text-sm text-muted-foreground">{dir.count} {t('managers.responsible_managers')}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {loading ? (
         <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 rounded-xl" />
-          ))}
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)}
         </div>
       ) : managers.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-            <div className="flex size-12 items-center justify-center rounded-xl bg-muted">
-              <UserRound className="size-6 text-muted-foreground" />
-            </div>
+            <div className="flex size-12 items-center justify-center rounded-xl bg-muted"><UserRound className="size-6 text-muted-foreground" /></div>
             <p className="text-base font-semibold">{t('managers.no_managers')}</p>
-            <p className="max-w-sm text-sm text-muted-foreground">
-              {t('managers.no_managers_desc')}
-            </p>
-            <Button onClick={() => setAddOpen(true)}>
-              <Plus /> {t('managers.add_first')}
-            </Button>
+            <p className="max-w-sm text-sm text-muted-foreground">{t('managers.no_managers_desc')}</p>
+            <Button onClick={() => setAddOpen(true)}><Plus /> {t('managers.add_first')}</Button>
           </CardContent>
         </Card>
       ) : (
         <>
           <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <motion.div key="managers" variants={fadeUp}>
-              <StatMini icon={UserRound} label={t('managers.title')} value={managers.length} />
-            </motion.div>
-            <motion.div key="calls" variants={fadeUp}>
-              <StatMini icon={BarChart3} label={t('managers.calls_label')} value={totalCalls} />
-            </motion.div>
-            <motion.div key="avg" variants={fadeUp}>
-              <StatMini icon={Clock} label={t('managers.org_avg')} value={orgAvg != null ? `${orgAvg}/100` : '—'} />
-            </motion.div>
-            <motion.div key="key" variants={fadeUp}>
-              <StatMini icon={KeyRound} label={t('managers.api_access')} value={managers.filter((m) => m.api_token).length} />
-            </motion.div>
+            <motion.div key="managers" variants={fadeUp}><StatMini icon={UserRound} label={t('managers.title')} value={managers.length} /></motion.div>
+            <motion.div key="calls" variants={fadeUp}><StatMini icon={BarChart3} label={t('managers.calls_label')} value={totalCalls} /></motion.div>
+            <motion.div key="avg" variants={fadeUp}><StatMini icon={Clock} label={t('managers.org_avg')} value={orgAvg != null ? `${orgAvg}/100` : '—'} /></motion.div>
+            <motion.div key="key" variants={fadeUp}><StatMini icon={KeyRound} label={t('managers.api_access')} value={managers.filter((m) => m.api_token).length} /></motion.div>
           </div>
-
-          {/* Ranking Charts */}
           <div className="mb-6 grid gap-4 md:grid-cols-3">
-            <RankingChart
-              data={mostCallsData}
-              dataKey="value"
-              label={t('managers.most_calls')}
-              icon={PhoneCall}
-              color={chartColors.calls}
-            />
-            <RankingChart
-              data={mostSuccessfulData}
-              dataKey="value"
-              label={t('managers.most_successful')}
-              icon={Trophy}
-              color={chartColors.score}
-              unit="/100"
-            />
-            <RankingChart
-              data={mostEffectiveData}
-              dataKey="value"
-              label={t('managers.most_effective')}
-              icon={Target}
-              color={chartColors.talk}
-              unit="%"
-            />
+            <RankingChart data={mostCallsData} dataKey="value" label={t('managers.most_calls')} icon={PhoneCall} color={chartColors.calls} />
+            <RankingChart data={mostSuccessfulData} dataKey="value" label={t('managers.most_successful')} icon={Trophy} color={chartColors.score} unit="/100" />
+            <RankingChart data={mostEffectiveData} dataKey="value" label={t('managers.most_effective')} icon={Target} color={chartColors.talk} unit="%" />
           </div>
         </>
       )}
 
       {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-40 rounded-xl" />
-          ))}
-        </div>
+        <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-xl" />)}</div>
       ) : reduceMotion ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {managers.map((m) => (
-            <ManagerCard
-              key={m.id}
-              mgr={m}
-              onEdit={() => toast.info(t('managers.edit_via_team'))}
-              onDelete={() => handleDelete(m)}
-              onChanged={loadManagers}
-              onSelect={() => loadCalls(m)}
-            />
-          ))}
+          {managers.map((m) => <ManagerCard key={m.id} mgr={m} onEdit={() => toast.info(t('managers.edit_via_team'))} onDelete={handleDelete} onChanged={loadManagers} onSelect={loadCalls} />)}
         </div>
       ) : (
         <Stagger className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {managers.map((m) => (
-            <ManagerCard
-              key={m.id}
-              mgr={m}
-              onEdit={() => toast.info(t('managers.edit_via_team'))}
-              onDelete={() => handleDelete(m)}
-              onChanged={loadManagers}
-              onSelect={() => loadCalls(m)}
-            />
-          ))}
+          {managers.map((m) => <ManagerCard key={m.id} mgr={m} onEdit={() => toast.info(t('managers.edit_via_team'))} onDelete={handleDelete} onChanged={loadManagers} onSelect={loadCalls} />)}
         </Stagger>
       )}
 
-      {/* Quick Access Panels */}
-      <div className="mt-8 mb-6 grid grid-cols-3 gap-3">
-        <button
-          onClick={() => setExpandedSection('admin')}
-          className="group flex items-center gap-3 rounded-xl border bg-gradient-to-br from-amber-500/10 to-orange-500/10 p-4 text-left transition-all hover:shadow-lg hover:shadow-amber-500/10 hover:-translate-y-0.5"
-        >
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/25">
-            <Crown className="size-5" />
-          </div>
-          <div className="min-w-0">
-            <h3 className="font-semibold">{t('managers.admin_section')}</h3>
-            <p className="text-xs text-muted-foreground">{t('managers.admin_section_desc')}</p>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setExpandedSection('managers')}
-          className="group flex items-center gap-3 rounded-xl border bg-gradient-to-br from-indigo-500/10 to-purple-500/10 p-4 text-left transition-all hover:shadow-lg hover:shadow-indigo-500/10 hover:-translate-y-0.5"
-        >
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25">
-            <Users className="size-5" />
-          </div>
-          <div className="min-w-0">
-            <h3 className="font-semibold">{t('managers.managers_section')}</h3>
-            <p className="text-xs text-muted-foreground">{managers.length} {t('managers.managers_section_desc')}</p>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setExpandedSection('directions')}
-          className="group flex items-center gap-3 rounded-xl border bg-gradient-to-br from-emerald-500/10 to-teal-500/10 p-4 text-left transition-all hover:shadow-lg hover:shadow-emerald-500/10 hover:-translate-y-0.5"
-        >
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25">
-            <Compass className="size-5" />
-          </div>
-          <div className="min-w-0">
-            <h3 className="font-semibold">{t('managers.directions_section')}</h3>
-            <p className="text-xs text-muted-foreground">{t('managers.directions_section_desc')}</p>
-          </div>
-        </button>
-      </div>
-
-      {/* Floating Calls Dialog */}
       <Dialog open={callsDialogOpen} onOpenChange={setCallsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>
-              {selectedManager ? t('managers.recent_for', { name: selectedManager.name }) : ''}
-            </DialogTitle>
-            <DialogDescription>
-              {calls.length} {t('managers.calls_label').toLowerCase()}
-            </DialogDescription>
+            <DialogTitle>{selectedManager ? t('managers.recent_for', { name: selectedManager.name }) : ''}</DialogTitle>
+            <DialogDescription>{calls.length} {t('managers.calls_label').toLowerCase()}</DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto -mx-6 px-6">
             {callsLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-14 rounded-lg" />
-                ))}
-              </div>
+              <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-lg" />)}</div>
             ) : calls.length === 0 ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">
-                {t('managers.no_calls')}
-              </div>
+              <div className="py-10 text-center text-sm text-muted-foreground">{t('managers.no_calls')}</div>
             ) : (
               <div className="divide-y rounded-lg border">
                 {calls.map((c) => (
                   <div key={c.id} className="flex items-center justify-between p-3 text-sm">
                     <div className="min-w-0">
-                      <Link
-                        to={`/calls/${c.id}`}
-                        className="font-medium text-foreground hover:underline"
-                        onClick={() => setCallsDialogOpen(false)}
-                      >
-                        {c.name}
-                      </Link>
+                      <Link to={`/calls/${c.id}`} className="font-medium text-foreground hover:underline" onClick={() => setCallsDialogOpen(false)}>{c.name}</Link>
                       {c.client_name && <span className="text-xs text-muted-foreground"> · {c.client_name}</span>}
                       <div className="text-xs text-muted-foreground">
                         {c.duration_sec != null && formatDuration(c.duration_sec)}
@@ -739,14 +463,8 @@ export function ManagersPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <Badge variant={statusVariant(c.status as CallStatus)}>
-                        {t(`status.${c.status}`)}
-                      </Badge>
-                      {c.status === 'done' && c.analysis.scorecard?.overall != null && (
-                        <span className={scoreColor(c.analysis.scorecard.overall)}>
-                          {c.analysis.scorecard.overall}/100
-                        </span>
-                      )}
+                      <Badge variant={statusVariant(c.status as CallStatus)}>{t(`status.${c.status}`)}</Badge>
+                      {c.status === 'done' && c.analysis.scorecard?.overall != null && <span className={scoreColor(c.analysis.scorecard.overall)}>{c.analysis.scorecard.overall}/100</span>}
                       <ExternalLink className="size-3.5 text-muted-foreground" />
                     </div>
                   </div>

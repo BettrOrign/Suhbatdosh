@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LogOut, Mic, Users, BarChart3, Menu, X, LayoutDashboard, ChevronDown, Crown, UserRound, Compass } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { LogOut, Mic, Users, BarChart3, Menu, X, LayoutDashboard } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/i18n/i18n'
@@ -14,35 +14,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { t } = useI18n()
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [managersOpen, setManagersOpen] = useState(false)
 
-  const links: { to: string; labelKey: string; icon: typeof Mic; show: boolean }[] = [
+  const links: { to: string; labelKey: string; icon: any; show: boolean }[] = [
     { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard, show: true },
     { to: '/calls', labelKey: 'nav.calls', icon: Mic, show: true },
     { to: '/clients', labelKey: 'nav.clients', icon: Users, show: true },
+    { to: '/managers', labelKey: 'nav.managers', icon: BarChart3, show: user?.role === 'admin' },
+    { to: '/managers/admin', labelKey: 'nav.submenu.admin', icon: BarChart3, show: user?.role === 'admin' },
+    { to: '/managers/directions', labelKey: 'nav.submenu.directions', icon: BarChart3, show: user?.role === 'admin' },
     { to: '/users', labelKey: 'nav.team', icon: Users, show: user?.role === 'admin' },
-  ]
-
-  const subItems = [
-    { label: t('nav.submenu.admin'), icon: Crown, to: '/managers/admin' },
-    { label: t('nav.submenu.managers'), icon: UserRound, to: '/managers' },
-    { label: t('nav.submenu.directions'), icon: Compass, to: '/managers/directions' },
   ]
 
   return (
     <div className="min-h-screen flex">
       {/* Mobile sidebar overlay */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-      </AnimatePresence>
+      {sidebarOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
       {/* Right sidebar */}
       <motion.aside
@@ -62,12 +56,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <p className="text-xs text-muted-foreground">Call Analytics</p>
               </div>
             </Link>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden ml-auto shrink-0"
-              onClick={() => setSidebarOpen(false)}
-            >
+            <Button variant="ghost" size="icon" className="lg:hidden ml-auto shrink-0" onClick={() => setSidebarOpen(false)}>
               <X className="size-4" />
             </Button>
           </div>
@@ -108,68 +97,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </Link>
                 )
               })}
-
-            {/* Managers dropdown */}
-            {user?.role === 'admin' && (
-              <div className="relative">
-                <button
-                  onClick={() => setManagersOpen(!managersOpen)}
-                  className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
-                    location.pathname === '/managers' || location.pathname.startsWith('/managers/')
-                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-400 shadow-sm'
-                      : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground cursor-pointer'
-                  }`}
-                >
-                  <motion.div
-                    layoutId="sidebar-pill"
-                    className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-indigo-500"
-                    transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-                    style={{ display: location.pathname === '/managers' || location.pathname.startsWith('/managers/') ? 'block' : 'none' }}
-                  />
-                  <BarChart3 className="size-4 shrink-0" />
-                  {t('nav.managers')}
-                  <ChevronDown className={`ml-auto size-4 transition-transform duration-200 ${managersOpen ? 'rotate-180' : ''}`} />
-                </button>
-                <AnimatePresence>
-                  {managersOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.15 }}
-                      className="flex flex-col gap-0.5 pl-8 pr-2 py-1"
-                    >
-                       {subItems.map((item) => {
-                         const Icon = item.icon
-                         const isActive = location.pathname === item.to || (item.to === '/managers' && location.pathname.startsWith('/managers/'))
-                         return (
-                           <Link
-                             key={item.to}
-                             to={item.to}
-                             onClick={() => { setManagersOpen(false); setSidebarOpen(false) }}
-                             className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
-                               isActive
-                                 ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-400 shadow-sm'
-                                 : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground cursor-pointer'
-                             }`}
-                           >
-                             {isActive && (
-                               <motion.div
-                                 layoutId="sidebar-pill"
-                                 className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-indigo-500"
-                                 transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-                               />
-                             )}
-                             <Icon className="size-4 shrink-0" />
-                             {item.label}
-                           </Link>
-                         )
-                       })}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
           </nav>
 
           {/* Bottom section */}
@@ -206,12 +133,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-20 border-b bg-background/70 backdrop-blur-xl">
           <div className="flex h-14 items-center justify-between px-6">
             <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSidebarOpen(true)}
-                className="lg:hidden"
-              >
+              <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(true)} className="lg:hidden">
                 <Menu className="size-4" />
               </Button>
             </div>

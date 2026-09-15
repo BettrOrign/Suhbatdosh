@@ -10,7 +10,9 @@ import { Analytics } from '@/pages/Analytics'
 import { Calls } from '@/pages/Calls'
 import { CallDetail } from '@/pages/CallDetail'
 import { Clients } from '@/pages/Clients'
-import { ManagersPage } from '@/pages/Managers'
+import { ManagersPage } from '@/pages/ManagersList'
+import { ManagersAdminPage } from '@/pages/ManagersAdmin'
+import { ManagersDirectionsPage } from '@/pages/ManagersDirections'
 import { UsersPage } from '@/pages/Users'
 import { Login } from '@/pages/Login'
 
@@ -33,8 +35,8 @@ function Shell() {
           <Route path="/calls/:id" element={<CallDetail />} />
           <Route path="/clients" element={<Clients />} />
           <Route path="/managers" element={<ManagersPage />} />
-          <Route path="/managers/admin" element={<ManagersPage />} />
-          <Route path="/managers/directions" element={<ManagersPage />} />
+          <Route path="/managers/admin" element={<ManagersAdminPage />} />
+          <Route path="/managers/directions" element={<ManagersDirectionsPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

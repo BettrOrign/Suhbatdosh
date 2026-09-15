@@ -62,6 +62,7 @@ def regenerate_own_token(user: dict = Depends(get_current_user)):
 @router.get("/users")
 def list_users(user: dict = Depends(require_role("admin", "yonalish"))):
     """Return all users; admins and yonalish can see users."""
+    is_admin = user["role"] == "admin"
     return [
         {
             "id": u["id"],
@@ -69,7 +70,7 @@ def list_users(user: dict = Depends(require_role("admin", "yonalish"))):
             "email": u["email"],
             "role": u["role"],
             "active": u["active"],
-            "api_token": u["api_token"],
+            **({"api_token": u["api_token"]} if is_admin else {}),
         }
         for u in db.list_users()
     ]

@@ -298,7 +298,7 @@ function ManagerCard({
 export function ManagersDirectionsPage() {
   const { user } = useAuth()
   const { t } = useI18n()
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = user?.role === 'admin' || user?.role === 'yonalish'
   const reduceMotion = useReducedMotion()
 
   const [managers, setManagers] = useState<Manager[]>([])

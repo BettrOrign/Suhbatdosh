@@ -103,7 +103,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 })}
 
             {/* Managers dropdown */}
-            {user?.role === 'admin' && (
+            {(user?.role === 'admin' || user?.role === 'yonalish') && (
               <div>
                 <button
                   onClick={() => setManagersOpen(!managersOpen)}

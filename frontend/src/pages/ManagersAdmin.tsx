@@ -279,9 +279,9 @@ export function ManagersAdminPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return adminManagers.filter((a) => a.role === 'admin')
+    if (!q) return adminManagers
     return adminManagers.filter(
-      (a) => a.role === 'admin' &&
+      (a) =>
         a.name.toLowerCase().includes(q) ||
         a.company.toLowerCase().includes(q) ||
         (a.email?.toLowerCase().includes(q) ?? false),

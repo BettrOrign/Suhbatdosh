@@ -274,6 +274,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     'managers.direction_support': 'Customer Support',
     'managers.direction_marketing': 'Marketing',
     'managers.direction_hr': 'Human Resources',
+    'managers.direction_masul': 'Masul',
 
     // generic
     'common.are_you_sure': 'Are you sure?',
@@ -616,6 +617,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     'managers.direction_support': 'Mijozlarga xizmat',
     'managers.direction_marketing': 'Marketing',
     'managers.direction_hr': 'Inson resurslari',
+    'managers.direction_masul': 'Masul',
 
     // generic
     'common.are_you_sure': 'Ishonchingiz komilmi?',

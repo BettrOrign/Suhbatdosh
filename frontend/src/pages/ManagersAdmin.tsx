@@ -168,7 +168,7 @@ function AdminManagerRow({ adminManager, onEdit, onChanged }: {
   const remove = async () => {
     if (!window.confirm(t('managers.delete_confirm', { name: adminManager.name }))) return
     try {
-      await api.deleteClient(adminManager.id)
+      await api.deleteUser(adminManager.id)
       toast.success(t('managers.deleted'))
       await onChanged()
     } catch (e) {

@@ -117,6 +117,11 @@ def _seed_default_users():
         ("Rustam Zoirov", "rustam@suhbatdosh.local", "rustam1234"),
         ("Murod Abdullayev", "murod@suhbatdosh.local", "murod1234"),
         ("Bakhtiyor Karimov", "bakhtiyor@suhbatdosh.local", "bakhtiyor1234"),
+        ("Jasur Raximov", "jasur@suhbatdosh.local", "jasur1234"),
+        ("Davron Mirzayev", "davron@suhbatdosh.local", "davron1234"),
+        ("Sardor Alimov", "sardor@suhbatdosh.local", "sardor1234"),
+        ("Bobur Turgunov", "bobur@suhbatdosh.local", "bobur1234"),
+        ("Akbar Normatov", "akbar@suhbatdosh.local", "akbar1234"),
     ]
     for name, email, password in yonalish:
         if db.get_user_by_email(email):
@@ -173,6 +178,11 @@ def _seed_demo_calls():
     rustam = db.get_user_by_email("rustam@suhbatdosh.local")
     murod = db.get_user_by_email("murod@suhbatdosh.local")
     bakhtiyor = db.get_user_by_email("bakhtiyor@suhbatdosh.local")
+    jasur_yon = db.get_user_by_email("jasur@suhbatdosh.local")
+    davron = db.get_user_by_email("davron@suhbatdosh.local")
+    sardor_yon = db.get_user_by_email("sardor@suhbatdosh.local")
+    bobur = db.get_user_by_email("bobur@suhbatdosh.local")
+    akbar = db.get_user_by_email("akbar@suhbatdosh.local")
 
     demo_clients_data = [
         ("TechSoft LLC", "998901234567", "TechSoft", "info@techsoft.uz", "IT xizmatlari bo'yicha doimiy mijoz"),
@@ -800,7 +810,7 @@ def _seed_demo_calls():
 
     manager_users = [(u, "manager") for u in [aziz, nodira, sardor, jasur, malika] if u]
     receptionist_users = [(u, "receptionist") for u in [dilnoza, nilufar] if u]
-    yonalish_users = [(u, "yonalish") for u in [shoxrux, farhod, rustam, murod, bakhtiyor] if u]
+    yonalish_users = [(u, "yonalish") for u in [shoxrux, farhod, rustam, murod, bakhtiyor, jasur_yon, davron, sardor_yon, bobur, akbar] if u]
     all_users = manager_users + receptionist_users + yonalish_users
 
     client_names = list(client_map.keys())

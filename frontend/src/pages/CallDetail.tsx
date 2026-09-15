@@ -213,7 +213,7 @@ export function CallDetail() {
 
   useEffect(() => {
     if (!id || isNaN(callId)) {
-      navigate('/calls/')
+      navigate('/')
     }
   }, [id, callId, navigate])
 
@@ -373,7 +373,7 @@ export function CallDetail() {
                 asChild
                 className="mt-0.5 h-10 text-white hover:bg-white/20"
               >
-                <Link to="/" aria-label={t('call.back')}>
+                <Link to="/calls/" aria-label={t('call.back')}>
                   <ArrowLeft className="size-5" />
                 </Link>
               </Button>

@@ -89,11 +89,11 @@ def _seed_default_users():
     log = logging.getLogger("suhbatdosh.main")
 
     managers = [
-        ("Aziz Karimov", "aziz@suhbatdosh.local", "aziz1234"),
-        ("Nodira Raximova", "nodira@suhbatdosh.local", "nodira1234"),
-        ("Sardor Alimov", "sardor@suhbatdosh.local", "sardor1234"),
-        ("Jasur Qosimov", "jasur@suhbatdosh.local", "jasur1234"),
-        ("Malika Turdiyeva", "malika@suhbatdosh.local", "malika1234"),
+        ("Aziz Karimov", "aziz@suhbatdosh.uz", "aziz1234"),
+        ("Nodira Raximova", "nodira@suhbatdosh.uz", "nodira1234"),
+        ("Sardor Alimov", "sardor@suhbatdosh.uz", "sardor1234"),
+        ("Jasur Qosimov", "jasur@suhbatdosh.uz", "jasur1234"),
+        ("Malika Turdiyeva", "malika@suhbatdosh.uz", "malika1234"),
     ]
     for name, email, password in managers:
         if db.get_user_by_email(email):
@@ -102,8 +102,8 @@ def _seed_default_users():
         log.info("Seeded manager: %s", email)
 
     receptionists = [
-        ("Dilnoza Karimova", "dilnoza@suhbatdosh.local", "dilnoza1234"),
-        ("Nilufar Hamidova", "nilufar@suhbatdosh.local", "nilufar1234"),
+        ("Dilnoza Karimova", "dilnoza@suhbatdosh.uz", "dilnoza1234"),
+        ("Nilufar Hamidova", "nilufar@suhbatdosh.uz", "nilufar1234"),
     ]
     for name, email, password in receptionists:
         if db.get_user_by_email(email):
@@ -112,16 +112,16 @@ def _seed_default_users():
         log.info("Seeded receptionist: %s", email)
 
     yonalish = [
-        ("Shoxrux Bobojonov", "shoxrux@suhbatdosh.local", "shoxrux1234"),
-        ("Farhod Toshpulatov", "farhod@suhbatdosh.local", "farhod1234"),
-        ("Rustam Zoirov", "rustam@suhbatdosh.local", "rustam1234"),
-        ("Murod Abdullayev", "murod@suhbatdosh.local", "murod1234"),
-        ("Bakhtiyor Karimov", "bakhtiyor@suhbatdosh.local", "bakhtiyor1234"),
-        ("Jasur Raximov", "jasur.yonalish@suhbatdosh.local", "jasur1234"),
-        ("Davron Mirzayev", "davron@suhbatdosh.local", "davron1234"),
-        ("Sardor Alimov", "sardor.yonalish@suhbatdosh.local", "sardor1234"),
-        ("Bobur Turgunov", "bobur@suhbatdosh.local", "bobur1234"),
-        ("Akbar Normatov", "akbar@suhbatdosh.local", "akbar1234"),
+        ("Shoxrux Bobojonov", "shoxrux@suhbatdosh.uz", "shoxrux1234"),
+        ("Farhod Toshpulatov", "farhod@suhbatdosh.uz", "farhod1234"),
+        ("Rustam Zoirov", "rustam@suhbatdosh.uz", "rustam1234"),
+        ("Murod Abdullayev", "murod@suhbatdosh.uz", "murod1234"),
+        ("Bakhtiyor Karimov", "bakhtiyor@suhbatdosh.uz", "bakhtiyor1234"),
+        ("Jasur Raximov", "jasur.yonalish@suhbatdosh.uz", "jasur1234"),
+        ("Davron Mirzayev", "davron@suhbatdosh.uz", "davron1234"),
+        ("Sardor Alimov", "sardor.yonalish@suhbatdosh.uz", "sardor1234"),
+        ("Bobur Turgunov", "bobur@suhbatdosh.uz", "bobur1234"),
+        ("Akbar Normatov", "akbar@suhbatdosh.uz", "akbar1234"),
     ]
     for name, email, password in yonalish:
         if db.get_user_by_email(email):
@@ -143,46 +143,46 @@ def _seed_demo_calls():
         return
 
     managers = [
-        ("Aziz Karimov", "aziz@suhbatdosh.local", "aziz1234"),
-        ("Nodira Raximova", "nodira@suhbatdosh.local", "nodira1234"),
-        ("Sardor Alimov", "sardor@suhbatdosh.local", "sardor1234"),
-        ("Jasur Qosimov", "jasur@suhbatdosh.local", "jasur1234"),
-        ("Malika Turdiyeva", "malika@suhbatdosh.local", "malika1234"),
+        ("Aziz Karimov", "aziz@suhbatdosh.uz", "aziz1234"),
+        ("Nodira Raximova", "nodira@suhbatdosh.uz", "nodira1234"),
+        ("Sardor Alimov", "sardor@suhbatdosh.uz", "sardor1234"),
+        ("Jasur Qosimov", "jasur@suhbatdosh.uz", "jasur1234"),
+        ("Malika Turdiyeva", "malika@suhbatdosh.uz", "malika1234"),
     ]
     for name, email, password in managers:
         if not db.get_user_by_email(email):
             db.create_user(name, email, hash_password(password), role="manager")
             log.info("Seeded manager: %s", email)
 
-    if not db.get_user_by_email("dilnoza@suhbatdosh.local"):
-        db.create_user("Dilnoza Karimova", "dilnoza@suhbatdosh.local", hash_password("dilnoza1234"), role="receptionist")
-        log.info("Seeded receptionist: dilnoza@suhbatdosh.local")
-    if not db.get_user_by_email("nilufar@suhbatdosh.local"):
-        db.create_user("Nilufar Hamidova", "nilufar@suhbatdosh.local", hash_password("nilufar1234"), role="receptionist")
-        log.info("Seeded receptionist: nilufar@suhbatdosh.local")
+    if not db.get_user_by_email("dilnoza@suhbatdosh.uz"):
+        db.create_user("Dilnoza Karimova", "dilnoza@suhbatdosh.uz", hash_password("dilnoza1234"), role="receptionist")
+        log.info("Seeded receptionist: dilnoza@suhbatdosh.uz")
+    if not db.get_user_by_email("nilufar@suhbatdosh.uz"):
+        db.create_user("Nilufar Hamidova", "nilufar@suhbatdosh.uz", hash_password("nilufar1234"), role="receptionist")
+        log.info("Seeded receptionist: nilufar@suhbatdosh.uz")
 
-    if not db.get_user_by_email("admin@suhbatdosh.local"):
-        db.create_user("Admin", "admin@suhbatdosh.local", hash_password("admin1234"), role="admin")
-        log.info("Seeded admin: admin@suhbatdosh.local")
+    if not db.get_user_by_email("admin@suhbatdosh.uz"):
+        db.create_user("Admin", "admin@suhbatdosh.uz", hash_password("admin1234"), role="admin")
+        log.info("Seeded admin: admin@suhbatdosh.uz")
 
-    aziz = db.get_user_by_email("aziz@suhbatdosh.local")
-    nodira = db.get_user_by_email("nodira@suhbatdosh.local")
-    sardor = db.get_user_by_email("sardor@suhbatdosh.local")
-    jasur = db.get_user_by_email("jasur@suhbatdosh.local")
-    malika = db.get_user_by_email("malika@suhbatdosh.local")
-    dilnoza = db.get_user_by_email("dilnoza@suhbatdosh.local")
-    nilufar = db.get_user_by_email("nilufar@suhbatdosh.local")
-    admin = db.get_user_by_email("admin@suhbatdosh.local")
-    shoxrux = db.get_user_by_email("shoxrux@suhbatdosh.local")
-    farhod = db.get_user_by_email("farhod@suhbatdosh.local")
-    rustam = db.get_user_by_email("rustam@suhbatdosh.local")
-    murod = db.get_user_by_email("murod@suhbatdosh.local")
-    bakhtiyor = db.get_user_by_email("bakhtiyor@suhbatdosh.local")
-    jasur_yon = db.get_user_by_email("jasur.yonalish@suhbatdosh.local")
-    davron = db.get_user_by_email("davron@suhbatdosh.local")
-    sardor_yon = db.get_user_by_email("sardor.yonalish@suhbatdosh.local")
-    bobur = db.get_user_by_email("bobur@suhbatdosh.local")
-    akbar = db.get_user_by_email("akbar@suhbatdosh.local")
+    aziz = db.get_user_by_email("aziz@suhbatdosh.uz")
+    nodira = db.get_user_by_email("nodira@suhbatdosh.uz")
+    sardor = db.get_user_by_email("sardor@suhbatdosh.uz")
+    jasur = db.get_user_by_email("jasur@suhbatdosh.uz")
+    malika = db.get_user_by_email("malika@suhbatdosh.uz")
+    dilnoza = db.get_user_by_email("dilnoza@suhbatdosh.uz")
+    nilufar = db.get_user_by_email("nilufar@suhbatdosh.uz")
+    admin = db.get_user_by_email("admin@suhbatdosh.uz")
+    shoxrux = db.get_user_by_email("shoxrux@suhbatdosh.uz")
+    farhod = db.get_user_by_email("farhod@suhbatdosh.uz")
+    rustam = db.get_user_by_email("rustam@suhbatdosh.uz")
+    murod = db.get_user_by_email("murod@suhbatdosh.uz")
+    bakhtiyor = db.get_user_by_email("bakhtiyor@suhbatdosh.uz")
+    jasur_yon = db.get_user_by_email("jasur.yonalish@suhbatdosh.uz")
+    davron = db.get_user_by_email("davron@suhbatdosh.uz")
+    sardor_yon = db.get_user_by_email("sardor.yonalish@suhbatdosh.uz")
+    bobur = db.get_user_by_email("bobur@suhbatdosh.uz")
+    akbar = db.get_user_by_email("akbar@suhbatdosh.uz")
 
     demo_clients_data = [
         ("TechSoft LLC", "998901234567", "TechSoft", "info@techsoft.uz", "IT xizmatlari bo'yicha doimiy mijoz"),

@@ -217,7 +217,7 @@ export const translations: Record<Lang, Record<string, string>> = {
     'users.delete_btn': 'Delete user',
     'users.cant_delete_self': "You can't delete your own account",
     'users.name_placeholder': 'e.g. Alex Morgan',
-    'users.email_placeholder': 'alex@suhbatdosh.local',
+    'users.email_placeholder': 'alex@suhbatdosh.uz',
     'users.inactive': 'Inactive',
     'users.load_failed': 'Failed to load users: {error}',
 

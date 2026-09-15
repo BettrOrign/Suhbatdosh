@@ -235,7 +235,7 @@ function ManagerCard({
             <div className="rounded-lg bg-muted/50 p-3">
               <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                 <BarChart3 className="size-3.5 shrink-0" />
-                <span className="truncate">{t('managers.calls_label')}</span>
+                <span className="truncate">{t('directions.total_solved')}</span>
               </p>
               <p className="mt-1 text-xl font-bold leading-tight tabular-nums">{mgr.total_calls}</p>
             </div>
@@ -280,7 +280,7 @@ function ManagerCard({
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1.5 border-t pt-3">
             <Button variant="outline" size="sm" onClick={() => onSelect(mgr)}>
-              {t('managers.show_calls')}
+              {t('directions.show_problems')}
             </Button>
             <Button variant="outline" size="sm" onClick={() => onEdit(mgr)} aria-label={t('managers.edit_btn')}>
               {t('managers.edit')}
@@ -392,8 +392,8 @@ export function ManagersDirectionsPage() {
     <div>
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t('managers.directions_section')}</h1>
-          <p className="text-sm text-muted-foreground">{t('managers.directions_section_desc')}</p>
+          <h1 className="text-2xl font-bold tracking-tight">{t('directions.title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('directions.desc')}</p>
         </div>
         <Button onClick={() => setAddOpen(true)}>
           <Plus /> {t('managers.add')}
@@ -418,15 +418,15 @@ export function ManagersDirectionsPage() {
       ) : (
         <>
           <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <motion.div key="managers" variants={fadeUp}><StatMini icon={UserRound} label={t('managers.title')} value={managers.length} /></motion.div>
-            <motion.div key="calls" variants={fadeUp}><StatMini icon={BarChart3} label={t('managers.calls_label')} value={totalCalls} /></motion.div>
-            <motion.div key="avg" variants={fadeUp}><StatMini icon={Clock} label={t('managers.org_avg')} value={orgAvg != null ? `${orgAvg}/100` : '—'} /></motion.div>
-            <motion.div key="key" variants={fadeUp}><StatMini icon={KeyRound} label={t('managers.api_access')} value={managers.filter((m) => m.api_token).length} /></motion.div>
+            <motion.div key="managers" variants={fadeUp}><StatMini icon={UserRound} label={t('directions.total_masullar')} value={managers.length} /></motion.div>
+            <motion.div key="calls" variants={fadeUp}><StatMini icon={BarChart3} label={t('directions.total_solved')} value={totalCalls} /></motion.div>
+            <motion.div key="avg" variants={fadeUp}><StatMini icon={Clock} label={t('directions.avg_score')} value={orgAvg != null ? `${orgAvg}/100` : '—'} /></motion.div>
+            <motion.div key="key" variants={fadeUp}><StatMini icon={KeyRound} label={t('directions.api_access')} value={managers.filter((m) => m.api_token).length} /></motion.div>
           </div>
           <div className="mb-6 grid gap-4 md:grid-cols-3">
-            <RankingChart data={mostCallsData} dataKey="value" label={t('managers.most_calls')} icon={PhoneCall} color={chartColors.calls} />
-            <RankingChart data={mostSuccessfulData} dataKey="value" label={t('managers.most_successful')} icon={Trophy} color={chartColors.score} unit="/100" />
-            <RankingChart data={mostEffectiveData} dataKey="value" label={t('managers.most_effective')} icon={Target} color={chartColors.talk} unit="%" />
+            <RankingChart data={mostCallsData} dataKey="value" label={t('directions.most_solved')} icon={PhoneCall} color={chartColors.calls} />
+            <RankingChart data={mostSuccessfulData} dataKey="value" label={t('directions.most_successful')} icon={Trophy} color={chartColors.score} unit="/100" />
+            <RankingChart data={mostEffectiveData} dataKey="value" label={t('directions.most_effective')} icon={Target} color={chartColors.talk} unit="%" />
           </div>
         </>
       )}
@@ -446,14 +446,14 @@ export function ManagersDirectionsPage() {
       <Dialog open={callsDialogOpen} onOpenChange={setCallsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>{selectedManager ? t('managers.recent_for', { name: selectedManager.name }) : ''}</DialogTitle>
-            <DialogDescription>{calls.length} {t('managers.calls_label').toLowerCase()}</DialogDescription>
+            <DialogTitle>{selectedManager ? t('directions.recent_problems', { name: selectedManager.name }) : ''}</DialogTitle>
+            <DialogDescription>{calls.length} {t('directions.total_solved').toLowerCase()}</DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto -mx-6 px-6">
             {callsLoading ? (
               <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-lg" />)}</div>
             ) : calls.length === 0 ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">{t('managers.no_calls')}</div>
+              <div className="py-10 text-center text-sm text-muted-foreground">{t('directions.no_problems')}</div>
             ) : (
               <div className="divide-y rounded-lg border">
                 {calls.map((c) => (

@@ -731,6 +731,51 @@ def _seed_demo_calls():
         (rustam, "Raqobatchi haqida gapirmadi", client_map.get("Green Valley"), 150, "uz"),
         (murod, "Narxni ochiq aytmadi", client_map.get("AutoPrime"), 170, "uz"),
         (bakhtiyor, "Mijozni to'g'ri yo'nallatmadi", client_map.get("IT Park"), 160, "uz"),
+        (shoxrux, "Qo'ng'iroqni juda kech boshladi", client_map.get("SmartEducation"), 190, "uz"),
+        (farhod, "Professional bo'lmagan til ishlatdi", client_map.get("UzbekTrade"), 140, "uz"),
+        (rustam, "Ehtiyoj aniqlash bosqichini o'tkazib yubordi", client_map.get("MegaMarket"), 210, "uz"),
+        (murod, "Mijozning e'tirozini to'g'ri hal qilmadi", client_map.get("TechSoft LLC"), 175, "ru"),
+        (bakhtiyor, "Suhbatni ertacha yakunladi", client_map.get("StartUp Hub"), 130, "uz"),
+        (shoxrux, "Dastlabki salomlashuv juda sovuq", client_map.get("Green Valley"), 100, "uz"),
+        (farhod, "Qo'shimcha xizmatlarni taklif qilmadi", client_map.get("AutoPrime"), 185, "uz"),
+        (rustam, "Mijozning byudjetini o'rganmadi", client_map.get("IT Park"), 200, "uz"),
+        (murod, "Texnik tafsilotlarni ko'p aytdi", client_map.get("SmartEducation"), 220, "ru"),
+        (bakhtiyor, "Closing qattiq emas", client_map.get("UzbekTrade"), 160, "uz"),
+        (shoxrux, "Mijozni tinglamadi", client_map.get("MegaMarket"), 195, "uz"),
+        (farhod, "Raqobatchi mahsulotini tanqid qildi", client_map.get("TechSoft LLC"), 170, "uz"),
+        (rustam, "Vaqtinchalik yechim taklif qildi", client_map.get("StartUp Hub"), 180, "uz"),
+        (murod, "Mijozning oldingi tajribasini so'ramadi", client_map.get("Green Valley"), 155, "uz"),
+        (bakhtiyor, "Narx strategiyasi noto'g'ri", client_map.get("AutoPrime"), 210, "uz"),
+        (shoxrux, "Sotuvchi ko'p gapirdi", client_map.get("IT Park"), 205, "uz"),
+        (farhod, "Mijozning xavotirini e'tiborsiz qoldirdi", client_map.get("SmartEducation"), 175, "uz"),
+        (rustam, "Til xatolari ko'p", client_map.get("UzbekTrade"), 160, "ru"),
+        (murod, "Mijozni qiziqtira olmadi", client_map.get("MegaMarket"), 190, "uz"),
+        (bakhtiyor, "Demo vaqtini belgilamadi", client_map.get("TechSoft LLC"), 145, "uz"),
+        (shoxrux, "Mijozning byudjetini qadirlamadi", client_map.get("StartUp Hub"), 200, "uz"),
+        (farhod, "Professional bo'lmagan xulq", client_map.get("Green Valley"), 130, "uz"),
+        (rustam, "Sotuvchi tayyorgarlik ko'rmagan", client_map.get("AutoPrime"), 185, "uz"),
+        (murod, "Qo'ng'iroqni qayta ulashda kechikish", client_map.get("IT Park"), 170, "uz"),
+        (bakhtiyor, "Mijozning shikoyatini hal qilmadi", client_map.get("SmartEducation"), 210, "uz"),
+        (shoxrux, "Sotuvchi o'zini ishonchsiz tutdi", client_map.get("UzbekTrade"), 155, "uz"),
+        (farhod, "Narxni tushuntirmadi", client_map.get("MegaMarket"), 195, "uz"),
+        (rustam, "Mijozni xursand qilmadi", client_map.get("TechSoft LLC"), 140, "uz"),
+        (murod, "Suhbatni boshqarolmadi", client_map.get("StartUp Hub"), 200, "uz"),
+        (bakhtiyor, "Texnik jihatdan notayyor", client_map.get("Green Valley"), 180, "ru"),
+        (shoxrux, "Mijozning vaqtini o'g'irladi", client_map.get("AutoPrime"), 165, "uz"),
+        (farhod, "Sotuvchi charchagan ko'rindi", client_map.get("IT Park"), 175, "uz"),
+        (rustam, "Mijozning savoliga javob bermadi", client_map.get("SmartEducation"), 190, "uz"),
+        (murod, "Professional bo'lmagan taqdimot", client_map.get("UzbekTrade"), 150, "uz"),
+        (bakhtiyor, "Mijozni rosa kutdirdi", client_map.get("MegaMarket"), 205, "uz"),
+        (shoxrux, "Sotuvchi yolg'on ma'lumot berdi", client_map.get("TechSoft LLC"), 220, "uz"),
+        (farhod, "Mijozning ishoncini boy bermadi", client_map.get("StartUp Hub"), 185, "uz"),
+        (rustam, "Qo'ng'iroq juda qisqa bo'ldi", client_map.get("Green Valley"), 90, "uz"),
+        (murod, "Sotuvchi tinglashni bilmaydi", client_map.get("AutoPrime"), 195, "uz"),
+        (bakhtiyor, "Mijozning ehtiyojini noto'g'ri aniqladi", client_map.get("IT Park"), 180, "uz"),
+        (shoxrux, "Suhbatda tortishuv bo'ldi", client_map.get("SmartEducation"), 210, "uz"),
+        (farhod, "Sotuvchi o'zini yomon ko'rsatdi", client_map.get("UzbekTrade"), 170, "uz"),
+        (rustam, "Mijozni qayta qo'ng'iroq qilishga majbur qildi", client_map.get("MegaMarket"), 160, "uz"),
+        (murod, "Sotuvchi tayyorgarlik ko'rmagan #2", client_map.get("TechSoft LLC"), 175, "uz"),
+        (bakhtiyor, "Narxni juda tez aytdi", client_map.get("StartUp Hub"), 145, "uz"),
     ]
     for yuser, name, cid, dur, lang in yonalish_problem_calls:
         if name in existing_names:
@@ -808,7 +853,7 @@ def _seed_demo_calls():
         return max(20, min(98, base + rng.randint(-20, 15)))
 
     now = datetime.now(timezone.utc)
-    total_procedural = 4
+    total_procedural = 0
 
     day_weights = []
     for d in range(60, 0, -1):

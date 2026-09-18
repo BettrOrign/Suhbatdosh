@@ -923,16 +923,16 @@ def get_manager_rankings(limit: int = 20) -> list[dict]:
         result = []
         for r in rows:
             avg_score = round(r[5]) if r[5] is not None else None
-            calls_today = r[8] or 0
-            calls_yesterday = r[9] or 0
+            calls_today = r[7] or 0
+            calls_yesterday = r[8] or 0
             trend = "up" if calls_today > calls_yesterday else ("down" if calls_today < calls_yesterday else "same")
             result.append({
                 "id": r[0], "name": r[1], "email": r[2], "role": r[3],
                 "total_calls": r[4], "avg_score": avg_score,
                 "avg_talk_ratio": round(r[6], 3) if r[6] is not None else None,
                 "calls_today": calls_today, "calls_yesterday": calls_yesterday,
-                "trend": trend, "best_score": round(r[10]) if r[10] is not None else None,
-                "solved_problems": r[11] or 0, "unsolved_problems": r[12] or 0,
+                "trend": trend, "best_score": round(r[9]) if r[9] is not None else None,
+                "solved_problems": r[10] or 0, "unsolved_problems": r[11] or 0,
             })
         return result
 

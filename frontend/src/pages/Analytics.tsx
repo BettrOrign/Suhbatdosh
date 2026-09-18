@@ -343,7 +343,9 @@ export function Analytics() {
           <CardContent>
             <div className="flex">
               <div className="space-y-2 max-h-72 overflow-y-auto mr-10">
-                {rankings.map((r, i) => (
+                {rankings
+                  .filter((r) => (r as { role?: string }).role === 'yonalish')
+                  .map((r, i) => (
                   <div key={r.id} className="flex items-center gap-3 rounded-lg border p-3 text-sm bg-current/5">
                     <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold tabular-nums">
                       {i + 1}
@@ -352,20 +354,15 @@ export function Analytics() {
                       <div className="flex items-center gap-2">
                         <span className="font-medium truncate">{r.name}</span>
                         <TrendIcon trend={r.trend} />
-                        {(r as { role?: string }).role === 'yonalish' && (
-                          <Badge variant="secondary" className="text-[10px]">{t('analytics.role_employee')}</Badge>
-                        )}
-                        {(r as { role?: string }).role === 'manager' && (
-                          <Badge variant="outline" className="text-[10px]">{t('analytics.role_manager')}</Badge>
-                        )}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {r.total_calls} {t('analytics.calls').toLowerCase()}
                         {r.avg_score != null && <> · <span className={scoreColor(r.avg_score)}>{r.avg_score}</span></>}
-                        {((r as { solved_problems?: number }).solved_problems != null || (r as { unsolved_problems?: number }).unsolved_problems != null) &&
-                          ((r as { solved_problems?: number }).solved_problems! > 0 || (r as { unsolved_problems?: number }).unsolved_problems! > 0) && (
-                          <> · <span className="text-emerald-600">✅ {(r as { solved_problems?: number }).solved_problems ?? 0} {t('analytics.solved')}</span>
-                          {' '}· <span className="text-red-500">❌ {(r as { unsolved_problems?: number }).unsolved_problems ?? 0} {t('analytics.unsolved')}</span></>
+                        {((r as { solved_problems?: number }).solved_problems ?? 0) > 0 && (
+                          <span className="text-emerald-600"> · {(r as { solved_problems?: number }).solved_problems ?? 0} {t('analytics.solved')}</span>
+                        )}
+                        {((r as { unsolved_problems?: number }).unsolved_problems ?? 0) > 0 && (
+                          <span className="text-red-500"> · {(r as { unsolved_problems?: number }).unsolved_problems ?? 0} {t('analytics.unsolved')}</span>
                         )}
                       </p>
                     </div>

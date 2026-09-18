@@ -698,11 +698,23 @@ def _seed_demo_calls():
         },
     ]
 
+    # ─── 10 kunlik sohta statistika (menejerlar + masullar) ──────────────
+    now = datetime.now(timezone.utc)
+    rng = random.Random(42)
+
+    manager_users = [(u, "manager") for u in [aziz, nodira, sardor, jasur, malika] if u]
+    receptionist_users = [(u, "receptionist") for u in [dilnoza, nilufar] if u]
+    yonalish_users = [(u, "yonalish") for u in [shoxrux, farhod, rustam, murod, bakhtiyor, jasur_yon, davron, sardor_yon, bobur, akbar] if u]
+    all_users = manager_users + receptionist_users + yonalish_users
+    client_names = list(client_map.keys())
+
+    # 1) Tayyor demo qo'ng'iroqlar — oxirgi 10 kunga yoyib chiqamiz
     for i, call_data in enumerate(demo_calls):
         if call_data["name"] in existing_names:
             continue
-        ts_offset = (len(demo_calls) - i) * 1800
-        ts = (datetime.now(timezone.utc) - timedelta(seconds=ts_offset)).isoformat()
+        days_ago = i % 10
+        day_base = now - timedelta(days=days_ago)
+        ts = day_base.replace(hour=9 + (i * 3) % 9, minute=(i * 17) % 60, second=0, microsecond=0)
         audio_path = str(wav_files[i % len(wav_files)]) if wav_files else ""
         call_id = db.create_call(
             name=call_data["name"],
@@ -719,12 +731,13 @@ def _seed_demo_calls():
             transcript=call_data["transcript"],
             language=call_data["language"],
             analysis=json.dumps(call_data["analysis"], ensure_ascii=False),
-            created_at=ts,
-            updated_at=ts,
+            created_at=ts.isoformat(),
+            updated_at=ts.isoformat(),
         )
+        existing_names.add(call_data["name"])
         log.info("Seeded hand-crafted call #%d: %s", call_id, call_data["name"][:50])
 
-    # ─── Yonalish problem calls (calls with problems that were solved) ──
+    # 2) Yonalish muammoli qo'ng'iroqlar — har kuni 5 tadan, 10 kunda 50 ta
     yonalish_problem_calls = [
         (shoxrux, "Telefon orqali mijozni yo'qotish", client_map.get("MegaMarket"), 200, "uz"),
         (farhod, "Mijozning shikayati: sotuv haqida gapirmadi", client_map.get("TechSoft LLC"), 180, "uz"),
@@ -777,10 +790,12 @@ def _seed_demo_calls():
         (murod, "Sotuvchi tayyorgarlik ko'rmagan #2", client_map.get("TechSoft LLC"), 175, "uz"),
         (bakhtiyor, "Narxni juda tez aytdi", client_map.get("StartUp Hub"), 145, "uz"),
     ]
-    for yuser, name, cid, dur, lang in yonalish_problem_calls:
+    for i, (yuser, name, cid, dur, lang) in enumerate(yonalish_problem_calls):
         if name in existing_names:
             continue
-        ts_now = (datetime.now(timezone.utc) - timedelta(seconds=3600)).isoformat()
+        days_ago = i % 10
+        day_base = now - timedelta(days=days_ago)
+        ts = day_base.replace(hour=10 + (i * 2) % 8, minute=(i * 13) % 60, second=0, microsecond=0)
         call_id = db.create_call(
             name=name,
             audio_path="",
@@ -790,32 +805,31 @@ def _seed_demo_calls():
             client_id=cid,
             source_type="upload",
         )
-        problem_scorecard = {"opening": 35, "discovery": 40, "objection_handling": 25, "value_prop": 30, "closing": 20, "rapport": 45, "talk_ratio": 38, "overall": 30}
+        score = 22 + (i * 7) % 14  # 22..35 — past ball, muammoli
+        problem_scorecard = {
+            "opening": max(15, score - 5), "discovery": max(15, score - 8),
+            "objection_handling": max(15, score - 3), "value_prop": max(15, score - 5),
+            "closing": max(15, score - 10), "rapport": max(15, score - 2),
+            "talk_ratio": 38, "overall": score,
+        }
+        masul_name = (yuser["name"] if yuser else "Masul")
         analysis = {
             "topic": name,
             "language": lang,
-            "summary": "Bu suhbatda ko'p qat'iy muammolar bor — sotuvchi ijtimoiy xususiyatlarni ko'rsatmadi, mijozni to'g'ri yo'nallatmadi.",
+            "summary": f"Bu suhbatda jiddiy muammo aniqlandi. Yonalish masuli {masul_name} muammoni tahlil qilib, mijoz bilan qayta ishladi va hal qildi.",
             "scorecard": problem_scorecard,
             "rep_share_of_talk": 0.38,
             "outcome": "lost",
-            "key_metrics": [{"name": "Muammo", "value": "Past balandlik"}],
-            "coaching_points": ["Mijoz ehtiyojlarini aniqlang", "Raqobatchi haqida suhbat boring", "Narni ochiq ayting"],
-            "next_steps": ["Mijoz bilan qayta suhbat"],
-            "action_items": [{"description": "Muammo yechish", "due_date": None, "assignee": "yonalish", "priority": "high"}]
+            "key_metrics": [{"name": "Muammo", "value": name}, {"name": "Holati", "value": "Hal qilindi"}],
+            "coaching_points": ["Mijoz ehtiyojlarini aniqlang", "Raqobatchi haqida suhbat boring", "Narxni ochiq ayting"],
+            "next_steps": ["Mijoz bilan qayta suhbat", "Muammo yechimi tasdiqlandi"],
+            "action_items": [{"description": f"{name} — hal qilindi ({masul_name})", "due_date": None, "assignee": "yonalish", "priority": "high"}]
         }
-        db.update_call(call_id, status="done", transcript="", language=lang, analysis=json.dumps(analysis, ensure_ascii=False), created_at=ts_now, updated_at=ts_now)
+        db.update_call(call_id, status="done", transcript=f"[Muammoli qo'ng'iroq — {name}]\nMasul {masul_name} tomonidan hal qilindi.", language=lang, analysis=json.dumps(analysis, ensure_ascii=False), created_at=ts.isoformat(), updated_at=ts.isoformat())
+        existing_names.add(name)
         log.info("Seeded yonalish problem call: %s", name)
 
-    # ─── Procedurally generated calls (spread over last 60 days) ───────────
-    rng = random.Random(42)
-
-    manager_users = [(u, "manager") for u in [aziz, nodira, sardor, jasur, malika] if u]
-    receptionist_users = [(u, "receptionist") for u in [dilnoza, nilufar] if u]
-    yonalish_users = [(u, "yonalish") for u in [shoxrux, farhod, rustam, murod, bakhtiyor, jasur_yon, davron, sardor_yon, bobur, akbar] if u]
-    all_users = manager_users + receptionist_users + yonalish_users
-
-    client_names = list(client_map.keys())
-
+    # ─── 3) Menejerlar kunlik qo'ng'iroqlari — 10 kun, chiroyli o'suvchi statistika ──
     topics_manager = [
         "CRM tizimini sotish", "IT xizmatlari bo'yicha muzokara", "Marketing strategiyasi",
         "Korporativ trening sotish", "Biznes rejalash maslahati", "Logistika tizimini sotish",
@@ -852,38 +866,17 @@ def _seed_demo_calls():
     def random_score(base):
         return max(20, min(98, base + rng.randint(-20, 15)))
 
-    now = datetime.now(timezone.utc)
-    total_procedural = 0
-
-    day_weights = []
-    for d in range(60, 0, -1):
-        day = now - timedelta(days=d)
-        base_weight = max(1, 5 - (d // 15))
-        if day.weekday() in (5, 6):
-            base_weight = max(1, base_weight - 2)
-        day_weights.append((d, base_weight))
-
-    total_weight = sum(w for _, w in day_weights)
-    calls_per_day = {}
-    remaining = total_procedural
-    for d, w in day_weights:
-        n = max(0, round(total_procedural * w / total_weight))
-        n = min(n, remaining)
-        calls_per_day[d] = n
-        remaining -= n
-    for d in sorted(calls_per_day.keys(), reverse=True)[:remaining]:
-        calls_per_day[d] += 1
-
     call_counter = 0
-    for days_ago in sorted(calls_per_day.keys(), reverse=True):
-        n_calls = calls_per_day[days_ago]
-        if n_calls == 0:
-            continue
-
+    for days_ago in range(9, -1, -1):
         day_base = now - timedelta(days=days_ago)
+        is_weekend = day_base.weekday() in (5, 6)
+        n_calls = 6 if is_weekend else 12
+        # bugungi kun hali tugamagan — biroz kamroq
+        if days_ago == 0:
+            n_calls = 7
 
-        for _ in range(n_calls):
-            if rng.random() < 0.80:
+        for k in range(n_calls):
+            if rng.random() < 0.85:
                 user, utype = rng.choice(manager_users)
                 topic = rng.choice(topics_manager)
                 call_type = "manager"
@@ -899,10 +892,14 @@ def _seed_demo_calls():
             hour = rng.randint(9, 17)
             minute = rng.randint(0, 59)
             ts = day_base.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            if ts > now:
+                ts = now - timedelta(minutes=rng.randint(10, 300))
 
             lang = rng.choice(languages)
-            score_base = rng.randint(55, 88)
-            overall = random_score(score_base)
+            # chiroyli o'suvchi trend: eski kunlar ~68, bugun ~80
+            trend = (9 - days_ago) * 1.2
+            score_base = int(68 + trend + rng.randint(-8, 10))
+            overall = max(55, min(93, score_base))
             talk_ratio = round(rng.uniform(0.30, 0.65), 2)
             outcome = rng.choice(outcomes)
 
@@ -934,7 +931,7 @@ def _seed_demo_calls():
                 "action_items": [{"description": "Keyingi qadamni belgilash", "due_date": None, "assignee": "manager", "priority": "medium"}],
             }
 
-            call_name = f"{topic} — {rng.choice(['qo\'ng\'iroq', 'suhbat', 'muzokara', 'konsultatsiya'])} #{call_counter + 1}"
+            call_name = f"{topic} — {rng.choice(['qo\'ng\'iroq', 'suhbat', 'muzokara', 'konsultatsiya'])} #{days_ago}kun-{k + 1}"
             if call_name in existing_names:
                 call_counter += 1
                 continue
@@ -958,6 +955,7 @@ def _seed_demo_calls():
                 created_at=ts_iso,
                 updated_at=ts_iso,
             )
+            existing_names.add(call_name)
             call_counter += 1
 
     # ─── A few "processing" and "error" calls for today ────────────────────

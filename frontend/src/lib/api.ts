@@ -154,6 +154,6 @@ export const api = {
   getWeeklyTrend: () => request<{ day: string; total_calls: number; done_calls: number; avg_score: number | null; avg_duration: number | null }[]>('/api/stats/weekly-trend'),
   getMonthlyTrend: () => request<{ week: string; total_calls: number; done_calls: number; avg_score: number | null }[]>('/api/stats/monthly-trend'),
   getProblemCalls: () => request<{ id: number; name: string; duration_sec: number; source_type: string; created_at: string; score: number | null; outcome: string; summary: string; uploader_name: string | null }[]>('/api/stats/problem-calls'),
-  getManagerRankings: () => request<{ id: number; name: string; email: string; total_calls: number; avg_score: number | null; avg_talk_ratio: number | null; calls_today: number; calls_yesterday: number; trend: string; best_score: number | null }[]>('/api/stats/manager-rankings'),
+  getManagerRankings: () => request<{ id: number; name: string; email: string; role?: string; total_calls: number; avg_score: number | null; avg_talk_ratio: number | null; calls_today: number; calls_yesterday: number; trend: string; best_score: number | null; solved_problems?: number; unsolved_problems?: number }[]>('/api/stats/manager-rankings'),
   getSourceBreakdown: () => request<Record<string, number>>('/api/stats/source-breakdown'),
 }

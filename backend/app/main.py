@@ -117,9 +117,9 @@ def _seed_default_users():
         ("Rustam Zoirov", "rustam@suhbatdosh.uz", "rustam1234"),
         ("Murod Abdullayev", "murod@suhbatdosh.uz", "murod1234"),
         ("Bakhtiyor Karimov", "bakhtiyor@suhbatdosh.uz", "bakhtiyor1234"),
-        ("Jasur Raximov", "jasur.yonalish@suhbatdosh.uz", "jasur1234"),
+        ("Jasur Ergashev", "jasur.yonalish@suhbatdosh.uz", "jasur1234"),
         ("Davron Mirzayev", "davron@suhbatdosh.uz", "davron1234"),
-        ("Sardor Alimov", "sardor.yonalish@suhbatdosh.uz", "sardor1234"),
+        ("Sardor Yusupov", "sardor.yonalish@suhbatdosh.uz", "sardor1234"),
         ("Bobur Turgunov", "bobur@suhbatdosh.uz", "bobur1234"),
         ("Akbar Normatov", "akbar@suhbatdosh.uz", "akbar1234"),
     ]
@@ -698,7 +698,7 @@ def _seed_demo_calls():
         },
     ]
 
-    # ─── 10 kunlik sohta statistika (menejerlar + masullar) ──────────────
+    # ─── 10 kunlik sohta statistika (menejerlar + xodimlar) ──────────────
     now = datetime.now(timezone.utc)
     rng = random.Random(42)
 
@@ -812,20 +812,33 @@ def _seed_demo_calls():
             "closing": max(15, score - 10), "rapport": max(15, score - 2),
             "talk_ratio": 38, "overall": score,
         }
-        masul_name = (yuser["name"] if yuser else "Masul")
+        masul_name = (yuser["name"] if yuser else "Xodim")
+        solved = i < 35  # birinchi 35 tasi hal qilingan, oxirgi 15 tasi hali ochiq
+        if solved:
+            summary = f"Bu suhbatda jiddiy muammo aniqlandi. Xodim {masul_name} muammoni tahlil qilib, mijoz bilan qayta ishladi va hal qildi."
+            key_metrics = [{"name": "Muammo", "value": name}, {"name": "Holati", "value": "Hal qilindi"}]
+            next_steps = ["Mijoz bilan qayta suhbat", "Muammo yechimi tasdiqlandi"]
+            action_items = [{"description": f"{name} — hal qilindi ({masul_name})", "due_date": None, "assignee": "yonalish", "priority": "high"}]
+            transcript = f"[Muammoli qo'ng'iroq — {name}]\nXodim {masul_name} tomonidan hal qilindi."
+        else:
+            summary = f"Bu suhbatda jiddiy muammo aniqlandi, lekin hali hal qilinmagan. Xodim {masul_name} ustida ishlamoqda."
+            key_metrics = [{"name": "Muammo", "value": name}, {"name": "Holati", "value": "Hali ochiq"}]
+            next_steps = ["Zudlik bilan mijozga qayta bog'lanish", "Muammoni hal qilish"]
+            action_items = [{"description": f"{name} — hali ochiq, hal qilish kerak ({masul_name})", "due_date": None, "assignee": "yonalish", "priority": "high"}]
+            transcript = f"[Muammoli qo'ng'iroq — {name}]\nHali hal qilinmagan, {masul_name} ishlamoqda."
         analysis = {
             "topic": name,
             "language": lang,
-            "summary": f"Bu suhbatda jiddiy muammo aniqlandi. Yonalish masuli {masul_name} muammoni tahlil qilib, mijoz bilan qayta ishladi va hal qildi.",
+            "summary": summary,
             "scorecard": problem_scorecard,
             "rep_share_of_talk": 0.38,
             "outcome": "lost",
-            "key_metrics": [{"name": "Muammo", "value": name}, {"name": "Holati", "value": "Hal qilindi"}],
+            "key_metrics": key_metrics,
             "coaching_points": ["Mijoz ehtiyojlarini aniqlang", "Raqobatchi haqida suhbat boring", "Narxni ochiq ayting"],
-            "next_steps": ["Mijoz bilan qayta suhbat", "Muammo yechimi tasdiqlandi"],
-            "action_items": [{"description": f"{name} — hal qilindi ({masul_name})", "due_date": None, "assignee": "yonalish", "priority": "high"}]
+            "next_steps": next_steps,
+            "action_items": action_items
         }
-        db.update_call(call_id, status="done", transcript=f"[Muammoli qo'ng'iroq — {name}]\nMasul {masul_name} tomonidan hal qilindi.", language=lang, analysis=json.dumps(analysis, ensure_ascii=False), created_at=ts.isoformat(), updated_at=ts.isoformat())
+        db.update_call(call_id, status="done", transcript=transcript, language=lang, analysis=json.dumps(analysis, ensure_ascii=False), created_at=ts.isoformat(), updated_at=ts.isoformat())
         existing_names.add(name)
         log.info("Seeded yonalish problem call: %s", name)
 

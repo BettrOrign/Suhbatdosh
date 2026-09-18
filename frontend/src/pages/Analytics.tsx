@@ -352,10 +352,21 @@ export function Analytics() {
                       <div className="flex items-center gap-2">
                         <span className="font-medium truncate">{r.name}</span>
                         <TrendIcon trend={r.trend} />
+                        {(r as { role?: string }).role === 'yonalish' && (
+                          <Badge variant="secondary" className="text-[10px]">{t('analytics.role_employee')}</Badge>
+                        )}
+                        {(r as { role?: string }).role === 'manager' && (
+                          <Badge variant="outline" className="text-[10px]">{t('analytics.role_manager')}</Badge>
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {r.total_calls} {t('analytics.calls').toLowerCase()}
                         {r.avg_score != null && <> · <span className={scoreColor(r.avg_score)}>{r.avg_score}</span></>}
+                        {((r as { solved_problems?: number }).solved_problems != null || (r as { unsolved_problems?: number }).unsolved_problems != null) &&
+                          ((r as { solved_problems?: number }).solved_problems! > 0 || (r as { unsolved_problems?: number }).unsolved_problems! > 0) && (
+                          <> · <span className="text-emerald-600">✅ {(r as { solved_problems?: number }).solved_problems ?? 0} {t('analytics.solved')}</span>
+                          {' '}· <span className="text-red-500">❌ {(r as { unsolved_problems?: number }).unsolved_problems ?? 0} {t('analytics.unsolved')}</span></>
+                        )}
                       </p>
                     </div>
                     {r.best_score != null && (

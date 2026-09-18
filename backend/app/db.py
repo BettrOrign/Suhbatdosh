@@ -889,38 +889,50 @@ def get_problem_calls(limit: int = 10) -> list[dict]:
 
 
 def get_manager_rankings(limit: int = 20) -> list[dict]:
-    """Full manager performance rankings with trend indicators."""
+    """Full performance rankings with trend indicators (managers + xodimlar).
+
+    Includes ``manager`` and ``yonalish`` roles so the Xodimlar card never
+    stays empty. Also counts solved vs unsolved problem calls per user:
+    solved = score < 50 and analysis mentions "hal qilindi".
+    """
     with get_db() as db:
         rows = db.execute(
             """
-            SELECT u.id, u.name, u.email,
+            SELECT u.id, u.name, u.email, u.role,
                    COUNT(c.id) as total_calls,
                    AVG(CASE WHEN c.status = 'done' THEN json_extract(c.analysis, '$.scorecard.overall') END) as avg_score,
                    AVG(CASE WHEN c.status = 'done' THEN json_extract(c.analysis, '$.rep_share_of_talk') END) as avg_talk,
                    SUM(CASE WHEN date(c.created_at) = date('now') THEN 1 ELSE 0 END) as calls_today,
                    SUM(CASE WHEN date(c.created_at) = date('now', '-1 day') THEN 1 ELSE 0 END) as calls_yesterday,
-                   MAX(CASE WHEN c.status = 'done' THEN json_extract(c.analysis, '$.scorecard.overall') END) as best_score
+                   MAX(CASE WHEN c.status = 'done' THEN json_extract(c.analysis, '$.scorecard.overall') END) as best_score,
+                   SUM(CASE WHEN c.status = 'done'
+                             AND json_extract(c.analysis, '$.scorecard.overall') < 50
+                             AND lower(coalesce(c.analysis, '')) LIKE '%hal qilindi%' THEN 1 ELSE 0 END) as solved_problems,
+                   SUM(CASE WHEN c.status = 'done'
+                             AND json_extract(c.analysis, '$.scorecard.overall') < 50
+                             AND lower(coalesce(c.analysis, '')) NOT LIKE '%hal qilindi%' THEN 1 ELSE 0 END) as unsolved_problems
             FROM users u
             LEFT JOIN calls c ON c.user_id = u.id AND c.call_type = 'manager'
-            WHERE u.role = 'manager' AND u.active = 1
+            WHERE u.role IN ('manager', 'yonalish') AND u.active = 1
             GROUP BY u.id
-            ORDER BY avg_score DESC NULLS LAST
+            ORDER BY total_calls DESC, avg_score DESC NULLS LAST
             LIMIT ?
             """,
             (limit,),
         ).fetchall()
         result = []
         for r in rows:
-            avg_score = round(r[4]) if r[4] is not None else None
-            calls_today = r[7] or 0
-            calls_yesterday = r[8] or 0
+            avg_score = round(r[5]) if r[5] is not None else None
+            calls_today = r[8] or 0
+            calls_yesterday = r[9] or 0
             trend = "up" if calls_today > calls_yesterday else ("down" if calls_today < calls_yesterday else "same")
             result.append({
-                "id": r[0], "name": r[1], "email": r[2],
-                "total_calls": r[3], "avg_score": avg_score,
-                "avg_talk_ratio": round(r[5], 3) if r[5] is not None else None,
+                "id": r[0], "name": r[1], "email": r[2], "role": r[3],
+                "total_calls": r[4], "avg_score": avg_score,
+                "avg_talk_ratio": round(r[6], 3) if r[6] is not None else None,
                 "calls_today": calls_today, "calls_yesterday": calls_yesterday,
-                "trend": trend, "best_score": round(r[6]) if r[6] is not None else None,
+                "trend": trend, "best_score": round(r[10]) if r[10] is not None else None,
+                "solved_problems": r[11] or 0, "unsolved_problems": r[12] or 0,
             })
         return result
 

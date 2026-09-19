@@ -72,6 +72,9 @@ export function Analytics() {
   const [weeklyTrend, setWeeklyTrend] = useState<WeeklyTrend>([])
   const [rankings, setRankings] = useState<ManagerRanking>([])
   const [calls, setCalls] = useState<Call[]>([])
+  const [selectedEmployee, setSelectedEmployee] = useState<{ id: number; name: string } | null>(null)
+  const [empCalls, setEmpCalls] = useState<Call[]>([])
+  const [empLoading, setEmpLoading] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -96,6 +99,19 @@ export function Analytics() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const loadEmpCalls = useCallback(async (emp: { id: number; name: string }) => {
+    setSelectedEmployee(emp)
+    setEmpLoading(true)
+    try {
+      const cl = await api.listManagerCalls(emp.id)
+      setEmpCalls(cl)
+    } catch {
+      setEmpCalls([])
+    } finally {
+      setEmpLoading(false)
+    }
+  }, [])
 
   const scoreDistData = (() => {
     const done = calls.filter((c) => c.status === 'done' && typeof c.analysis?.scorecard?.overall === 'number')
@@ -341,12 +357,16 @@ export function Analytics() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex">
-              <div className="space-y-2 max-h-72 overflow-y-auto mr-10">
+            <div className="flex gap-4">
+              <div className="space-y-2 max-h-72 overflow-y-auto flex-1 min-w-0">
                 {rankings
                   .filter((r) => (r as { role?: string }).role === 'yonalish')
                   .map((r, i) => (
-                  <div key={r.id} className="flex items-center gap-3 rounded-lg border p-3 text-sm bg-current/5">
+                  <div
+                    key={r.id}
+                    onClick={() => loadEmpCalls({ id: r.id, name: r.name })}
+                    className={`flex items-center gap-3 rounded-lg border p-3 text-sm bg-current/5 cursor-pointer transition-all hover:bg-indigo-50 dark:hover:bg-indigo-950/30 hover:border-indigo-300 dark:hover:border-indigo-700 ${selectedEmployee?.id === r.id ? 'ring-2 ring-indigo-500 border-indigo-400' : ''}`}
+                  >
                     <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold tabular-nums">
                       {i + 1}
                     </span>
@@ -372,7 +392,40 @@ export function Analytics() {
                   </div>
                 ))}
               </div>
-              <div className="size-full h-auto max-w-192 border-1 border-sky-500 rounded-2xl bg-current/5"></div>
+              <div className="w-80 shrink-0 border rounded-xl bg-current/5 p-3 overflow-y-auto max-h-72">
+                {selectedEmployee ? (
+                  empLoading ? (
+                    <div className="flex items-center justify-center h-full text-xs text-muted-foreground">{t('analytics.loading')}</div>
+                  ) : empCalls.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full gap-2 text-xs text-muted-foreground">
+                      <p>{t('analytics.no_calls_for', { name: selectedEmployee.name })}</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-semibold text-foreground mb-2">{selectedEmployee.name} — {t('analytics.problems_list')}</p>
+                      {empCalls.map((c) => (
+                        <div key={c.id} className="rounded-lg border p-2 text-xs">
+                          <p className="font-medium truncate">{c.name}</p>
+                          <div className="flex items-center gap-2 mt-1 text-muted-foreground">
+                            {c.analysis?.scorecard?.overall != null && (
+                              <span className={scoreColor(c.analysis.scorecard.overall)}>{c.analysis.scorecard.overall}</span>
+                            )}
+                            {c.client_name && <span className="truncate">· {c.client_name}</span>}
+                            {c.duration_sec != null && <span>· {formatDuration(c.duration_sec)}</span>}
+                          </div>
+                          {c.analysis && 'action_items' in c.analysis && c.analysis.action_items?.[0]?.description && (
+                            <p className="text-[11px] text-muted-foreground mt-1 truncate">{c.analysis.action_items[0].description}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full gap-2 text-xs text-muted-foreground">
+                    <p>{t('analytics.click_employee')}</p>
+                  </div>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>

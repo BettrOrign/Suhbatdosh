@@ -79,6 +79,7 @@ export interface CallAnalysis {
   key_metrics: KeyMetric[]
   coaching_points: string[]
   next_steps: string[]
+  action_items: { description: string; due_date: string | null; assignee: string; priority: string }[]
 }
 
 export interface Call {

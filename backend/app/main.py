@@ -737,59 +737,43 @@ def _seed_demo_calls():
         existing_names.add(call_data["name"])
         log.info("Seeded hand-crafted call #%d: %s", call_id, call_data["name"][:50])
 
-    # 2) Yonalish muammoli qo'ng'iroqlar — har kuni 5 tadan, 10 kunda 50 ta
-    yonalish_problem_calls = [
-        (shoxrux, "Telefon orqali mijozni yo'qotish", client_map.get("MegaMarket"), 200, "uz"),
-        (farhod, "Mijozning shikayati: sotuv haqida gapirmadi", client_map.get("TechSoft LLC"), 180, "uz"),
-        (rustam, "Raqobatchi haqida gapirmadi", client_map.get("Green Valley"), 150, "uz"),
-        (murod, "Narxni ochiq aytmadi", client_map.get("AutoPrime"), 170, "uz"),
-        (bakhtiyor, "Mijozni to'g'ri yo'nallatmadi", client_map.get("IT Park"), 160, "uz"),
-        (shoxrux, "Qo'ng'iroqni juda kech boshladi", client_map.get("SmartEducation"), 190, "uz"),
-        (farhod, "Professional bo'lmagan til ishlatdi", client_map.get("UzbekTrade"), 140, "uz"),
-        (rustam, "Ehtiyoj aniqlash bosqichini o'tkazib yubordi", client_map.get("MegaMarket"), 210, "uz"),
-        (murod, "Mijozning e'tirozini to'g'ri hal qilmadi", client_map.get("TechSoft LLC"), 175, "ru"),
-        (bakhtiyor, "Suhbatni ertacha yakunladi", client_map.get("StartUp Hub"), 130, "uz"),
-        (shoxrux, "Dastlabki salomlashuv juda sovuq", client_map.get("Green Valley"), 100, "uz"),
-        (farhod, "Qo'shimcha xizmatlarni taklif qilmadi", client_map.get("AutoPrime"), 185, "uz"),
-        (rustam, "Mijozning byudjetini o'rganmadi", client_map.get("IT Park"), 200, "uz"),
-        (murod, "Texnik tafsilotlarni ko'p aytdi", client_map.get("SmartEducation"), 220, "ru"),
-        (bakhtiyor, "Closing qattiq emas", client_map.get("UzbekTrade"), 160, "uz"),
-        (shoxrux, "Mijozni tinglamadi", client_map.get("MegaMarket"), 195, "uz"),
-        (farhod, "Raqobatchi mahsulotini tanqid qildi", client_map.get("TechSoft LLC"), 170, "uz"),
-        (rustam, "Vaqtinchalik yechim taklif qildi", client_map.get("StartUp Hub"), 180, "uz"),
-        (murod, "Mijozning oldingi tajribasini so'ramadi", client_map.get("Green Valley"), 155, "uz"),
-        (bakhtiyor, "Narx strategiyasi noto'g'ri", client_map.get("AutoPrime"), 210, "uz"),
-        (shoxrux, "Sotuvchi ko'p gapirdi", client_map.get("IT Park"), 205, "uz"),
-        (farhod, "Mijozning xavotirini e'tiborsiz qoldirdi", client_map.get("SmartEducation"), 175, "uz"),
-        (rustam, "Til xatolari ko'p", client_map.get("UzbekTrade"), 160, "ru"),
-        (murod, "Mijozni qiziqtira olmadi", client_map.get("MegaMarket"), 190, "uz"),
-        (bakhtiyor, "Demo vaqtini belgilamadi", client_map.get("TechSoft LLC"), 145, "uz"),
-        (shoxrux, "Mijozning byudjetini qadirlamadi", client_map.get("StartUp Hub"), 200, "uz"),
-        (farhod, "Professional bo'lmagan xulq", client_map.get("Green Valley"), 130, "uz"),
-        (rustam, "Sotuvchi tayyorgarlik ko'rmagan", client_map.get("AutoPrime"), 185, "uz"),
-        (murod, "Qo'ng'iroqni qayta ulashda kechikish", client_map.get("IT Park"), 170, "uz"),
-        (bakhtiyor, "Mijozning shikoyatini hal qilmadi", client_map.get("SmartEducation"), 210, "uz"),
-        (shoxrux, "Sotuvchi o'zini ishonchsiz tutdi", client_map.get("UzbekTrade"), 155, "uz"),
-        (farhod, "Narxni tushuntirmadi", client_map.get("MegaMarket"), 195, "uz"),
-        (rustam, "Mijozni xursand qilmadi", client_map.get("TechSoft LLC"), 140, "uz"),
-        (murod, "Suhbatni boshqarolmadi", client_map.get("StartUp Hub"), 200, "uz"),
-        (bakhtiyor, "Texnik jihatdan notayyor", client_map.get("Green Valley"), 180, "ru"),
-        (shoxrux, "Mijozning vaqtini o'g'irladi", client_map.get("AutoPrime"), 165, "uz"),
-        (farhod, "Sotuvchi charchagan ko'rindi", client_map.get("IT Park"), 175, "uz"),
-        (rustam, "Mijozning savoliga javob bermadi", client_map.get("SmartEducation"), 190, "uz"),
-        (murod, "Professional bo'lmagan taqdimot", client_map.get("UzbekTrade"), 150, "uz"),
-        (bakhtiyor, "Mijozni rosa kutdirdi", client_map.get("MegaMarket"), 205, "uz"),
-        (shoxrux, "Sotuvchi yolg'on ma'lumot berdi", client_map.get("TechSoft LLC"), 220, "uz"),
-        (farhod, "Mijozning ishoncini boy bermadi", client_map.get("StartUp Hub"), 185, "uz"),
-        (rustam, "Qo'ng'iroq juda qisqa bo'ldi", client_map.get("Green Valley"), 90, "uz"),
-        (murod, "Sotuvchi tinglashni bilmaydi", client_map.get("AutoPrime"), 195, "uz"),
-        (bakhtiyor, "Mijozning ehtiyojini noto'g'ri aniqladi", client_map.get("IT Park"), 180, "uz"),
-        (shoxrux, "Suhbatda tortishuv bo'ldi", client_map.get("SmartEducation"), 210, "uz"),
-        (farhod, "Sotuvchi o'zini yomon ko'rsatdi", client_map.get("UzbekTrade"), 170, "uz"),
-        (rustam, "Mijozni qayta qo'ng'iroq qilishga majbur qildi", client_map.get("MegaMarket"), 160, "uz"),
-        (murod, "Sotuvchi tayyorgarlik ko'rmagan #2", client_map.get("TechSoft LLC"), 175, "uz"),
-        (bakhtiyor, "Narxni juda tez aytdi", client_map.get("StartUp Hub"), 145, "uz"),
+    # 2) Yonalish muammoli qo'ng'iroqlar — barcha 10 xodimga taqsimlangan, 10 kunda 50 ta
+    all_yonalish = [shoxrux, farhod, rustam, murod, bakhtiyor, jasur_yon, davron, sardor_yon, bobur, akbar]
+    problem_names = [
+        "Telefon orqali mijozni yo'qotish", "Mijozning shikayati: sotuv haqida gapirmadi",
+        "Raqobatchi haqida gapirmadi", "Narxni ochiq aytmadi",
+        "Mijozni to'g'ri yo'nallatmadi", "Qo'ng'iroqni juda kech boshladi",
+        "Professional bo'lmagan til ishlatdi", "Ehtiyoj aniqlash bosqichini o'tkazib yubordi",
+        "Mijozning e'tirozini to'g'ri hal qilmadi", "Suhbatni ertacha yakunladi",
+        "Dastlabki salomlashuv juda sovuq", "Qo'shimcha xizmatlarni taklif qilmadi",
+        "Mijozning byudjetini o'rganmadi", "Texnik tafsilotlarni ko'p aytdi",
+        "Closing qattiq emas", "Mijozni tinglamadi",
+        "Raqobatchi mahsulotini tanqid qildi", "Vaqtinchalik yechim taklif qildi",
+        "Mijozning oldingi tajribasini so'ramadi", "Narx strategiyasi noto'g'ri",
+        "Sotuvchi ko'p gapirdi", "Mijozning xavotirini e'tiborsiz qoldirdi",
+        "Til xatolari ko'p", "Mijozni qiziqtira olmadi",
+        "Demo vaqtini belgilamadi", "Mijozning byudjetini qadirlamadi",
+        "Professional bo'lmagan xulq", "Sotuvchi tayyorgarlik ko'rmagan",
+        "Qo'ng'iroqni qayta ulashda kechikish", "Mijozning shikoyatini hal qilmadi",
+        "Sotuvchi o'zini ishonchsiz tutdi", "Narxni tushuntirmadi",
+        "Mijozni xursand qilmadi", "Suhbatni boshqarolmadi",
+        "Texnik jihatdan notayyor", "Mijozning vaqtini o'g'irladi",
+        "Sotuvchi charchagan ko'rindi", "Mijozning savoliga javob bermadi",
+        "Professional bo'lmagan taqdimot", "Mijozni rosa kutdirdi",
+        "Sotuvchi yolg'on ma'lumot berdi", "Mijozning ishoncini boy bermadi",
+        "Qo'ng'iroq juda qisqa bo'ldi", "Sotuvchi tinglashni bilmaydi",
+        "Mijozning ehtiyojini noto'g'ri aniqladi", "Suhbatda tortishuv bo'ldi",
+        "Sotuvchi o'zini yomon ko'rsatdi", "Mijozni qayta qo'ng'iroq qilishga majbur qildi",
+        "Sotuvchi tayyorgarlik ko'rmagan #2", "Narxni juda tez aytdi",
     ]
+    client_keys = list(client_map.keys())
+    yonalish_problem_calls = []
+    for pi, pname in enumerate(problem_names):
+        yuser = all_yonalish[pi % len(all_yonalish)]
+        cname = client_keys[pi % len(client_keys)]
+        yonalish_problem_calls.append(
+            (yuser, pname, client_map.get(cname), 120 + (pi * 7) % 120, rng.choice(["uz", "uz", "uz", "ru"]))
+        )
     for i, (yuser, name, cid, dur, lang) in enumerate(yonalish_problem_calls):
         if name in existing_names:
             continue

@@ -18,7 +18,7 @@ import httpx
 
 logger = logging.getLogger("suhbatdosh.zadarma")
 
-BASE_URL = "https://api.zadarma.com/v1"
+BASE_URL = "https://api.zadarma.com"
 
 
 def _sign(method: str, params: dict, secret: str) -> str:
@@ -36,8 +36,8 @@ def _sign(method: str, params: dict, secret: str) -> str:
     md5_params = hashlib.md5(params_str.encode()).hexdigest()
     # method is e.g. "/v1/statistics/pbx/"
     string_to_sign = f"{method}{params_str}{md5_params}"
-    signature = hmac.new(secret.encode(), string_to_sign.encode(), hashlib.sha1).digest()
-    return b64encode(signature).decode()
+    signature = hmac.new(secret.encode(), string_to_sign.encode(), hashlib.sha1).hexdigest()
+    return b64encode(signature.encode()).decode()
 
 
 class ZadarmaClient:

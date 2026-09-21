@@ -10,8 +10,8 @@ Requires ZADARMA_API_KEY and ZADARMA_API_SECRET environment variables.
 import hashlib
 import hmac
 import logging
-import time
 from base64 import b64encode
+from collections import OrderedDict
 from urllib.parse import urlencode
 
 import httpx
@@ -21,23 +21,16 @@ logger = logging.getLogger("suhbatdosh.zadarma")
 BASE_URL = "https://api.zadarma.com"
 
 
-def _sign(method: str, params: dict, secret: str) -> str:
+def _sign(method: str, params_str: str, secret: str) -> str:
     """Generate the HMAC-SHA1 signature required by the Zadarma API.
 
-    Algorithm (from Zadarma docs):
-      1. Sort params by key alphabetically
-      2. Build query string (RFC 1738 encoding)
-      3. string_to_sign = METHOD + request_path + md5(query_string)
-      4. hash = HMAC-SHA1(string_to_sign, secret)
-      5. base64-encode the hash
+    Matches the official Python library exactly:
+      string_to_sign = method + params_string + md5(params_string)
+      signature = base64(HMAC-SHA1(string_to_sign, secret).hexdigest())
     """
-    sorted_params = dict(sorted(params.items()))
-    params_str = urlencode(sorted_params, quote_via=lambda s, *a, **kw: s)
-    md5_params = hashlib.md5(params_str.encode()).hexdigest()
-    # method is e.g. "/v1/statistics/pbx/"
-    string_to_sign = f"{method}{params_str}{md5_params}"
-    signature = hmac.new(secret.encode(), string_to_sign.encode(), hashlib.sha1).hexdigest()
-    return b64encode(signature.encode()).decode()
+    data = method + params_str + hashlib.md5(params_str.encode("utf-8")).hexdigest()
+    hmac_h = hmac.new(secret.encode("utf-8"), data.encode("utf-8"), hashlib.sha1)
+    return b64encode(bytes(hmac_h.hexdigest(), "utf-8")).decode()
 
 
 class ZadarmaClient:
@@ -51,23 +44,27 @@ class ZadarmaClient:
     def _request(self, method: str, path: str, params: dict | None = None) -> dict:
         """Make an authenticated GET request and return the parsed JSON body."""
         params = params or {}
-        signature = _sign(path, params, self.api_secret)
+        params["format"] = "json"
+        params_str = urlencode(OrderedDict(sorted(params.items())))
+        signature = _sign(path, params_str, self.api_secret)
         headers = {"Authorization": f"{self.api_key}:{signature}"}
-        url = f"{BASE_URL}{path}"
-        resp = self._http.get(url, params=params, headers=headers)
+        url = f"{BASE_URL}{path}?{params_str}"
+        resp = self._http.get(url, headers=headers)
         resp.raise_for_status()
         return resp.json()
 
     def _request_post(self, path: str, data: dict | None = None) -> dict:
         """Make an authenticated POST request and return the parsed JSON body."""
         data = data or {}
-        signature = _sign(path, data, self.api_secret)
+        data["format"] = "json"
+        params_str = urlencode(OrderedDict(sorted(data.items())))
+        signature = _sign(path, params_str, self.api_secret)
         headers = {
             "Authorization": f"{self.api_key}:{signature}",
             "Content-Type": "application/x-www-form-urlencoded",
         }
         url = f"{BASE_URL}{path}"
-        resp = self._http.post(url, data=data, headers=headers)
+        resp = self._http.post(url, data=params_str, headers=headers)
         resp.raise_for_status()
         return resp.json()
 
@@ -90,7 +87,7 @@ class ZadarmaClient:
             end: "YYYY-MM-DD HH:MM:SS"
             version: stats format version (2 = new)
             skip: offset for pagination
-            limit: max rows (1–1000)
+            limit: max rows (1-1000)
 
         Returns the full API response dict with ``stats`` list.
         """

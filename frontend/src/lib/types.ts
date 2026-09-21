@@ -35,7 +35,7 @@ export interface Manager extends User {
 
 export type CallType = 'manager' | 'receptionist'
 
-export type SourceType = 'upload' | 'ingest' | 'telegram_voice' | 'telegram_audio' | 'telegram_video' | 'youtube'
+export type SourceType = 'upload' | 'ingest' | 'telegram_voice' | 'telegram_audio' | 'telegram_video' | 'youtube' | 'zadarma'
 
 export type CallStatus =
   | 'uploaded'

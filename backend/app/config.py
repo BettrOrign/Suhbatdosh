@@ -74,6 +74,10 @@ TELEGRAM_ADMIN_IDS: list[int] = [
 # --- YouTube Integration -----------------------------------------------------
 YOUTUBE_ENABLED = os.getenv("YOUTUBE_ENABLED", "true").lower() in ("true", "1", "yes")
 
+# --- Zadarma Integration ----------------------------------------------------
+ZADARMA_API_KEY = os.getenv("ZADARMA_API_KEY", "")
+ZADARMA_API_SECRET = os.getenv("ZADARMA_API_SECRET", "")
+
 # Ensure the directories the app writes audio/pcm into exist at import time,
 # so concurrent upload jobs never race to create them on first use.
 for d in (AUDIO_DIR, PCM_DIR):

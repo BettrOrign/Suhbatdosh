@@ -18,6 +18,7 @@ from .routes_ingest import router as ingest_router
 from .routes_managers import router as managers_router
 from .routes_notifications import router as notifications_router
 from .routes_sources import router as sources_router
+from .routes_zadarma import router as zadarma_router
 from .telegram_bot import create_bot_application
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -70,6 +71,7 @@ app.include_router(ingest_router)
 app.include_router(managers_router)
 app.include_router(notifications_router)
 app.include_router(sources_router)
+app.include_router(zadarma_router)
 
 
 def _seed_admin():

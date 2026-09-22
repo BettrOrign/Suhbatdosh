@@ -147,16 +147,26 @@ export function Analytics() {
       <motion.div
         initial={reduceMotion ? false : { opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="mb-10"
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+        className="mb-8"
       >
-        <div className="flex items-center gap-4 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-6 text-white shadow-lg shadow-indigo-500/25">
-          <div className="flex size-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur">
-            <TrendingUp className="size-6" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">{t('analytics.title')}</h1>
-            <p className="text-sm text-white/70">{user?.name ?? ''}</p>
+        <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-card p-6 shadow-xs">
+          <div className="absolute -top-12 -right-12 size-40 rounded-full bg-primary/5 blur-2xl pointer-events-none" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative">
+            <div className="flex items-center gap-4">
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-xs">
+                <TrendingUp className="size-6" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight text-foreground">{t('analytics.title')}</h1>
+                <p className="text-sm text-muted-foreground mt-0.5">{user?.name ? `${t('dashboard.welcome_desc')} · ${user.name}` : t('dashboard.welcome_desc')}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <Badge variant="secondary" className="text-xs font-medium px-3 py-1">
+                {new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+              </Badge>
+            </div>
           </div>
         </div>
       </motion.div>
@@ -346,82 +356,107 @@ export function Analytics() {
         </Card>
       </div>
 
-      {/* Problems */}
+      {/* Manager Rankings */}
       <div className="block">
-        {/* clients */}
-        <Card>
-          <CardHeader className="pb-10">
-            <CardTitle className="text-2xl font-medium items-center gap-2">
-              <BarChart3 className="size-4" />
+        <Card className="border-border/70 shadow-xs">
+          <CardHeader className="pb-4 border-b border-border/50">
+            <CardTitle className="text-lg font-bold flex items-center gap-2 text-foreground">
+              <BarChart3 className="size-5 text-primary" />
               {t('analytics.manager_rankings')}
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex gap-4">
-              <div className="space-y-2 max-h-72 overflow-y-auto flex-1 min-w-0">
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              <div className="space-y-2 max-h-80 overflow-y-auto lg:col-span-7 min-w-0 pr-1">
                 {rankings
                   .filter((r) => (r as { role?: string }).role === 'yonalish')
-                  .map((r, i) => (
-                  <div
-                    key={r.id}
-                    onClick={() => loadEmpCalls({ id: r.id, name: r.name })}
-                    className={`flex items-center gap-3 rounded-lg border p-3 text-sm bg-current/5 cursor-pointer transition-all hover:bg-indigo-50 dark:hover:bg-indigo-950/30 hover:border-indigo-300 dark:hover:border-indigo-700 ${selectedEmployee?.id === r.id ? 'ring-2 ring-indigo-500 border-indigo-400' : ''}`}
-                  >
-                    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold tabular-nums">
-                      {i + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium truncate">{r.name}</span>
-                        <TrendIcon trend={r.trend} />
+                  .map((r, i) => {
+                    const isSelected = selectedEmployee?.id === r.id
+                    const rankClass = i === 0
+                      ? 'bg-amber-100 text-amber-800 border border-amber-300/80 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/50'
+                      : i === 1
+                      ? 'bg-slate-100 text-slate-700 border border-slate-300/80 dark:bg-slate-800 dark:text-slate-300'
+                      : i === 2
+                      ? 'bg-orange-100 text-orange-800 border border-orange-300/80 dark:bg-orange-950/40 dark:text-orange-300'
+                      : 'bg-muted text-muted-foreground border border-border/60'
+
+                    return (
+                      <div
+                        key={r.id}
+                        onClick={() => loadEmpCalls({ id: r.id, name: r.name })}
+                        className={`flex items-center gap-3 rounded-xl border p-3 text-sm cursor-pointer transition-all duration-200 ${
+                          isSelected
+                            ? 'bg-primary/5 border-primary shadow-xs ring-1 ring-primary'
+                            : 'bg-card border-border/70 hover:bg-muted/50 hover:border-border'
+                        }`}
+                      >
+                        <span className={`flex size-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold tabular-nums shadow-2xs ${rankClass}`}>
+                          {i + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-foreground truncate">{r.name}</span>
+                            <TrendIcon trend={r.trend} />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {r.total_calls} {t('analytics.calls').toLowerCase()}
+                            {r.avg_score != null && <> · <span className={`font-semibold ${scoreColor(r.avg_score)}`}>{r.avg_score} pts</span></>}
+                            {((r as { solved_problems?: number }).solved_problems ?? 0) > 0 && (
+                              <span className="text-emerald-600 font-medium"> · {(r as { solved_problems?: number }).solved_problems ?? 0} {t('analytics.solved')}</span>
+                            )}
+                            {((r as { unsolved_problems?: number }).unsolved_problems ?? 0) > 0 && (
+                              <span className="text-red-500 font-medium"> · {(r as { unsolved_problems?: number }).unsolved_problems ?? 0} {t('analytics.unsolved')}</span>
+                            )}
+                          </p>
+                        </div>
+                        {r.best_score != null && (
+                          <div className="text-right shrink-0">
+                            <span className="text-[10px] text-muted-foreground uppercase block font-semibold">Best</span>
+                            <span className={`text-xs font-bold ${scoreColor(r.best_score)}`}>{r.best_score}</span>
+                          </div>
+                        )}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {r.total_calls} {t('analytics.calls').toLowerCase()}
-                        {r.avg_score != null && <> · <span className={scoreColor(r.avg_score)}>{r.avg_score}</span></>}
-                        {((r as { solved_problems?: number }).solved_problems ?? 0) > 0 && (
-                          <span className="text-emerald-600"> · {(r as { solved_problems?: number }).solved_problems ?? 0} {t('analytics.solved')}</span>
-                        )}
-                        {((r as { unsolved_problems?: number }).unsolved_problems ?? 0) > 0 && (
-                          <span className="text-red-500"> · {(r as { unsolved_problems?: number }).unsolved_problems ?? 0} {t('analytics.unsolved')}</span>
-                        )}
-                      </p>
-                    </div>
-                    {r.best_score != null && (
-                      <span className="text-xs text-muted-foreground">best: <span className={scoreColor(r.best_score)}>{r.best_score}</span></span>
-                    )}
-                  </div>
-                ))}
+                    )
+                  })}
               </div>
-              <div className="w-80 shrink-0 border rounded-xl bg-current/5 p-3 overflow-y-auto max-h-72">
+              <div className="lg:col-span-5 w-full border border-border/70 rounded-xl bg-muted/20 p-3 overflow-y-auto max-h-80">
                 {selectedEmployee ? (
                   empLoading ? (
-                    <div className="flex items-center justify-center h-full text-xs text-muted-foreground">{t('analytics.loading')}</div>
+                    <div className="flex items-center justify-center h-48 text-xs text-muted-foreground">{t('analytics.loading')}</div>
                   ) : empCalls.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full gap-2 text-xs text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center h-48 gap-2 text-xs text-muted-foreground">
                       <p>{t('analytics.no_calls_for', { name: selectedEmployee.name })}</p>
                     </div>
                   ) : (
-                    <div className="space-y-1.5">
-                      <p className="text-xs font-semibold text-foreground mb-2">{selectedEmployee.name} — {t('analytics.problems_list')}</p>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between pb-2 border-b border-border/50">
+                        <p className="text-xs font-semibold text-foreground truncate">{selectedEmployee.name}</p>
+                        <Badge variant="secondary" className="text-[10px]">{empCalls.length} {t('analytics.calls').toLowerCase()}</Badge>
+                      </div>
                       {empCalls.map((c) => (
-                        <div key={c.id} className="rounded-lg border p-2 text-xs">
-                          <p className="font-medium truncate">{c.name}</p>
-                          <div className="flex items-center gap-2 mt-1 text-muted-foreground">
+                        <div key={c.id} className="rounded-lg border border-border/60 bg-card p-2.5 text-xs shadow-2xs hover:border-border transition-colors">
+                          <p className="font-semibold truncate text-foreground">{c.name}</p>
+                          <div className="flex items-center gap-2 mt-1 text-muted-foreground text-[11px]">
                             {c.analysis?.scorecard?.overall != null && (
-                              <span className={scoreColor(c.analysis.scorecard.overall)}>{c.analysis.scorecard.overall}</span>
+                              <span className={`font-semibold ${scoreColor(c.analysis.scorecard.overall)}`}>
+                                {c.analysis.scorecard.overall}/100
+                              </span>
                             )}
                             {c.client_name && <span className="truncate">· {c.client_name}</span>}
                             {c.duration_sec != null && <span>· {formatDuration(c.duration_sec)}</span>}
                           </div>
                           {c.analysis && 'action_items' in c.analysis && c.analysis.action_items?.[0]?.description && (
-                            <p className="text-[11px] text-muted-foreground mt-1 truncate">{c.analysis.action_items[0].description}</p>
+                            <p className="text-[11px] text-muted-foreground mt-1.5 line-clamp-2 bg-muted/40 p-1 rounded">
+                              {c.analysis.action_items[0].description}
+                            </p>
                           )}
                         </div>
                       ))}
                     </div>
                   )
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-full gap-2 text-xs text-muted-foreground">
+                  <div className="flex flex-col items-center justify-center h-48 gap-2 text-xs text-muted-foreground text-center p-4">
+                    <Users className="size-8 text-muted-foreground/40 mb-1" />
                     <p>{t('analytics.click_employee')}</p>
                   </div>
                 )}

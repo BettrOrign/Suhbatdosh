@@ -9,6 +9,8 @@ import {
   Clock,
   FileAudio2,
   KeyRound,
+  LayoutGrid,
+  List,
   Loader2,
   Search,
   Upload,
@@ -67,12 +69,6 @@ const TYPE_OPTIONS: { value: CallType; label: string }[] = [
   { value: 'receptionist', label: 'upload.call_type.receptionist' },
 ]
 
-function scoreBarColor(score: number | undefined): string {
-  if (score == null) return 'bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500'
-  if (score >= 70) return 'bg-gradient-to-r from-emerald-400 to-green-500'
-  if (score >= 40) return 'bg-gradient-to-r from-amber-400 to-yellow-500'
-  return 'bg-gradient-to-r from-red-400 to-rose-500'
-}
 
 function formatBytes(bytes: number): string {
   if (!bytes) return '0 B'
@@ -134,57 +130,53 @@ function CallCard({ call }: { call: Call }) {
     typeof extras.error === 'string' && extras.error.trim() !== '' ? extras.error.trim() : ''
 
   return (
-    <Link to={`/calls/${call.id}`} className="group block h-full rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 cursor-pointer">
-      <Card className={`h-full overflow-hidden border-2 transition-all duration-300 ${
-        call.status === 'done' ? 'border-transparent group-hover:border-emerald-300 group-hover:shadow-lg group-hover:shadow-emerald-500/10' :
-        call.status === 'error' ? 'border-transparent group-hover:border-red-300 group-hover:shadow-lg group-hover:shadow-red-500/10' :
-        'border-transparent group-hover:border-indigo-300 group-hover:shadow-lg group-hover:shadow-indigo-500/10'
-      }`}>
-        <div className={`h-1.5 w-full ${
-          call.status === 'done' ? scoreBarColor(overall) :
-          call.status === 'error' ? 'bg-gradient-to-r from-red-400 to-rose-500' :
-          call.status === 'analyzing' ? 'bg-gradient-to-r from-amber-400 to-yellow-500 animate-shimmer' :
-          'bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500'
+    <Link to={`/calls/${call.id}`} className="group block h-full rounded-2xl focus:outline-none cursor-pointer">
+      <Card className="h-full overflow-hidden border border-border/70 bg-card rounded-2xl shadow-xs transition-all duration-200 group-hover:border-border group-hover:shadow-md">
+        <div className={`h-1 w-full ${
+          call.status === 'done' ? (overall != null && overall >= 70 ? 'bg-emerald-500' : overall != null && overall >= 40 ? 'bg-amber-500' : 'bg-red-500') :
+          call.status === 'error' ? 'bg-destructive' :
+          call.status === 'analyzing' ? 'bg-amber-500 animate-pulse' :
+          'bg-primary'
         }`} />
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 pt-4">
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <CardTitle className="line-clamp-1 text-base">{displayName}</CardTitle>
-              <CardDescription className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-                <span className="inline-flex items-center gap-1">
+            <div className="min-w-0 flex-1">
+              <CardTitle className="line-clamp-1 text-base font-semibold group-hover:text-primary transition-colors">{displayName}</CardTitle>
+              <CardDescription className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs">
+                <span className="inline-flex items-center gap-1 text-muted-foreground">
                   <Clock className="size-3" />
                   {formatDuration(call.duration_sec)}
                 </span>
-                <span>{formatDate(call.created_at)}</span>
+                <span className="text-muted-foreground">{formatDate(call.created_at)}</span>
                 {call.language && (
-                  <span className="inline-flex items-center gap-1 rounded bg-indigo-100 px-1.5 py-0.5 uppercase tracking-wide text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-400">
+                  <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 uppercase tracking-wider text-[10px] font-semibold bg-muted text-muted-foreground">
                     {call.language}
                   </span>
                 )}
                 {outcome && (
-                  <span className="rounded-full bg-muted px-2 py-0.5 font-medium capitalize text-muted-foreground">
+                  <span className="rounded-full bg-muted/80 px-2 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">
                     {outcome}
                   </span>
                 )}
               </CardDescription>
             </div>
-            <Badge variant={statusVariant(call.status)} className={call.status === 'done' ? 'color-badge-good' : call.status === 'error' ? 'color-badge-bad' : ''}>
+            <Badge variant={statusVariant(call.status)} className={`text-[11px] shrink-0 font-medium ${call.status === 'done' ? 'color-badge-good' : call.status === 'error' ? 'color-badge-bad' : ''}`}>
               {t('status.' + call.status)}
             </Badge>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 pb-4">
           {processing && (
             <div className="space-y-2">
               <div className="flex items-center gap-1.5">
-                <span className="size-1.5 animate-pulse-soft rounded-full bg-indigo-500" />
+                <span className="size-1.5 animate-pulse rounded-full bg-primary" />
                 <span className="text-xs text-muted-foreground">
                   {t('status.' + call.status)} in background…
                 </span>
               </div>
               <Progress
                 value={call.status === 'analyzing' ? 70 : 40}
-                className="h-1.5 [&_[data-slot=progress-indicator]]:animate-pulse-soft"
+                className="h-1.5"
               />
               {analysisError && (
                 <p className="line-clamp-2 font-mono text-[11px] leading-relaxed text-destructive/80">
@@ -194,19 +186,19 @@ function CallCard({ call }: { call: Call }) {
             </div>
           )}
           {call.status === 'error' && (
-            <div className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs font-medium text-destructive">
+            <div className="flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs font-medium text-destructive">
               <CircleAlert className="size-3.5" /> {t('status.error')}
             </div>
           )}
           {call.status === 'done' && overall != null && (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3.5">
               <ScoreRing score={overall} />
-              <div className="min-w-0 space-y-1">
-                <p className={`text-[11px] font-semibold uppercase tracking-wide ${scoreColor(overall)}`}>
+              <div className="min-w-0 space-y-1 flex-1">
+                <p className={`text-xs font-bold uppercase tracking-wide ${scoreColor(overall)}`}>
                   {scoreLabel(overall)} · {overall}/100
                 </p>
                 {summary && (
-                  <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+                  <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
                     {summary}
                   </p>
                 )}
@@ -217,7 +209,7 @@ function CallCard({ call }: { call: Call }) {
             <p className="text-sm text-muted-foreground">Analysis ready — open to review.</p>
           )}
           {call.status === 'done' && problem && (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2 dark:border-amber-800/30 dark:bg-amber-950/20">
+            <div className="flex items-start gap-2 rounded-xl border border-amber-200/60 bg-amber-50/40 px-3 py-2 dark:border-amber-800/30 dark:bg-amber-950/20">
               <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
               <p className="line-clamp-2 text-xs leading-relaxed">
                 <span className="font-semibold">{t('call.problem')}: </span>
@@ -230,19 +222,99 @@ function CallCard({ call }: { call: Call }) {
               {keyMetrics.map((m, i) => (
                 <span
                   key={i}
-                  className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-400"
+                  className="rounded-full border border-border/80 bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-foreground"
                 >
                   {m.name}: {m.value}
                 </span>
               ))}
             </div>
           )}
-          <div className="flex items-center justify-end gap-1 text-xs text-muted-foreground pt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center justify-end gap-1 text-xs text-primary font-medium pt-1 opacity-0 group-hover:opacity-100 transition-opacity">
             View details <ArrowRight className="size-3" />
           </div>
         </CardContent>
       </Card>
     </Link>
+  )
+}
+
+function CallTableView({ calls }: { calls: Call[] }) {
+  const { t } = useI18n()
+  return (
+    <div className="rounded-2xl border border-border/70 bg-card overflow-hidden shadow-xs">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-xs">
+          <thead className="bg-muted/40 border-b border-border/60 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+            <tr>
+              <th className="px-4 py-3">{t('calls.table.name')}</th>
+              <th className="px-4 py-3">{t('calls.table.status')}</th>
+              <th className="px-4 py-3">{t('calls.table.score')}</th>
+              <th className="px-4 py-3">{t('calls.table.duration')}</th>
+              <th className="px-4 py-3">{t('calls.table.type')}</th>
+              <th className="px-4 py-3">{t('calls.table.date')}</th>
+              <th className="px-4 py-3 text-right"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/50">
+            {calls.map((call) => {
+              const analysis = (call.analysis ?? {}) as Partial<Call['analysis']>
+              const overall = analysis.scorecard?.overall
+              const displayName = (call.status === 'done' && typeof analysis.topic === 'string' && analysis.topic) || call.name
+
+              return (
+                <tr key={call.id} className="hover:bg-muted/40 transition-colors group">
+                  <td className="px-4 py-3 max-w-[260px]">
+                    <Link to={`/calls/${call.id}`} className="font-semibold text-foreground hover:text-primary transition-colors block truncate">
+                      {displayName}
+                    </Link>
+                    {call.client_name && (
+                      <span className="text-[11px] text-muted-foreground truncate block mt-0.5">
+                        {call.client_name}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <Badge variant={statusVariant(call.status)} className={call.status === 'done' ? 'color-badge-good' : call.status === 'error' ? 'color-badge-bad' : ''}>
+                      {t('status.' + call.status)}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {overall != null ? (
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs ${
+                        overall >= 70 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                        overall >= 40 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
+                        'bg-red-500/10 text-red-600 dark:text-red-400'
+                      }`}>
+                        {overall}/100
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-muted-foreground font-mono">
+                    {formatDuration(call.duration_sec)}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-muted-foreground capitalize">
+                    {call.call_type}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                    {formatDate(call.created_at)}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-right">
+                    <Link
+                      to={`/calls/${call.id}`}
+                      className="inline-flex items-center gap-1 text-primary hover:underline font-medium text-xs opacity-80 group-hover:opacity-100"
+                    >
+                      View <ArrowRight className="size-3" />
+                    </Link>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
 }
 
@@ -396,6 +468,8 @@ export function Calls() {
   const [clients, setClients] = useState<Client[]>([])
   const [clientsLoading, setClientsLoading] = useState(false)
   const [search, setSearch] = useState('')
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'done' | 'processing' | 'error'>('all')
   const pollTimer = useRef<number | null>(null)
   const fetching = useRef(false)
   const reduceMotion = useReducedMotion()
@@ -480,125 +554,214 @@ export function Calls() {
   const processing = calls.filter((c) => !['done', 'error'].includes(c.status)).length
 
   const filteredCalls = useMemo(() => {
+    let result = calls
+    if (statusFilter === 'done') {
+      result = result.filter((c) => c.status === 'done')
+    } else if (statusFilter === 'processing') {
+      result = result.filter((c) => !['done', 'error'].includes(c.status))
+    } else if (statusFilter === 'error') {
+      result = result.filter((c) => c.status === 'error')
+    }
+
     const q = search.trim().toLowerCase()
-    if (!q) return calls
-    return calls.filter(
+    if (!q) return result
+    return result.filter(
       (c) => c.name?.toLowerCase().includes(q) || c.client_name?.toLowerCase().includes(q),
     )
-  }, [calls, search])
+  }, [calls, search, statusFilter])
 
   return (
     <div>
       {/* Calls toolbar */}
-      <header className="mb-6 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">{t('dashboard.title')}</h1>
-        <div className="ml-auto flex w-full flex-wrap items-center gap-3 sm:w-auto sm:flex-nowrap">
-          <div className="relative min-w-0 flex-1 basis-48 sm:flex-none">
-            <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="mb-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">{t('dashboard.title')}</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {filteredCalls.length} {t('analytics.calls').toLowerCase()}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 ml-auto">
+            {/* View toggle */}
+            <div className="flex items-center rounded-xl border border-border/70 bg-card p-0.5 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                title={t('calls.view_grid')}
+                className={`p-1.5 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <LayoutGrid className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                title={t('calls.view_table')}
+                className={`p-1.5 rounded-lg transition-colors ${viewMode === 'table' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <List className="size-4" />
+              </button>
+            </div>
+
+            {/* Upload dialog trigger */}
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs gap-2">
+                  <Upload className="size-4" /> {t('dashboard.upload')}
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>{t('dashboard.upload_dialog_title')}</DialogTitle>
+                  <DialogDescription>
+                    {t('dashboard.upload_dialog_desc')}
+                  </DialogDescription>
+                </DialogHeader>
+                <Dropzone file={file} onFile={setFile} />
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="name" className="text-xs">{t('upload.name_optional')}</Label>
+                    <Input
+                       id="name"
+                       value={name}
+                       placeholder={file?.name ?? t('upload.name_placeholder')}
+                       onChange={(e) => setName(e.target.value)}
+                       autoFocus
+                     />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">{t('upload.call_type')}</Label>
+                    <TypeSegmented value={callType} onChange={setCallType} options={typeOptions} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">{t('upload.client_optional')}</Label>
+                    <Select value={clientId} onValueChange={setClientId}>
+                      <SelectTrigger className="w-full" disabled={clientsLoading}>
+                        <SelectValue placeholder={clientsLoading ? 'Loading clients…' : t('upload.no_client')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NO_CLIENT}>{t('upload.no_client')}</SelectItem>
+                        {clients.map((c) => (
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            {c.name}
+                            {c.company ? ` · ${c.company}` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter className="mt-2">
+                  <Button onClick={handleUpload} disabled={uploading || !file} className="w-full gap-2">
+                    {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                    {uploading ? t('dashboard.uploading') : t('dashboard.upload')}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        {/* Filter and Search Bar */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('dashboard.search_placeholder')}
-              className="w-full pl-8 sm:w-56"
+              className="w-full pl-9 h-9 text-xs rounded-xl bg-card border-border/70"
             />
           </div>
+
+          {/* Status filter tabs */}
+          <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+            {(['all', 'done', 'processing', 'error'] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                  statusFilter === s
+                    ? 'bg-primary text-primary-foreground shadow-2xs font-semibold'
+                    : 'bg-card border border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                }`}
+              >
+                {s === 'all' ? t('calls.all_statuses') :
+                 s === 'done' ? t('status.done') :
+                 s === 'processing' ? t('dashboard.stat.in_progress') :
+                 t('status.error')}
+              </button>
+            ))}
+          </div>
+
           {!loading && processing > 0 && (
-            <Badge variant="secondary" className="gap-1.5">
-              <span className="size-1.5 animate-pulse-soft rounded-full bg-primary" />
+            <Badge variant="secondary" className="gap-1.5 text-xs py-1">
+              <span className="size-1.5 animate-pulse rounded-full bg-primary" />
               {t('dashboard.in_progress', { n: processing })}
             </Badge>
           )}
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gradient-bg hover:opacity-90 shadow-lg shadow-indigo-500/25">
-                <Upload /> {t('dashboard.upload')}
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{t('dashboard.upload_dialog_title')}</DialogTitle>
-                <DialogDescription>
-                  {t('dashboard.upload_dialog_desc')}
-                </DialogDescription>
-              </DialogHeader>
-              <Dropzone file={file} onFile={setFile} />
-              <div className="space-y-2">
-                <Label htmlFor="name">{t('upload.name_optional')}</Label>
-                <Input
-                   id="name"
-                   value={name}
-                   placeholder={file?.name ?? t('upload.name_placeholder')}
-                   onChange={(e) => setName(e.target.value)}
-                   autoFocus
-                 />
-              </div>
-              <div className="space-y-2">
-                <Label>{t('upload.call_type')}</Label>
-                <TypeSegmented value={callType} onChange={setCallType} options={typeOptions} />
-              </div>
-              <div className="space-y-2">
-                <Label>{t('upload.client_optional')}</Label>
-                <Select value={clientId} onValueChange={setClientId}>
-                  <SelectTrigger className="w-full" disabled={clientsLoading}>
-                    <SelectValue placeholder={clientsLoading ? 'Loading clients…' : t('upload.no_client')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NO_CLIENT}>{t('upload.no_client')}</SelectItem>
-                    {clients.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.name}
-                        {c.company ? ` · ${c.company}` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <DialogFooter>
-                <Button onClick={handleUpload} disabled={uploading || !file}>
-                  {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
-                  {uploading ? t('dashboard.uploading') : t('dashboard.upload')}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </div>
-      </header>
+      </div>
+
+      {/* Live Stats */}
+      {!loading && calls.length > 0 && (
+        <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[
+            { label: t('analytics.total_calls'), value: calls.length, color: 'text-foreground', bg: 'bg-primary/10', icon: '📞' },
+            { label: t('status.done'), value: calls.filter(c => c.status === 'done').length, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10', icon: '✅' },
+            { label: t('dashboard.stat.in_progress'), value: calls.filter(c => !['done','error'].includes(c.status)).length, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10', icon: '⏳' },
+            { label: t('status.error'), value: calls.filter(c => c.status === 'error').length, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10', icon: '❌' },
+          ].map((stat) => (
+            <div key={stat.label} className="flex items-center gap-3 rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
+              <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${stat.bg} text-lg`}>
+                {stat.icon}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">{stat.label}</p>
+                <p className={`text-xl font-bold tabular-nums leading-tight ${stat.color}`}>{stat.value}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <div className="grid gap-4 md:grid-cols-2">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-44 rounded-xl" />
+            <Skeleton key={i} className="h-44 rounded-2xl" />
           ))}
         </div>
       ) : calls.length === 0 ? (
-        <Card className="border-dashed border-2 border-indigo-200 dark:border-indigo-900/50">
+        <Card className="border-dashed border-2 border-border/70 rounded-2xl bg-card">
           <CardContent className="flex flex-col items-center gap-4 px-6 py-20 text-center">
-            <div className="flex size-16 items-center justify-center rounded-2xl gradient-bg shadow-lg shadow-indigo-500/25">
-              <AudioWaveform className="size-8 text-white" />
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary border border-primary/20 shadow-xs">
+              <AudioWaveform className="size-7" />
             </div>
             <div className="space-y-1">
-              <p className="text-base font-semibold">{t('dashboard.no_calls')}</p>
+              <p className="text-base font-semibold text-foreground">{t('dashboard.no_calls')}</p>
               <p className="mx-auto max-w-sm text-sm text-muted-foreground">
                 {t('dashboard.no_calls_desc')}
               </p>
             </div>
-            <Button onClick={() => setDialogOpen(true)} className="gradient-bg hover:opacity-90 shadow-lg shadow-indigo-500/25">
-                <Upload /> {t('dashboard.upload_first')}
+            <Button onClick={() => setDialogOpen(true)} className="gap-2 shadow-xs">
+              <Upload className="size-4" /> {t('dashboard.upload_first')}
             </Button>
           </CardContent>
         </Card>
       ) : filteredCalls.length === 0 ? (
-        <Card className="border-dashed border-2 border-muted-foreground/20">
-          <CardContent className="flex flex-col items-center gap-4 px-6 py-20 text-center">
-            <Search className="size-8 text-indigo-400" />
+        <Card className="border-dashed border-2 border-border/70 rounded-2xl bg-card">
+          <CardContent className="flex flex-col items-center gap-4 px-6 py-16 text-center">
+            <Search className="size-8 text-muted-foreground/50" />
             <div className="space-y-1">
-              <p className="text-base font-semibold">{t('dashboard.no_search_results')}</p>
+              <p className="text-base font-semibold text-foreground">{t('dashboard.no_search_results')}</p>
               <p className="mx-auto max-w-sm text-sm text-muted-foreground">
                 {t('dashboard.no_search_results_desc')}
               </p>
             </div>
           </CardContent>
         </Card>
+      ) : viewMode === 'table' ? (
+        <CallTableView calls={filteredCalls} />
       ) : reduceMotion ? (
         <div className="grid gap-4 md:grid-cols-2">
           {filteredCalls.map((c) => (

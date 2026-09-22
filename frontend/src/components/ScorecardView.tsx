@@ -29,12 +29,11 @@ export function ScorecardView({ scorecard }: { scorecard: Scorecard }) {
   const { t } = useI18n()
 
   return (
-    <Card className="overflow-hidden">
-      <div className="h-1.5 w-full bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400" />
-      <CardHeader>
-        <CardTitle className="text-lg">{t('call.metrics')}</CardTitle>
+    <Card className="overflow-hidden border-border/70 bg-card shadow-xs">
+      <CardHeader className="pb-3 border-b border-border/50">
+        <CardTitle className="text-base font-bold text-foreground">{t('call.metrics')}</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {METRICS.map(({ key, tkey, icon: Icon, gradient }, i) => {
             const v = scorecard[key] ?? 0

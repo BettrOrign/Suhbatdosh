@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import {
   ArrowLeft,
   Check,
+  CheckSquare,
   Clock,
   Copy,
   FilePenLine,
@@ -362,97 +363,98 @@ export function CallDetail() {
   const displayName = (call.status === 'done' && typeof analysis.topic === 'string' && analysis.topic) || call.name
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8">
+    <div className="mx-auto max-w-5xl px-4 sm:px-6 py-6 sm:py-8">
       {/* Hero Header */}
       <Reveal>
-        <div className="mb-6 overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-6 text-white shadow-lg shadow-indigo-500/20">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-4">
+        <div className="mb-6 overflow-hidden rounded-2xl border border-border/70 bg-card p-6 shadow-xs relative">
+          <div className="absolute top-0 right-0 -mt-10 -mr-10 size-48 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 relative">
+            <div className="flex items-start gap-3.5">
               <Button
-                variant="ghost"
+                variant="outline"
+                size="icon"
                 asChild
-                className="mt-0.5 h-10 text-white hover:bg-white/20"
+                className="mt-0.5 size-9 rounded-xl shrink-0"
               >
                 <Link to="/calls/" aria-label={t('call.back')}>
-                  <ArrowLeft className="size-5" />
+                  <ArrowLeft className="size-4" />
                 </Link>
               </Button>
               <div className="min-w-0">
-                <h1 className="text-2xl font-bold tracking-tight">{displayName}</h1>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-medium backdrop-blur">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">{displayName}</h1>
+                <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground">
                     <Clock className="size-3" />
                     {formatDuration(call.duration_sec)}
                   </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-medium backdrop-blur">
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground">
                     {formatDate(call.created_at)}
                   </span>
                   {call.language && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-medium backdrop-blur">
+                    <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary uppercase tracking-wider">
                       <Globe className="size-3" />
                       {call.language}
                     </span>
                   )}
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-medium capitalize backdrop-blur">
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-muted/40 px-2.5 py-1 text-xs font-medium capitalize text-muted-foreground">
                     <PhoneCall className="size-3" />
                     {call.call_type}
                   </span>
                   {call.client_name && (
                     <Link
                       to="/clients"
-                      className="inline-flex items-center gap-1.5 rounded-full bg-white/30 px-3 py-1 text-xs font-semibold hover:bg-white/40 transition-colors"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
                     >
                       {call.client_name}
                     </Link>
                   )}
                   {call.uploader_name && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-medium backdrop-blur">
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground">
                       by {call.uploader_name}
                     </span>
                   )}
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 self-start sm:self-auto">
               <Badge
                 variant={statusVariant(call.status)}
-                className={`text-xs font-semibold ${
-                  call.status === 'done' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300' :
-                  call.status === 'error' ? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300' :
-                  'bg-white/20 text-white'
+                className={`text-xs font-semibold px-3 py-1 ${
+                  call.status === 'done' ? 'color-badge-good' :
+                  call.status === 'error' ? 'color-badge-bad' : ''
                 }`}
               >
                 {t('status.' + call.status)}
               </Badge>
             </div>
           </div>
-          <div className="mt-4 flex items-center gap-2">
+          <div className="mt-5 pt-4 border-t border-border/50 flex flex-wrap items-center gap-2">
             {isAdmin && (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={openEdit}
-                className="text-white hover:bg-white/20"
+                className="gap-1.5 text-xs rounded-xl"
               >
-                <FilePenLine className="size-4" /> {t('call.edit_details')}
+                <FilePenLine className="size-3.5" /> {t('call.edit_details')}
               </Button>
             )}
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               onClick={reanalyze}
               disabled={!call.transcript}
-              className="text-white hover:bg-white/20 disabled:text-white/50"
+              className="gap-1.5 text-xs rounded-xl"
             >
-              <RefreshCw className="size-4" /> {t('call.reanalyze')}
+              <RefreshCw className="size-3.5" /> {t('call.reanalyze')}
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={remove}
-              className="text-white hover:bg-red-500/30"
+              className="gap-1.5 text-xs rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive ml-auto"
             >
-              <Trash2 className="size-4" /> {t('call.delete')}
+              <Trash2 className="size-3.5" /> {t('call.delete')}
             </Button>
           </div>
         </div>
@@ -460,9 +462,8 @@ export function CallDetail() {
 
       {/* Audio Player */}
       <Reveal>
-        <Card className="mb-6 overflow-hidden border-indigo-200 dark:border-indigo-800/50">
-          <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
-          <CardContent className="py-5">
+        <Card className="mb-6 overflow-hidden border-border/70 bg-card shadow-xs">
+          <CardContent className="py-4">
             <WavePlayer url={api.audioUrl(callId)} />
           </CardContent>
         </Card>
@@ -503,18 +504,18 @@ export function CallDetail() {
         <>
           {/* Score + Summary Hero */}
           <Reveal>
-            <div className="mb-6 grid gap-6 lg:grid-cols-5">
+            <div className="mb-6 grid gap-5 lg:grid-cols-5">
               {/* Score Ring */}
-              <Card className="lg:col-span-2 overflow-hidden">
-                <div className={`h-1.5 w-full ${
-                  overall >= 70 ? 'bg-gradient-to-r from-emerald-400 to-green-500' :
-                  overall >= 40 ? 'bg-gradient-to-r from-amber-400 to-yellow-500' :
-                  'bg-gradient-to-r from-red-400 to-rose-500'
+              <Card className="lg:col-span-2 overflow-hidden border-border/70 bg-card shadow-xs">
+                <div className={`h-1 w-full ${
+                  overall >= 70 ? 'bg-emerald-500' :
+                  overall >= 40 ? 'bg-amber-500' :
+                  'bg-red-500'
                 }`} />
                 <CardContent className="flex flex-col items-center justify-center py-8">
                   <ScoreRing score={overall} size={140} />
                   <motion.p
-                    className={`mt-4 text-lg font-semibold ${
+                    className={`mt-4 text-base font-bold ${
                       overall >= 70 ? 'text-emerald-600 dark:text-emerald-400' :
                       overall >= 40 ? 'text-amber-600 dark:text-amber-400' :
                       'text-red-600 dark:text-red-400'
@@ -529,24 +530,24 @@ export function CallDetail() {
               </Card>
 
               {/* Summary + Details */}
-              <Card className="lg:col-span-3">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Lightbulb className="size-5 text-amber-500" />
+              <Card className="lg:col-span-3 border-border/70 bg-card shadow-xs">
+                <CardHeader className="pb-3 border-b border-border/50">
+                  <CardTitle className="flex items-center gap-2 text-base font-bold text-foreground">
+                    <Lightbulb className="size-4 text-amber-500" />
                     {t('call.summary')}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 pt-4">
                   <p className="text-sm leading-relaxed text-muted-foreground">{analysis.summary}</p>
                   <Separator />
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="rounded-xl bg-muted/50 p-3">
-                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{t('call.outcome')}</p>
-                      <p className="mt-1 text-sm font-semibold capitalize">{analysis.outcome ?? '—'}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{t('call.outcome')}</p>
+                      <p className="mt-1 text-sm font-semibold capitalize text-foreground">{analysis.outcome ?? '—'}</p>
                     </div>
-                    <div className="rounded-xl bg-muted/50 p-3">
-                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Rep share of talk</p>
-                      <p className="mt-1 text-sm font-semibold">
+                    <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Rep share of talk</p>
+                      <p className="mt-1 text-sm font-semibold text-foreground">
                         {analysis.rep_share_of_talk != null ? `${Math.round(analysis.rep_share_of_talk * 100)}%` : '—'}
                       </p>
                     </div>
@@ -554,17 +555,19 @@ export function CallDetail() {
                   {!!analysis.key_metrics?.length && (
                     <>
                       <Separator />
-                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{t('call.key_metrics')}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {analysis.key_metrics.map((m, i) => (
-                          <Badge
-                            key={i}
-                            variant="secondary"
-                            className="bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-400 dark:border-indigo-800"
-                          >
-                            {m.name}: {m.value}
-                          </Badge>
-                        ))}
+                      <div>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">{t('call.key_metrics')}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {analysis.key_metrics.map((m, i) => (
+                            <Badge
+                              key={i}
+                              variant="secondary"
+                              className="bg-muted/70 text-foreground border border-border/60 text-xs font-normal"
+                            >
+                              <span className="font-semibold text-muted-foreground mr-1">{m.name}:</span> {m.value}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
                     </>
                   )}
@@ -577,15 +580,15 @@ export function CallDetail() {
           {typeof problemExtras.problem === 'string' &&
             problemExtras.problem!.trim() !== '' && (
               <Reveal>
-                <Card className="mb-6 overflow-hidden">
-                  <div className="h-1.5 w-full bg-gradient-to-r from-amber-400 to-orange-500" />
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <TriangleAlert className="size-5 text-amber-500" />
+                <Card className="mb-6 overflow-hidden border-border/70 bg-card shadow-xs">
+                  <div className="h-1 w-full bg-amber-500" />
+                  <CardHeader className="pb-3 border-b border-border/50">
+                    <CardTitle className="flex items-center gap-2 text-base font-bold text-foreground">
+                      <TriangleAlert className="size-4 text-amber-500" />
                       {t('call.problem')}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-4 pt-4">
                     <p className="text-sm leading-relaxed text-muted-foreground">
                       {problemExtras.problem}
                     </p>
@@ -593,19 +596,19 @@ export function CallDetail() {
                       problemExtras.solutions!.length > 0 && (
                         <>
                           <Separator />
-                          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                             {t('call.solutions')}
                           </p>
-                          <div className="grid gap-3">
+                          <div className="grid gap-2.5">
                             {problemExtras.solutions!.map((s, i) => (
                               <div
                                 key={i}
-                                className="flex items-start gap-4 rounded-xl border border-amber-100 bg-gradient-to-r from-amber-50/50 to-orange-50/50 p-4 dark:border-amber-800/30 dark:from-amber-950/20 dark:to-orange-950/20"
+                                className="flex items-start gap-3 rounded-xl border border-amber-200/60 bg-amber-50/30 p-3.5 dark:border-amber-800/30 dark:bg-amber-950/20"
                               >
-                                <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-700 dark:bg-amber-900/50 dark:text-amber-400">
+                                <div className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-xs font-bold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
                                   {i + 1}
                                 </div>
-                                <span className="text-sm leading-relaxed">{s}</span>
+                                <span className="text-sm leading-relaxed text-foreground">{s}</span>
                               </div>
                             ))}
                           </div>
@@ -623,76 +626,154 @@ export function CallDetail() {
             </div>
           </Reveal>
 
-          {/* Coaching Tabs */}
+          {/* Coaching & Action Items Tabs */}
           <Reveal>
-            <Tabs defaultValue="coaching" className="mb-6">
-              <TabsList className="mb-4">
-                <TabsTrigger value="coaching" className="gap-1.5">
-                  <Lightbulb className="size-3.5" />
-                  {t('call.tab.coaching')}
+            <Tabs defaultValue="action-items" className="mb-6">
+              <TabsList className="mb-4 bg-muted/60 p-1 rounded-xl">
+                <TabsTrigger value="action-items" className="gap-1.5 rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-xs">
+                  <CheckSquare className="size-3.5 text-primary" />
+                  {t('call.tab.action_items')}
+                  {analysis.action_items && analysis.action_items.length > 0 && (
+                    <span className="ml-1 rounded-full bg-primary/15 text-primary px-1.5 py-0.2 text-[10px] font-bold">
+                      {analysis.action_items.length}
+                    </span>
+                  )}
                 </TabsTrigger>
-                <TabsTrigger value="next-steps" className="gap-1.5">
-                  <Target className="size-3.5" />
+                <TabsTrigger value="coaching" className="gap-1.5 rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-xs">
+                  <Lightbulb className="size-3.5 text-amber-500" />
+                  {t('call.tab.coaching')}
+                  {analysis.coaching_points && analysis.coaching_points.length > 0 && (
+                    <span className="ml-1 rounded-full bg-muted text-muted-foreground px-1.5 py-0.2 text-[10px] font-semibold">
+                      {analysis.coaching_points.length}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="next-steps" className="gap-1.5 rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-xs">
+                  <Target className="size-3.5 text-cyan-500" />
                   {t('call.tab.next_steps')}
+                  {analysis.next_steps && analysis.next_steps.length > 0 && (
+                    <span className="ml-1 rounded-full bg-muted text-muted-foreground px-1.5 py-0.2 text-[10px] font-semibold">
+                      {analysis.next_steps.length}
+                    </span>
+                  )}
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="coaching">
-                <div className="space-y-4">
-                  {/* Coaching Points */}
-                  <Card className="overflow-hidden">
-                    <div className="h-1.5 w-full bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400" />
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <Lightbulb className="size-5 text-amber-500" />
-                        {t('call.coaching_points')}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid gap-3">
-                        {analysis.coaching_points?.map((s, i) => (
-                          <motion.div
-                            key={i}
-                            className="flex items-start gap-4 rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/50 to-purple-50/50 p-4 dark:border-indigo-800/30 dark:from-indigo-950/20 dark:to-purple-950/20"
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.06 }}
-                          >
-                            <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-400">
-                              {i + 1}
-                            </div>
-                            <span className="text-sm leading-relaxed">{s}</span>
-                          </motion.div>
-                        ))}
+              {/* Action Items Tab */}
+              <TabsContent value="action-items">
+                <Card className="overflow-hidden border-border/70 bg-card shadow-xs">
+                  <CardHeader className="pb-3 border-b border-border/50">
+                    <CardTitle className="flex items-center gap-2 text-base font-bold text-foreground">
+                      <CheckSquare className="size-4 text-primary" />
+                      {t('call.action_items')}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    {analysis.action_items && analysis.action_items.length > 0 ? (
+                      <div className="grid gap-2.5">
+                        {analysis.action_items.map((item, i) => {
+                          const priorityClass =
+                            item.priority === 'high' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800/40' :
+                            item.priority === 'medium' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800/40' :
+                            'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+
+                          return (
+                            <motion.div
+                              key={i}
+                              initial={{ opacity: 0, y: 6 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: i * 0.05 }}
+                              className="flex items-start gap-3.5 rounded-xl border border-border/70 bg-muted/20 p-3.5 hover:border-border transition-colors"
+                            >
+                              <div className="mt-0.5 size-5 shrink-0 rounded-md border border-primary/30 bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                                {i + 1}
+                              </div>
+                              <div className="min-w-0 flex-1 space-y-1.5">
+                                <p className="text-sm font-medium text-foreground leading-relaxed">
+                                  {item.description}
+                                </p>
+                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                  <span className={`px-2 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-wider ${priorityClass}`}>
+                                    {item.priority}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-[11px] font-medium capitalize">
+                                    {item.assignee}
+                                  </span>
+                                  {item.due_date && (
+                                    <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground font-mono">
+                                      <Clock className="size-3" />
+                                      {item.due_date}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </motion.div>
+                          )
+                        })}
                       </div>
-                    </CardContent>
-                  </Card>
-                </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-10 text-center gap-2">
+                        <CheckSquare className="size-8 text-muted-foreground/40" />
+                        <p className="text-sm text-muted-foreground">{t('call.no_action_items')}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
 
+              {/* Coaching Points */}
+              <TabsContent value="coaching">
+                <Card className="overflow-hidden border-border/70 bg-card shadow-xs">
+                  <CardHeader className="pb-3 border-b border-border/50">
+                    <CardTitle className="flex items-center gap-2 text-base font-bold text-foreground">
+                      <Lightbulb className="size-4 text-amber-500" />
+                      {t('call.coaching_points')}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <div className="grid gap-2.5">
+                      {analysis.coaching_points?.map((s, i) => (
+                        <motion.div
+                          key={i}
+                          className="flex items-start gap-3.5 rounded-xl border border-border/70 bg-muted/20 p-3.5 hover:border-border transition-colors"
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: i * 0.05 }}
+                        >
+                          <div className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+                            {i + 1}
+                          </div>
+                          <span className="text-sm leading-relaxed text-foreground">{s}</span>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Next Steps */}
               <TabsContent value="next-steps">
-                <Card className="overflow-hidden">
-                  <div className="h-1.5 w-full bg-gradient-to-r from-cyan-400 to-blue-500" />
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Target className="size-5 text-cyan-500" />
+                <Card className="overflow-hidden border-border/70 bg-card shadow-xs">
+                  <CardHeader className="pb-3 border-b border-border/50">
+                    <CardTitle className="flex items-center gap-2 text-base font-bold text-foreground">
+                      <Target className="size-4 text-cyan-500" />
                       {t('call.next_steps')}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-3">
+                  <CardContent className="pt-4">
+                    <div className="grid gap-2.5">
                       {analysis.next_steps?.map((s, i) => (
                         <motion.div
                           key={i}
-                          className="flex items-start gap-4 rounded-xl border border-cyan-100 bg-gradient-to-r from-cyan-50/50 to-blue-50/50 p-4 dark:border-cyan-800/30 dark:from-cyan-950/20 dark:to-blue-950/20"
-                          initial={{ opacity: 0, y: 8 }}
+                          className="flex items-start gap-3.5 rounded-xl border border-border/70 bg-muted/20 p-3.5 hover:border-border transition-colors"
+                          initial={{ opacity: 0, y: 6 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: i * 0.06 }}
+                          transition={{ delay: i * 0.05 }}
                         >
-                          <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-cyan-100 text-xs font-bold text-cyan-700 dark:bg-cyan-900/50 dark:text-cyan-400">
+                          <div className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-cyan-500/15 text-xs font-bold text-cyan-600 dark:text-cyan-400">
                             {i + 1}
                           </div>
-                          <span className="text-sm leading-relaxed">{s}</span>
+                          <span className="text-sm leading-relaxed text-foreground">{s}</span>
                         </motion.div>
                       ))}
                     </div>
@@ -706,11 +787,10 @@ export function CallDetail() {
 
       {/* Transcript */}
       <Reveal>
-        <Card className="overflow-hidden">
-          <div className="h-1 w-full bg-gradient-to-r from-slate-400 to-slate-500" />
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <MessageSquare className="size-4 text-muted-foreground" />
+        <Card className="overflow-hidden border-border/70 bg-card shadow-xs">
+          <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-border/50">
+            <CardTitle className="flex items-center gap-2 text-base font-bold text-foreground">
+              <MessageSquare className="size-4 text-primary" />
               {t('call.transcript')}
             </CardTitle>
             <div className="flex gap-2">

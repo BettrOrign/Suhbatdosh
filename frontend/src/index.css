@@ -6,53 +6,53 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #f8faff;
+  --background: #f8fafc;
   --foreground: #0f172a;
   --card: #ffffff;
   --card-foreground: #0f172a;
   --popover: #ffffff;
   --popover-foreground: #0f172a;
-  --primary: #6366f1;
+  --primary: #4f46e5;
   --primary-foreground: #ffffff;
-  --secondary: #eef2ff;
-  --secondary-foreground: #3730a3;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #1e293b;
   --muted: #f1f5f9;
   --muted-foreground: #64748b;
-  --accent: #e0e7ff;
-  --accent-foreground: #3730a3;
+  --accent: #eef2ff;
+  --accent-foreground: #4338ca;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
   --border: #e2e8f0;
   --input: #e2e8f0;
   --ring: #6366f1;
   --radius: 0.75rem;
-  --chart-1: #6366f1;
+  --chart-1: #4f46e5;
   --chart-2: #10b981;
   --chart-3: #f59e0b;
   --chart-4: #ef4444;
   --chart-5: #8b5cf6;
   --sidebar: #ffffff;
   --sidebar-foreground: #0f172a;
-  --sidebar-primary: #6366f1;
+  --sidebar-primary: #4f46e5;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #eef2ff;
-  --sidebar-accent-foreground: #3730a3;
-  --sidebar-border: #e2e8f0;
+  --sidebar-accent: #f8fafc;
+  --sidebar-accent-foreground: #4338ca;
+  --sidebar-border: #f1f5f9;
   --sidebar-ring: #6366f1;
 }
 
 .dark {
-  --background: #020617;
-  --foreground: #f1f5f9;
+  --background: #090d16;
+  --foreground: #f8fafc;
   --card: #0f172a;
-  --card-foreground: #f1f5f9;
+  --card-foreground: #f8fafc;
   --popover: #0f172a;
-  --popover-foreground: #f1f5f9;
-  --primary: #818cf8;
-  --primary-foreground: #020617;
-  --secondary: #1e1b4b;
-  --secondary-foreground: #c7d2fe;
-  --muted: #1e293b;
+  --popover-foreground: #f8fafc;
+  --primary: #6366f1;
+  --primary-foreground: #ffffff;
+  --secondary: #172033;
+  --secondary-foreground: #e2e8f0;
+  --muted: #131c2e;
   --muted-foreground: #94a3b8;
   --accent: #1e1b4b;
   --accent-foreground: #c7d2fe;
@@ -60,20 +60,20 @@
   --destructive-foreground: #020617;
   --border: #1e293b;
   --input: #1e293b;
-  --ring: #818cf8;
-  --chart-1: #818cf8;
+  --ring: #6366f1;
+  --chart-1: #6366f1;
   --chart-2: #34d399;
   --chart-3: #fbbf24;
   --chart-4: #f87171;
   --chart-5: #a78bfa;
-  --sidebar: #020617;
-  --sidebar-foreground: #f1f5f9;
-  --sidebar-primary: #818cf8;
-  --sidebar-primary-foreground: #020617;
-  --sidebar-accent: #1e1b4b;
+  --sidebar: #0b1120;
+  --sidebar-foreground: #f8fafc;
+  --sidebar-primary: #6366f1;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #131c2e;
   --sidebar-accent-foreground: #c7d2fe;
-  --sidebar-border: #1e293b;
-  --sidebar-ring: #818cf8;
+  --sidebar-border: #172033;
+  --sidebar-ring: #6366f1;
 }
 
 @theme inline {
@@ -160,26 +160,45 @@ body {
 
 @layer components {
   .gradient-text {
-    @apply bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-500 dark:from-indigo-400 dark:via-violet-400 dark:to-indigo-300 bg-clip-text text-transparent font-semibold;
   }
   .gradient-bg {
-    @apply bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500;
+    @apply bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 text-white shadow-sm;
   }
   .glass {
     @apply bg-background/80 backdrop-blur-xl;
   }
   .glass-card {
-    @apply bg-card/80 backdrop-blur-sm border border-border/50 shadow-sm hover:shadow-md transition-shadow;
+    @apply bg-card/90 backdrop-blur-md border border-border/60 shadow-xs hover:shadow-md hover:border-border transition-all duration-200;
+  }
+  .card-modern {
+    @apply bg-card border border-border/70 rounded-2xl shadow-xs transition-all duration-200 hover:shadow-sm;
   }
   .color-badge-good {
-    @apply bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400;
+    @apply bg-emerald-50 text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/40 font-medium;
   }
   .color-badge-warn {
-    @apply bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400;
+    @apply bg-amber-50 text-amber-700 border border-amber-200/60 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800/40 font-medium;
   }
   .color-badge-bad {
-    @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400;
+    @apply bg-red-50 text-red-700 border border-red-200/60 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800/40 font-medium;
   }
+}
+
+/* Modern thin scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
 }
 
 @media (prefers-reduced-motion: reduce) {

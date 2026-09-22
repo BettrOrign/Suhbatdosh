@@ -203,12 +203,14 @@ function ManagerCard({
   onDelete,
   onSelect,
   onChanged,
+  callsToday,
 }: {
   mgr: Manager
   onEdit: (m: Manager) => void
   onDelete: (m: Manager) => void
   onSelect: (m: Manager) => void
   onChanged: () => void
+  callsToday?: number
 }) {
   const { t } = useI18n()
   return (
@@ -226,7 +228,8 @@ function ManagerCard({
                 <CardDescription className="mt-0.5 truncate text-xs">{mgr.email}</CardDescription>
               </div>
             </div>
-            <Badge variant={mgr.active ? 'default' : 'secondary'} className="capitalize">
+            <Badge variant={mgr.active ? 'default' : 'secondary'} className={`capitalize gap-1.5 ${mgr.active ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800/50' : ''}`}>
+              {mgr.active && <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />}
               {mgr.active ? t('users.active') : t('users.inactive')}
             </Badge>
           </div>

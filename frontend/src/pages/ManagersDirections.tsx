@@ -203,14 +203,12 @@ function ManagerCard({
   onDelete,
   onSelect,
   onChanged,
-  callsToday,
 }: {
   mgr: Manager
   onEdit: (m: Manager) => void
   onDelete: (m: Manager) => void
   onSelect: (m: Manager) => void
   onChanged: () => void
-  callsToday?: number
 }) {
   const { t } = useI18n()
   return (

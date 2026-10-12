@@ -45,6 +45,19 @@ GEMINI_ANALYSIS_MODEL = _resolve(
     "gemini", "analysis_model", "GEMINI_ANALYSIS_MODEL", "gemini-2.5-flash",
 )
 
+# --- Local STT (private mode) ------------------------------------------------
+# The offline GigaAM model ships in the read-only local-stt/ folder next to
+# backend/, so <repo>/local-stt/model is the default. Overridable for tests
+# and for deployments that stage the model elsewhere.
+REPO_DIR = BASE_DIR.parent
+LOCAL_STT_MODEL_DIR = Path(
+    _resolve("stt", "model_dir", "LOCAL_STT_MODEL_DIR", REPO_DIR / "local-stt" / "model")
+).resolve()
+LOCAL_STT_THREADS = int(_resolve("stt", "threads", "LOCAL_STT_THREADS", "8"))
+LOCAL_STT_SAMPLE_RATE = 16000
+# Languages the GigaAM multilingual CTC model is trained for.
+LOCAL_STT_LANGUAGES = ["uz", "ru", "en", "kk", "ky"]
+
 # --- Storage paths ---------------------------------------------------------
 _data_dir = (
     os.getenv("DATA_DIR")
@@ -63,6 +76,38 @@ DB_PATH = DATA_DIR / "suhbatdosh.db"
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 ADMIN_NAME = os.getenv("ADMIN_NAME", "Admin")
+
+
+def _env_flag(env_name: str, default: bool) -> bool:
+    """Like :func:`_flag` but lets YAML win over the built-in default."""
+    val = os.getenv(env_name)
+    if val not in (None, ""):
+        return val.strip().lower() in ("true", "1", "yes", "on")
+    return _CFG.get("app", {}).get(env_name.lower(), default)
+
+
+# Demo seeding ships with trivial passwords, so it is ON only when APP_ENV is
+# absent/"dev"/"development" (the default). Production must set APP_ENV=prod,
+# which turns both the demo accounts and the demo calls off.
+APP_ENV = (os.getenv("APP_ENV", "") or "").strip().lower()
+DEV_MODE = APP_ENV in ("", "dev", "development", "local")
+SEED_DEMO_USERS = _env_flag("SEED_DEMO_USERS", DEV_MODE)
+SEED_DEMO_CALLS = _env_flag("SEED_DEMO_CALLS", DEV_MODE)
+
+# --- CORS -------------------------------------------------------------------
+# Comma-separated origin allowlist. Empty/unset falls back to "*" so the
+# Vite dev server (and same-origin static hosting) keep working out of the box;
+# production deployments should pin CORS_ORIGINS to their real hostnames.
+CORS_ORIGINS = [
+    o.strip().rstrip("/")
+    for o in (os.getenv("CORS_ORIGINS", "") or "").split(",")
+    if o.strip()
+] or ["*"]
+
+# Shared secret for machine-to-machine webhook endpoints (e.g. the Zadarma
+# webhook, which Zadarma calls without any session token). Empty means the
+# endpoint is refused rather than left open.
+ZADARMA_WEBHOOK_SECRET = os.getenv("ZADARMA_WEBHOOK_SECRET", "")
 
 # --- Telegram Bot ------------------------------------------------------------
 TELEGRAM_ENABLED = os.getenv("TELEGRAM_ENABLED", "true").lower() in ("true", "1", "yes")

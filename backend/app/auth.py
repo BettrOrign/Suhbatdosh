@@ -3,7 +3,7 @@ import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Query
 
 from . import config, db
 
@@ -62,16 +62,16 @@ def generate_api_token() -> str:
 
 def get_current_user(
     authorization: str | None = Header(default=None),
-    token: str | None = None,
+    token: str | None = Query(default=None),
 ) -> dict:
     """Resolve the authenticated user for a request.
 
     The session token may be supplied either as a ``Bearer <token>`` value in
-    the ``authorization`` header or as a ``token`` query/header parameter. The
-    matching session is looked up in the DB; expired or inactive sessions are
-    deleted and rejected with 401. Returns a ``{"id","name","email","role"}``
-    dict that downstream endpoints and :func:`require_role` use for
-    authorization checks.
+    the ``authorization`` header or as a ``token`` query parameter (the audio
+    and transcript URLs need it). The matching session is looked up in the DB;
+    expired or inactive sessions are deleted and rejected with 401. Returns a
+    ``{"id","name","email","role"}`` dict that downstream endpoints and
+    :func:`require_role` use for authorization checks.
     """
     session_token = None
     if authorization and authorization.startswith("Bearer "):
@@ -88,6 +88,16 @@ def get_current_user(
         db.delete_session(session_token)
         raise HTTPException(401, "Invalid or expired session")
     return {"id": sess["user_id"], "name": sess["name"], "email": sess["email"], "role": sess["role"]}
+
+
+def session_token_from(
+    authorization: str | None = Header(default=None),
+    token: str | None = Query(default=None),
+) -> str | None:
+    """Extract the raw session token from the Bearer header or the ``token`` query arg."""
+    if authorization and authorization.startswith("Bearer "):
+        return authorization.removeprefix("Bearer ").strip()
+    return token or None
 
 
 def get_user_by_token(token: str) -> dict | None:

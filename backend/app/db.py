@@ -757,6 +757,15 @@ def get_bot_setting(key: str, default: str = "") -> str:
         return row[0] if row else default
 
 
+def get_bot_setting_row(key: str) -> dict | None:
+    """Return ``{"key","value","updated_at"}`` for a bot_settings row, or ``None``."""
+    with get_db() as db:
+        row = db.execute(
+            "SELECT key, value, updated_at FROM bot_settings WHERE key = ?", (key,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
 # ---------------------------------------------------------------------------
 # Advanced Analytics
 # ---------------------------------------------------------------------------

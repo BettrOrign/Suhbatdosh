@@ -7,6 +7,7 @@ from .auth import (
     hash_password,
     new_session,
     require_role,
+    session_token_from,
     verify_password,
 )
 
@@ -30,9 +31,13 @@ def login(payload: dict):
 
 
 @router.post("/auth/logout")
-def logout(user: dict = Depends(get_current_user), authorization: str | None = None):
-    if authorization and authorization.startswith("Bearer "):
-        db.delete_session(authorization.removeprefix("Bearer ").strip())
+def logout(
+    user: dict = Depends(get_current_user),
+    session_token: str | None = Depends(session_token_from),
+):
+    """End the current session. Accepts the Bearer header or the ``token`` query arg."""
+    if session_token:
+        db.delete_session(session_token)
     return {"ok": True}
 
 

@@ -37,12 +37,23 @@ def create_client(payload: dict, user: dict = Depends(require_role("admin", "man
     return db.get_client(cid)
 
 
-@router.get("/clients/{client_id}")
-def get_client(client_id: int, user: dict = Depends(get_current_user)):
+def _visible_client(client_id: int, user: dict) -> dict:
+    """Load a client, hiding clients a manager does not own behind a 403.
+
+    Mirrors the scoping of GET /api/clients: admin/receptionist/yonalish see
+    everything, a manager sees only their own clients.
+    """
     c = db.get_client(client_id)
     if c is None:
         raise HTTPException(404, "Client not found")
+    if user["role"] == "manager" and c["manager_id"] not in (None, user["id"]):
+        raise HTTPException(403, "Forbidden")
     return c
+
+
+@router.get("/clients/{client_id}")
+def get_client(client_id: int, user: dict = Depends(get_current_user)):
+    return _visible_client(client_id, user)
 
 
 @router.patch("/clients/{client_id}")

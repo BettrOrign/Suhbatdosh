@@ -3,10 +3,20 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from . import config, db
+from .api import _check_call_access
 from .auth import get_current_user, require_role
 from .youtube import process_youtube_video, extract_video_id
 
 router = APIRouter(prefix="/api")
+
+
+def _call_for_tagging(call_id: int, user: dict) -> dict:
+    """Load a call and enforce per-role access before mutating its tags."""
+    call = db.get_call(call_id)
+    if call is None:
+        raise HTTPException(404, "call not found")
+    _check_call_access(call, user)
+    return call
 
 
 # ---------------------------------------------------------------------------
@@ -40,18 +50,21 @@ def tag_call(call_id: int, payload: dict, user: dict = Depends(get_current_user)
     tag_id = payload.get("tag_id")
     if not tag_id:
         raise HTTPException(400, "tag_id is required")
+    _call_for_tagging(call_id, user)
     db.tag_call(call_id, tag_id)
     return {"ok": True}
 
 
 @router.delete("/calls/{call_id}/tags/{tag_id}")
 def untag_call(call_id: int, tag_id: int, user: dict = Depends(get_current_user)):
+    _call_for_tagging(call_id, user)
     db.untag_call(call_id, tag_id)
     return {"ok": True}
 
 
 @router.get("/calls/{call_id}/tags")
 def get_call_tags(call_id: int, user: dict = Depends(get_current_user)):
+    _call_for_tagging(call_id, user)
     return db.get_call_tags(call_id)
 
 
@@ -110,14 +123,28 @@ async def process_youtube_url(
 
 @router.get("/bot/settings")
 def get_bot_settings(user: dict = Depends(require_role("admin"))):
+    """Report the non-secret bot configuration.
+
+    Reads the same ``bot_settings`` rows its POST writes (the previous version
+    ignored them entirely). Secrets are never echoed back.
+    """
     return {
         "youtube_enabled": config.YOUTUBE_ENABLED,
         "telegram_admin_ids": config.TELEGRAM_ADMIN_IDS,
+        "processing_mode": db.get_bot_setting("processing_mode", "online"),
     }
+
+
+# This table also holds the Zadarma API key/secret in plaintext, so the bot
+# settings endpoint may only touch an explicit allowlist rather than writing
+# whatever key it is handed.
+BOT_SETTINGS_WRITABLE = frozenset({"youtube_enabled", "telegram_admin_ids"})
 
 
 @router.post("/bot/settings")
 def update_bot_settings(payload: dict, user: dict = Depends(require_role("admin"))):
     for key, value in payload.items():
+        if key not in BOT_SETTINGS_WRITABLE:
+            raise HTTPException(400, f"setting {key!r} is not writable here")
         db.set_bot_setting(key, str(value))
     return {"ok": True}

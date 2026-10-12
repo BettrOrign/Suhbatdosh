@@ -17,6 +17,7 @@ from .routes_clients import router as clients_router
 from .routes_ingest import router as ingest_router
 from .routes_managers import router as managers_router
 from .routes_notifications import router as notifications_router
+from .routes_settings import router as settings_router
 from .routes_sources import router as sources_router
 from .routes_zadarma import router as zadarma_router
 from .telegram_bot import create_bot_application
@@ -31,9 +32,12 @@ async def lifespan(app: FastAPI):
     global _telegram_app
     db.init_db()
     _seed_admin()
-    _seed_default_users()
-    _seed_demo_calls()
-    start_reanalysis_task()
+    if config.SEED_DEMO_USERS:
+        _seed_default_users()
+    if config.SEED_DEMO_CALLS:
+        _seed_demo_calls()
+    if config.SEED_DEMO_USERS or config.SEED_DEMO_CALLS:
+        start_reanalysis_task()
     if config.TELEGRAM_ENABLED:
         _telegram_app = create_bot_application()
         if _telegram_app:
@@ -59,7 +63,7 @@ app = FastAPI(title="suhbatdosh - AI suhbat coach", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=config.CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -71,6 +75,7 @@ app.include_router(ingest_router)
 app.include_router(managers_router)
 app.include_router(notifications_router)
 app.include_router(sources_router)
+app.include_router(settings_router)
 app.include_router(zadarma_router)
 
 
@@ -87,8 +92,15 @@ def _seed_admin():
 
 
 def _seed_default_users():
-    """Seed default managers and receptionists if they don't already exist."""
+    """Seed default managers and receptionists if they don't already exist.
+
+    Gated on ``SEED_DEMO_USERS``: these accounts have well-known passwords, so
+    they are only created when APP_ENV is dev (the default).
+    """
     log = logging.getLogger("suhbatdosh.main")
+    if not config.SEED_DEMO_USERS:
+        log.info("Skipping demo users: SEED_DEMO_USERS is off")
+        return
 
     managers = [
         ("Aziz Karimov", "aziz@suhbatdosh.uz", "aziz1234"),
@@ -133,11 +145,19 @@ def _seed_default_users():
 
 
 def _seed_demo_calls():
-    """Seed demo calls so the dashboard is never empty."""
+    """Seed demo calls so the dashboard is never empty.
+
+    Gated on ``SEED_DEMO_CALLS`` for the same reason as the demo users: the
+    seeded manager/receptionist/admin accounts all have fixed passwords.
+    """
     import random
     import time as _time
 
     log = logging.getLogger("suhbatdosh.main")
+
+    if not config.SEED_DEMO_CALLS:
+        log.info("Skipping demo calls: SEED_DEMO_CALLS is off")
+        return
 
     with db.get_db() as conn:
         count = conn.execute("SELECT COUNT(*) FROM calls").fetchone()[0]

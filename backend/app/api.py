@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 
 from . import audio, config, db
 from .analysis import Analyzer
-from .auth import get_current_user
+from .auth import get_current_user, require_role
 from .live import LiveTranscriber
 from .transcribe import Transcriber
 
@@ -321,31 +321,33 @@ async def delete_call(call_id: int, user: dict = Depends(get_current_user)):
 # Startup: re-analyse done calls that lack the new ``topic`` field
 # ---------------------------------------------------------------------------
 
-def _reanalyse_done_calls():
-    """Re-run analysis on all 'done' calls whose analysis JSON is missing ``topic``.
+def _reanalyse_done_calls(limit: int = 50):
+    """Re-run analysis on 'done' calls whose analysis JSON is missing ``topic``.
 
     Runs in a background thread on startup so it does not block the server.
-    Each call is re-analysed with a short back-off to avoid hammering the API.
+    The candidate set is capped at ``limit`` (oldest first, so the backlog
+    drains in order) because this would otherwise re-bill Gemini for the whole
+    database on every restart. Single SQL query — no N+1 get_call per row.
     """
     import time as _time
 
     with db.get_db() as conn:
         rows = conn.execute(
-            "SELECT id, transcript FROM calls WHERE status = 'done'"
+            "SELECT c.id, c.transcript, c.analysis FROM calls c "
+            "WHERE c.status = 'done' AND c.transcript IS NOT NULL "
+            "AND TRIM(c.transcript) != '' "
+            "AND (c.analysis IS NULL OR c.analysis = '' OR c.analysis = '{}' "
+            "     OR json_extract(c.analysis, '$.topic') IS NULL) "
+            "ORDER BY c.id LIMIT ?",
+            (limit,),
         ).fetchall()
 
     need_reanalysis = []
     for r in rows:
-        call_id = r["id"]
-        call = db.get_call(call_id)
-        if not call:
-            continue
-        analysis = call.get("analysis") or {}
+        analysis = json.loads(r["analysis"] or "{}")
         if analysis.get("topic"):
             continue
-        if not (call.get("transcript") or "").strip():
-            continue
-        need_reanalysis.append((call_id, call["transcript"]))
+        need_reanalysis.append((r["id"], r["transcript"]))
 
     if not need_reanalysis:
         return
@@ -381,38 +383,44 @@ def start_reanalysis_task():
 # ---------------------------------------------------------------------------
 # Analytics endpoints
 # ---------------------------------------------------------------------------
+#
+# These aggregate across the whole organisation, so they are restricted to the
+# roles that legitimately see org-wide performance. Managers get their own
+# numbers back through /api/calls instead, not someone else's.
+
+ORG_WIDE_STATS = Depends(require_role("admin", "yonalish"))
 
 
 @router.get("/stats/overview")
-def stats_overview(user: dict = Depends(get_current_user)):
+def stats_overview(user: dict = ORG_WIDE_STATS):
     return db.get_org_stats()
 
 
 @router.get("/stats/day-over-day")
-def stats_day_over_day(user: dict = Depends(get_current_user)):
+def stats_day_over_day(user: dict = ORG_WIDE_STATS):
     return db.get_day_over_day_stats()
 
 
 @router.get("/stats/weekly-trend")
-def stats_weekly_trend(user: dict = Depends(get_current_user)):
+def stats_weekly_trend(user: dict = ORG_WIDE_STATS):
     return db.get_weekly_trend()
 
 
 @router.get("/stats/monthly-trend")
-def stats_monthly_trend(user: dict = Depends(get_current_user)):
+def stats_monthly_trend(user: dict = ORG_WIDE_STATS):
     return db.get_monthly_trend()
 
 
 @router.get("/stats/problem-calls")
-def stats_problem_calls(user: dict = Depends(get_current_user)):
+def stats_problem_calls(user: dict = ORG_WIDE_STATS):
     return db.get_problem_calls()
 
 
 @router.get("/stats/manager-rankings")
-def stats_manager_rankings(user: dict = Depends(get_current_user)):
+def stats_manager_rankings(user: dict = ORG_WIDE_STATS):
     return db.get_manager_rankings()
 
 
 @router.get("/stats/source-breakdown")
-def stats_source_breakdown(user: dict = Depends(get_current_user)):
+def stats_source_breakdown(user: dict = ORG_WIDE_STATS):
     return db.get_source_breakdown()

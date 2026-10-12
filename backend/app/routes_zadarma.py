@@ -5,9 +5,11 @@ Provides:
   - GET  /api/zadarma/config  — get current config status (admin only)
   - POST /api/zadarma/sync    — fetch recent recordings from Zadarma and import
   - POST /api/zadarma/webhook — receive real-time NOTIFY_RECORD events
+                  (authenticated with the ZADARMA_WEBHOOK_SECRET shared secret)
 """
 
 import hashlib
+import hmac
 import json
 import logging
 import shutil
@@ -231,7 +233,7 @@ def _run_sync(start: str, end: str, user_id: int):
         clid = stat.get("clid", "")
         destination = stat.get("destination", "")
         callstart = stat.get("callstart", "")
-        name = f"Zadarma {clid}→{destination} {callstart}" if callstart else f"Zadarma call {z_call_id}"
+        name = f"Zadarma {clid} -> {destination} {callstart}" if callstart else f"Zadarma call {z_call_id}"
 
         source_meta = {
             "zadarma_call_id": z_call_id,
@@ -293,16 +295,51 @@ def _match_sip_to_user(sip: str) -> int | None:
 
 
 # ---------------------------------------------------------------------------
-# Webhook endpoint (no auth — called by Zadarma)
+# Webhook endpoint (shared-secret auth — called by Zadarma, no session)
 # ---------------------------------------------------------------------------
+
+# Zadarma does not send our bearer token, so the webhook authenticates with a
+# shared secret it echoes back: either as `?zd_echo=<secret>` on the GET
+# verification call, or as an `X-Webhook-Secret` header / `webhook_secret` form
+# field on the POST. With no secret configured the webhook is refused rather
+# than left open (it can trigger audio downloads into the app).
+_WEBHOOK_HEADERS = ("x-webhook-secret", "x-zadarma-secret")
+
+
+def _request_secret(request: Request, form_secret: str | None = None) -> str | None:
+    for header in _WEBHOOK_HEADERS:
+        value = request.headers.get(header)
+        if value:
+            return value
+    if form_secret:
+        return form_secret
+    return request.query_params.get("zd_echo") or None
+
+
+def _check_webhook_secret(request: Request, form_secret: str | None = None) -> None:
+    """Reject the request unless it carries the configured webhook secret."""
+    expected = app_config.ZADARMA_WEBHOOK_SECRET
+    if not expected:
+        raise HTTPException(
+            503,
+            "Zadarma webhook is disabled: set ZADARMA_WEBHOOK_SECRET to enable it",
+        )
+    supplied = _request_secret(request, form_secret)
+    if not supplied or not hmac.compare_digest(str(supplied), expected):
+        logger.warning("Rejected Zadarma webhook with an invalid or missing secret")
+        raise HTTPException(401, "Invalid webhook secret")
 
 
 @router.get("/webhook")
 async def webhook_verify(request: Request):
-    """Zadarma URL verification — returns ``zd_echo`` param back."""
-    zd_echo = request.query_params.get("zd_echo", "")
+    """Zadarma URL verification — echo ``zd_echo`` back after checking the secret.
+
+    When ZADARMA_WEBHOOK_SECRET is set, ``zd_echo`` must equal it. When it is
+    unset the webhook is disabled entirely and we return 503.
+    """
+    _check_webhook_secret(request)
     from fastapi.responses import PlainTextResponse
-    return PlainTextResponse(zd_echo)
+    return PlainTextResponse(request.query_params.get("zd_echo", ""))
 
 
 @router.post("/webhook")
@@ -314,9 +351,12 @@ async def webhook_notify(request: Request, background: BackgroundTasks):
       - call_id_with_rec: unique recording ID
       - pbx_call_id: permanent call ID
 
-    We verify the signature, then queue the recording for import.
+    The shared secret in ``X-Webhook-Secret`` (or the ``webhook_secret`` form
+    field) is verified before anything is queued for import.
     """
     body = await request.form()
+    _check_webhook_secret(request, body.get("webhook_secret"))
+
     event = body.get("event", "")
 
     if event != "NOTIFY_RECORD":

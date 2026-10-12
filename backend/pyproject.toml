@@ -14,4 +14,19 @@ dependencies = [
     "python-telegram-bot>=21.0",
     "apscheduler>=3.10",
     "yt-dlp>=2025.1.1",
+    # Offline STT for private mode (CPU only, no torch).
+    # sherpa-onnx-core ships the native libsherpa-onnx/onnxruntime .so files
+    # that the sherpa-onnx python wheel dlopen()s at import time.
+    "sherpa-onnx>=1.10.0",
+    "sherpa-onnx-core>=1.10.0",
+    "soundfile>=0.12.1",
+    "numpy>=1.26",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

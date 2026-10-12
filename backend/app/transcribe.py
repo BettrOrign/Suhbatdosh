@@ -6,9 +6,15 @@ from pathlib import Path
 from google import genai
 from google.genai import types
 
-from . import audio, config
+from . import audio, config, db, local_stt
 
 logger = logging.getLogger("suhbatdosh.transcribe")
+
+# bot_settings key holding "online" | "private". Default online.
+MODE_SETTING_KEY = "processing_mode"
+MODE_ONLINE = "online"
+MODE_PRIVATE = "private"
+VALID_MODES = (MODE_ONLINE, MODE_PRIVATE)
 
 TRANSCRIBE_PROMPT = (
     "Transcribe this phone call verbatim. The call may contain English, Russian and Uzbek speech "
@@ -16,6 +22,47 @@ TRANSCRIBE_PROMPT = (
     "Output only the plain transcript text, one utterance per line. No commentary, no timestamps, "
     "no speaker labels."
 )
+
+
+def get_mode() -> str:
+    """Return the configured processing mode, defaulting to ``online``.
+
+    Read fresh on every call so switching modes in the UI takes effect without
+    a restart. An unrecognised stored value is treated as ``online``.
+    """
+    try:
+        mode = (db.get_bot_setting(MODE_SETTING_KEY, "") or "").strip().lower()
+    except Exception as exc:  # DB not initialised yet (e.g. very early boot)
+        logger.warning("Could not read processing mode, defaulting to online: %s", exc)
+        return MODE_ONLINE
+    return mode if mode in VALID_MODES else MODE_ONLINE
+
+
+class LocalSttUnavailable(RuntimeError):
+    """Raised when private mode is selected but local STT cannot be used."""
+
+
+async def _local_transcribe(wav_path: Path) -> dict:
+    """Offline transcription via the in-process GigaAM model.
+
+    Runs the blocking sherpa-onnx decode in a worker thread so the caller's
+    ``asyncio.wait_for`` timeout can actually fire.
+
+    Raises :class:`LocalSttUnavailable` (never anything the caller must decode
+    beyond "fall back to Gemini") when the model or dependency is missing.
+    """
+    try:
+        text = await asyncio.to_thread(local_stt.transcribe_wav, wav_path)
+    except (RuntimeError, OSError, ImportError) as exc:
+        raise LocalSttUnavailable(str(exc)) from exc
+    # The CTC model emits one flat stream with no speaker labels and no
+    # punctuation; a single segment is the honest representation.
+    segments = (
+        [{"text": text, "finished": True, "speaker_label": None, "language_code": None}]
+        if text
+        else []
+    )
+    return {"text": text, "language_code": None, "segments": segments}
 
 
 def _compress_wav(wav_path: Path) -> Path:
@@ -35,18 +82,48 @@ class Transcriber:
     """REST-based verbatim multilingual transcription for finished recordings."""
 
     def __init__(self, api_key: str | None = None):
-        self._client = genai.Client(api_key=api_key or config.GEMINI_API_KEY)
+        self._api_key = api_key or config.GEMINI_API_KEY
+        self._client = None
+
+    @property
+    def client(self):
+        """The Gemini client, built on first use.
+
+        Lazy because private mode never talks to Gemini, and constructing the
+        client eagerly would make transcription fail outright on a deployment
+        with no API key configured.
+        """
+        if self._client is None:
+            self._client = genai.Client(api_key=self._api_key)
+        return self._client
 
     async def transcribe_wav(self, wav_path: Path) -> dict:
-        """Transcribe a WAV file via a single Gemini generate_content call.
+        """Transcribe a WAV file, honouring the configured processing mode.
+
+        ``private`` transcribes on this machine with GigaAM and never sends the
+        audio anywhere; if the local model is unusable it logs why and falls
+        back to Gemini rather than failing the call. ``online`` is the original
+        Gemini path, unchanged.
 
         Returns {"text": str, "language_code": str|None, "segments": [{"text":...}]}.
         """
+        if get_mode() == MODE_PRIVATE:
+            try:
+                return await _local_transcribe(wav_path)
+            except LocalSttUnavailable as exc:
+                local_stt.set_fallback_reason(str(exc))
+                logger.warning(
+                    "Private mode selected but local STT unavailable (%s) - falling back to Gemini", exc
+                )
+        return await self._gemini_transcribe(wav_path)
+
+    async def _gemini_transcribe(self, wav_path: Path) -> dict:
+        """Transcribe a WAV file via a single Gemini generate_content call."""
         compressed = _compress_wav(wav_path)
         try:
             data = compressed.read_bytes()
             resp = await asyncio.wait_for(
-                self._client.aio.models.generate_content(
+                self.client.aio.models.generate_content(
                     model=config.GEMINI_ANALYSIS_MODEL,
                     contents=[
                         types.Part(text=TRANSCRIBE_PROMPT),

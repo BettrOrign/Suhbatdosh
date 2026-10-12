@@ -1,66 +1,74 @@
-import { type ComponentType } from 'react'
+import type { ComponentType } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
+
 import { Card, CardContent } from '@/components/ui/card'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
+import { cn } from '@/lib/utils'
 
-interface StatCardProps {
+export interface StatCardProps {
   icon: ComponentType<{ className?: string }>
   label: string
   value: number
   hint?: string
   valueClass?: string
-  iconGradient?: string
-  variant?: 'solid' | 'outline' | 'gradient' | 'accent'
+  /** Optional trailing element, e.g. a delta chip. */
+  trailing?: React.ReactNode
   decimals?: number
   progress?: number | null
   progressClass?: string
 }
 
-const VARIANT_STYLES = {
-  solid: 'bg-primary/10 text-primary border border-primary/20',
-  outline: 'bg-background border border-border text-foreground',
-  gradient: 'bg-gradient-to-br from-indigo-500/15 to-violet-500/15 text-primary border border-primary/20',
-  accent: 'bg-muted text-foreground border border-border/60',
-}
-
+/**
+ * The KPI tile. Restraint is the point: a small icon well, an uppercase
+ * micro-label, one big tabular number. The old variants (solid / outline /
+ * gradient / accent) all differed only in background colour and made the row
+ * look arbitrary.
+ */
 export function StatCard({
   icon: Icon,
   label,
   value,
   hint,
   valueClass,
-  variant = 'solid',
+  trailing,
   decimals = 0,
   progress,
   progressClass,
 }: StatCardProps) {
-  const reduceMotion = useReducedMotion()
-  const style = VARIANT_STYLES[variant]
+  const reduced = useReducedMotion()
 
   return (
     <motion.div
-      whileHover={reduceMotion ? undefined : { y: -2 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+      whileHover={reduced ? undefined : { y: -2 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 26, mass: 0.7 }}
       className="h-full"
     >
-      <Card className="h-full overflow-hidden border-border/70 bg-card shadow-xs transition-all duration-200 hover:shadow-md hover:border-border">
-        <CardContent className="flex items-center gap-3.5 p-4">
-          <div className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${style} shadow-xs`}>
-            <Icon className="size-5" />
-          </div>
+      <Card size="sm" className="h-full transition-shadow duration-150 hover:shadow-e2">
+        <CardContent className="flex items-start gap-3 p-3.5">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-surface-sunken text-muted-foreground ring-1 ring-border-subtle">
+            <Icon aria-hidden="true" className="size-4" />
+          </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
-            <p className={`text-2xl font-bold leading-tight tabular-nums tracking-tight mt-0.5 ${valueClass ?? 'text-foreground'}`}>
+            <div className="flex items-start justify-between gap-2">
+              <p className="eyebrow truncate">{label}</p>
+              {trailing}
+            </div>
+            <p
+              className={cn(
+                'mt-1 text-2xl leading-none font-semibold tracking-[-0.02em] tabular-nums',
+                valueClass ?? 'text-foreground'
+              )}
+            >
               <AnimatedNumber value={value} decimals={decimals} />
             </p>
-            {hint && <p className="truncate text-xs text-muted-foreground mt-0.5">{hint}</p>}
+            {hint && <p className="mt-1 truncate text-2xs text-muted-foreground">{hint}</p>}
             {progress != null && (
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-surface-sunken">
                 <motion.div
-                  className={`h-full rounded-full ${progressClass ?? 'bg-primary'}`}
-                  initial={reduceMotion ? false : { width: 0 }}
+                  className={cn('h-full rounded-full', progressClass ?? 'bg-primary')}
+                  initial={reduced ? false : { width: 0 }}
                   animate={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
-                  transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }}
+                  transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                 />
               </div>
             )}
@@ -68,5 +76,43 @@ export function StatCard({
         </CardContent>
       </Card>
     </motion.div>
+  )
+}
+
+/** Small `+12 / -4` chip used for day-over-day deltas. */
+export function DeltaChip({
+  delta,
+  className,
+}: {
+  delta: number | string | null
+  className?: string
+}) {
+  if (delta == null || delta === '' || delta === '0') return null
+  const numeric = typeof delta === 'number' ? delta : Number.parseFloat(delta)
+  if (delta === 0) {
+    return (
+      <span
+        className={cn(
+          'inline-flex items-center rounded-full bg-surface-sunken px-1.5 py-px text-2xs font-medium tabular-nums text-muted-foreground ring-1 ring-border-subtle ring-inset',
+          className
+        )}
+      >
+        0
+      </span>
+    )
+  }
+  const up = typeof delta === 'number' ? delta > 0 : numeric > 0
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full px-1.5 py-px text-2xs font-semibold tabular-nums ring-1 ring-inset',
+        up
+          ? 'bg-success-soft text-success-soft-foreground ring-success/25'
+          : 'bg-destructive-soft text-destructive-soft-foreground ring-destructive/25',
+        className
+      )}
+    >
+      {typeof delta === 'number' && up ? `+${delta}` : delta}
+    </span>
   )
 }

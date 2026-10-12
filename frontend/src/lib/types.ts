@@ -9,7 +9,6 @@ export interface User {
 }
 
 export interface Client {
-  role: string
   id: number
   name: string
   phone: string
@@ -20,17 +19,6 @@ export interface Client {
   manager_name: string | null
   call_count: number
   created_at: string
-}
-
-export interface Manager extends User {
-  active: boolean
-  created_at: string
-  api_token: string | null
-  total_calls: number
-  avg_score: number | null
-  avg_talk_ratio: number | null
-  last_score: number | null
-  last_call_at: string | null
 }
 
 export type CallType = 'manager' | 'receptionist'
@@ -115,18 +103,80 @@ export interface Notification {
   created_at: string
 }
 
-export interface Tag {
-  id: number
-  name: string
-  color: string
-  created_at: string
+/* --- processing mode (docs/CONTRACT.md) ----------------------------------- */
+
+/**
+ * `online`  — transcription AND analysis via Gemini.
+ * `private` — transcription via the local GigaAM model; the transcript still
+ *             goes to Gemini for analysis. Audio never leaves the machine.
+ */
+export type ProcessingMode = 'online' | 'private'
+
+export interface SttInfo {
+  provider: string
+  model: string
+  available: boolean
+  languages: string[]
 }
 
-export interface YoutubeWhitelistEntry {
-  id: number
-  channel_id: string | null
-  channel_name: string | null
-  pattern: string | null
-  active: boolean
-  created_at: string
+export interface AnalysisInfo {
+  provider: string
+  model: string
+}
+
+export interface Settings {
+  mode: ProcessingMode
+  stt: SttInfo
+  analysis: AnalysisInfo
+  updated_at: string
+}
+
+export type ManagedUser = User & { active: boolean }
+
+/* --- normalised analysis accessors ---------------------------------------
+ *
+ * `calls.analysis` is a JSON blob written by the model (`analysis.py`). Not
+ * every call has one, and every page used to reach into it with an
+ * `as unknown as SomeExtras` cast. These helpers make that explicit and
+ * total, which is what let `strict` find the real bugs. -------------------- */
+
+export interface AnalysisExtras {
+  problem?: string | null
+  solutions?: string[]
+  error?: string | null
+}
+
+/** Narrow the loose `Call.analysis` blob to `Partial<CallAnalysis>`. */
+export function asAnalysis(raw: Call['analysis']): Partial<CallAnalysis> {
+  return (raw ?? {}) as Partial<CallAnalysis>
+}
+
+export function analysisError(raw: Call['analysis']): string {
+  const extras = raw as AnalysisExtras
+  return typeof extras.error === 'string' ? extras.error.trim() : ''
+}
+
+export function analysisProblem(raw: Call['analysis']): string {
+  const extras = raw as AnalysisExtras
+  return typeof extras.problem === 'string' ? extras.problem.trim() : ''
+}
+
+export function analysisSolutions(raw: Call['analysis']): string[] {
+  const extras = raw as AnalysisExtras
+  return Array.isArray(extras.solutions) ? extras.solutions : []
+}
+
+/** Overall score, or `null` when the call is not scored yet. */
+export function overallScore(raw: Call['analysis']): number | null {
+  const v = asAnalysis(raw).scorecard?.overall
+  return typeof v === 'number' ? v : null
+}
+
+/** Model-written topic, preferred over the raw call name once analysed. */
+export function callTitle(call: Call): string {
+  if (call.status === 'done') {
+    const topic = asAnalysis(call.analysis).topic
+    if (typeof topic === 'string' && topic.trim()) return topic
+  }
+  return call.name
 }

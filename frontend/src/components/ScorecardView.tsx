@@ -1,81 +1,88 @@
-import { motion } from 'framer-motion'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useI18n } from '@/i18n/i18n'
-import type { Scorecard } from '@/lib/types'
+import { motion, useReducedMotion } from 'framer-motion'
 import {
-  Sparkles,
   MessageSquare,
   Shield,
-  Zap,
+  Sparkles,
   Target,
   ThumbsUp,
   TrendingUp,
+  Zap,
+  type LucideIcon,
 } from 'lucide-react'
 
-const METRICS: { key: keyof Scorecard; tkey: string; icon: typeof Target; gradient: string }[] = [
-  { key: 'opening', tkey: 'call.metric.opening', icon: Sparkles, gradient: 'from-amber-400 to-orange-500' },
-  { key: 'discovery', tkey: 'call.metric.discovery', icon: MessageSquare, gradient: 'from-blue-400 to-cyan-500' },
-  { key: 'objection_handling', tkey: 'call.metric.objections', icon: Shield, gradient: 'from-purple-400 to-violet-500' },
-  { key: 'value_prop', tkey: 'call.metric.value_prop', icon: Zap, gradient: 'from-yellow-400 to-amber-500' },
-  { key: 'closing', tkey: 'call.metric.closing', icon: Target, gradient: 'from-emerald-400 to-green-500' },
-  { key: 'rapport', tkey: 'call.metric.rapport', icon: ThumbsUp, gradient: 'from-pink-400 to-rose-500' },
-  { key: 'talk_ratio', tkey: 'call.metric.talk_ratio', icon: TrendingUp, gradient: 'from-indigo-400 to-blue-500' },
-]
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useI18n } from '@/i18n/i18n'
+import { fadeUp } from '@/lib/motion'
+import { cn } from '@/lib/utils'
+import { scoreColor, scoreColorVar } from '@/lib/format'
+import type { Scorecard } from '@/lib/types'
 
-const COLOR = (v: number) =>
-  v >= 70 ? 'var(--color-score-good)' : v >= 40 ? 'var(--color-score-warn)' : 'var(--color-score-bad)'
+/**
+ * The rubric breakdown. Each dimension gets one icon and one thin bar.
+ * The old version gave every dimension a saturated gradient tile, which made
+ * the row read as a marketing card rather than a measurement.
+ */
+const METRICS: { key: keyof Scorecard; tkey: string; icon: LucideIcon }[] = [
+  { key: 'opening', tkey: 'call.metric.opening', icon: Sparkles },
+  { key: 'discovery', tkey: 'call.metric.discovery', icon: MessageSquare },
+  { key: 'objection_handling', tkey: 'call.metric.objections', icon: Shield },
+  { key: 'value_prop', tkey: 'call.metric.value_prop', icon: Zap },
+  { key: 'closing', tkey: 'call.metric.closing', icon: Target },
+  { key: 'rapport', tkey: 'call.metric.rapport', icon: ThumbsUp },
+  { key: 'talk_ratio', tkey: 'call.metric.talk_ratio', icon: TrendingUp },
+]
 
 export function ScorecardView({ scorecard }: { scorecard: Scorecard }) {
   const { t } = useI18n()
+  const reduced = useReducedMotion()
 
   return (
-    <Card className="overflow-hidden border-border/70 bg-card shadow-xs">
-      <CardHeader className="pb-3 border-b border-border/50">
-        <CardTitle className="text-base font-bold text-foreground">{t('call.metrics')}</CardTitle>
+    <Card>
+      <CardHeader className="border-b border-border-subtle pb-2.5">
+        <CardTitle>{t('call.metrics')}</CardTitle>
       </CardHeader>
-      <CardContent className="pt-4">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {METRICS.map(({ key, tkey, icon: Icon, gradient }, i) => {
-            const v = scorecard[key] ?? 0
+      <CardContent className="pt-3">
+        <ul className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+          {METRICS.map(({ key, tkey, icon: Icon }) => {
+            const value = scorecard[key] ?? 0
+            const color = scoreColorVar(value)
             return (
-              <motion.div
+              <motion.li
                 key={key}
-                className="group relative overflow-hidden rounded-xl border bg-card p-4 transition-all hover:shadow-md"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 + i * 0.05 }}
+                variants={fadeUp}
+                initial="hidden"
+                animate="visible"
+                className="space-y-1.5"
               >
-                {/* Subtle gradient accent */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-[0.03] group-hover:opacity-[0.07] transition-opacity`} />
-
-                <div className="relative flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`flex size-9 items-center justify-center rounded-xl bg-gradient-to-br ${gradient} shadow-sm`}>
-                      <Icon className="size-4 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground">{t(tkey)}</p>
-                      <p className="text-xl font-bold" style={{ color: COLOR(v) }}>
-                        {v}
-                      </p>
-                    </div>
-                  </div>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                    <Icon aria-hidden="true" className="size-3 shrink-0" />
+                    <span className="truncate">{t(tkey)}</span>
+                  </span>
+                  <span className={cn(scoreColor(value), 'text-sm font-semibold tabular-nums')}>
+                    {value}
+                  </span>
                 </div>
-
-                {/* Progress bar */}
-                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-1 w-full overflow-hidden rounded-full bg-surface-sunken"
+                  role="meter"
+                  aria-valuenow={value}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={t(tkey)}
+                >
                   <motion.div
                     className="h-full rounded-full"
-                    style={{ backgroundColor: COLOR(v) }}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${v}%` }}
-                    transition={{ delay: 0.3 + i * 0.05, duration: 0.8, ease: 'easeOut' }}
+                    style={{ backgroundColor: color }}
+                    initial={reduced ? false : { width: 0 }}
+                    animate={{ width: `${Math.max(0, Math.min(100, value))}%` }}
+                    transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                   />
                 </div>
-              </motion.div>
+              </motion.li>
             )
           })}
-        </div>
+        </ul>
       </CardContent>
     </Card>
   )

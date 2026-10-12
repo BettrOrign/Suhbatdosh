@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 import { Loader2, Pause, Play, RotateCw } from 'lucide-react'
 
-import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n/i18n'
+import { cn } from '@/lib/utils'
 
 interface Props {
   url: string
 }
+
+const SPEEDS = [1, 1.25, 1.5, 2]
 
 function formatTime(sec: number): string {
   if (!Number.isFinite(sec) || sec < 0) return '0:00'
@@ -16,18 +18,25 @@ function formatTime(sec: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
+/**
+ * Waveform player. `speed` is kept in a ref and applied imperatively rather
+ * than being an effect dependency — otherwise cycling the speed would tear
+ * down and rebuild the entire WaveSurfer instance mid-playback (the bug the
+ * old `exhaustive-deps` warning was pointing at).
+ */
 export function WavePlayer({ url }: Props) {
   const { t } = useI18n()
   const containerRef = useRef<HTMLDivElement>(null)
   const waveRef = useRef<WaveSurfer | null>(null)
+  const speedRef = useRef(1)
+
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isError, setIsError] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
+  const [speed, setSpeed] = useState(1)
   const [retryCount, setRetryCount] = useState(0)
-
-  const [speed, setSpeed] = useState<number>(1)
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -39,14 +48,14 @@ export function WavePlayer({ url }: Props) {
 
     const ws = WaveSurfer.create({
       container: containerRef.current,
-      height: 48,
-      waveColor: 'rgba(148, 163, 184, 0.35)',
+      height: 40,
+      waveColor: 'color-mix(in oklch, var(--color-muted-foreground) 30%, transparent)',
       progressColor: 'var(--color-primary)',
       cursorColor: 'var(--color-primary)',
       cursorWidth: 2,
-      barWidth: 3,
+      barWidth: 2,
       barGap: 2,
-      barRadius: 3,
+      barRadius: 2,
       normalize: true,
       url,
     })
@@ -55,7 +64,7 @@ export function WavePlayer({ url }: Props) {
     ws.on('ready', () => {
       setIsLoading(false)
       setDuration(ws.getDuration() ?? 0)
-      ws.setPlaybackRate(speed)
+      ws.setPlaybackRate(speedRef.current)
     })
     ws.on('loading', () => {
       setIsLoading(true)
@@ -68,7 +77,7 @@ export function WavePlayer({ url }: Props) {
     ws.on('play', () => setIsPlaying(true))
     ws.on('pause', () => setIsPlaying(false))
     ws.on('finish', () => setIsPlaying(false))
-    ws.on('timeupdate', (t: number) => setCurrentTime(t))
+    ws.on('timeupdate', (time: number) => setCurrentTime(time))
 
     return () => {
       ws.destroy()
@@ -76,39 +85,41 @@ export function WavePlayer({ url }: Props) {
     }
   }, [url, retryCount])
 
-  const toggle = () => {
+  const toggle = useCallback(() => {
     const ws = waveRef.current
     if (!ws) return
     if (ws.isPlaying()) ws.pause()
     else void ws.play()
-  }
+  }, [])
 
-  const cycleSpeed = () => {
-    const speeds = [1, 1.25, 1.5, 2]
-    const next = speeds[(speeds.indexOf(speed) + 1) % speeds.length]
-    setSpeed(next)
+  const cycleSpeed = useCallback(() => {
+    const next = SPEEDS[(SPEEDS.indexOf(speedRef.current) + 1) % SPEEDS.length]
+    speedRef.current = next
     waveRef.current?.setPlaybackRate(next)
-  }
-
-  const retry = () => {
-    setRetryCount((c) => c + 1)
-  }
+    setSpeed(next)
+  }, [])
 
   return (
-    <div className="flex w-full items-center gap-3.5">
+    <div className="flex w-full items-center gap-3">
       <button
         type="button"
         disabled={isLoading}
         onClick={toggle}
         aria-label={isPlaying ? t('call.pause') : t('call.play')}
-        className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-all duration-200 ease-smooth hover:scale-105 hover:bg-primary/90 active:scale-95 disabled:pointer-events-none disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className={cn(
+          'flex size-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground',
+          'shadow-e1 outline-none transition-[transform,background-color] duration-150 ease-standard',
+          'hover:bg-primary-hover active:scale-95',
+          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+          'disabled:pointer-events-none disabled:opacity-60'
+        )}
       >
         {isLoading ? (
-          <Loader2 className="size-4 animate-spin" />
+          <Loader2 aria-hidden="true" className="size-4 animate-spin" />
         ) : isPlaying ? (
-          <Pause className="size-4 fill-current" />
+          <Pause aria-hidden="true" className="size-4 fill-current" />
         ) : (
-          <Play className="size-4 translate-x-0.5 fill-current" />
+          <Play aria-hidden="true" className="size-4 translate-x-px fill-current" />
         )}
       </button>
 
@@ -116,39 +127,35 @@ export function WavePlayer({ url }: Props) {
         {isError ? (
           <button
             type="button"
-            onClick={retry}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+            onClick={() => setRetryCount((c) => c + 1)}
+            className="flex w-full items-center justify-center gap-2 rounded-md bg-destructive-soft px-3 py-2 text-xs text-destructive-soft-foreground ring-1 ring-destructive/20 ring-inset transition-colors hover:opacity-80"
           >
-            <RotateCw className="size-4" />
+            <RotateCw aria-hidden="true" className="size-3.5" />
             {t('call.audio_error')}
           </button>
         ) : (
           <div
             ref={containerRef}
-            className={cn(
-              'transition-opacity duration-200',
-              isLoading && 'pointer-events-none opacity-40',
-            )}
+            className={cn('transition-opacity duration-150', isLoading && 'pointer-events-none opacity-40')}
           />
         )}
       </div>
 
-      <div className="flex items-center gap-2 shrink-0">
-        <button
-          type="button"
-          onClick={cycleSpeed}
-          title={t('call.speed')}
-          className="rounded-lg border border-border/70 bg-muted/50 px-2 py-1 text-xs font-semibold text-foreground hover:bg-muted transition-colors tabular-nums"
-        >
-          {speed}x
-        </button>
+      <button
+        type="button"
+        onClick={cycleSpeed}
+        title={t('call.speed')}
+        aria-label={t('call.speed')}
+        className="shrink-0 rounded-sm border border-border bg-surface-sunken px-1.5 py-0.5 text-2xs font-semibold tabular-nums outline-none transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        {speed}x
+      </button>
 
-        <div className="whitespace-nowrap text-right text-xs font-medium tabular-nums text-muted-foreground">
-          {formatTime(currentTime)}
-          <span className="mx-1 text-muted-foreground/50">/</span>
-          {formatTime(duration)}
-        </div>
-      </div>
+      <span className="shrink-0 text-right text-2xs font-medium tabular-nums text-muted-foreground">
+        {formatTime(currentTime)}
+        <span className="mx-0.5 opacity-50">/</span>
+        {formatTime(duration)}
+      </span>
     </div>
   )
 }

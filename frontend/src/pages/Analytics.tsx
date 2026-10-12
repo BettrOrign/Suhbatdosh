@@ -1,282 +1,247 @@
-import { useCallback, useEffect, useState } from 'react'
-import { toast } from 'sonner'
-import { motion, useReducedMotion } from 'framer-motion'
-import {
-  ArrowUp,
-  ArrowDown,
-  Minus,
-  BarChart3,
-  Clock,
-  Gauge,
-  PhoneCall,
-  TrendingUp,
-  Users,
-} from 'lucide-react'
-import {
-  BarChart,
-  Bar,
-  Area,
-  AreaChart,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from 'recharts'
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ArrowDown, ArrowUp, Clock, Gauge, Minus, PhoneCall, UsersRound, Users } from 'lucide-react'
+import { motion as m } from 'framer-motion'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Stagger, fadeUp } from '@/lib/motion'
+
+import { DeltaChip, StatCard } from '@/components/StatCard'
+import { ScoreChip } from '@/components/ScoreRing'
+import { CallTypePieChart } from '@/components/CallTypePieChart'
+import { ScoreDistributionChart } from '@/components/ScoreDistributionChart'
+import { Stagger, fadeUp, SPRING } from '@/lib/motion'
 import { useAuth } from '@/lib/auth'
 import { api } from '@/lib/api'
 import { useI18n } from '@/i18n/i18n'
-import { StatCard } from '@/components/StatCard'
-import { formatDuration, scoreColor } from '@/lib/format'
-import type { Call } from '@/lib/types'
+import { formatDate, formatDuration, scoreColor } from '@/lib/format'
+import { callTitle, overallScore, type Call } from '@/lib/types'
+import { cn } from '@/lib/utils'
 
 type OverviewStats = Awaited<ReturnType<typeof api.getOverviewStats>>
 type DayOverDay = Awaited<ReturnType<typeof api.getDayOverDay>>
 type WeeklyTrend = Awaited<ReturnType<typeof api.getWeeklyTrend>>
-type ManagerRanking = Awaited<ReturnType<typeof api.getManagerRankings>>
+type Ranking = Awaited<ReturnType<typeof api.getManagerRankings>>[number]
+type ProblemCall = Awaited<ReturnType<typeof api.getProblemCalls>>[number]
 
-const SCORE_COLORS = [
-  { range: '0-20', min: 0, max: 20, color: 'var(--color-score-bad)' },
-  { range: '20-40', min: 20, max: 40, color: 'var(--color-score-bad)' },
-  { range: '40-60', min: 40, max: 60, color: 'var(--color-score-warn)' },
-  { range: '60-80', min: 60, max: 80, color: 'var(--color-score-warn)' },
-  { range: '80-100', min: 80, max: 101, color: 'var(--color-score-good)' },
-]
-
-function TrendIcon({ trend }: { trend: string }) {
-  if (trend === 'up') return <ArrowUp className="size-3 text-emerald-500" />
-  if (trend === 'down') return <ArrowDown className="size-3 text-red-500" />
-  return <Minus className="size-3 text-muted-foreground" />
+const CHART_TOOLTIP = {
+  fontSize: 11,
+  borderRadius: 6,
+  border: '1px solid var(--color-border)',
+  background: 'var(--color-surface-elevated)',
 }
 
-function DiffBadge({ current, previous }: { current: number | null; previous: number | null }) {
-  if (current == null || previous == null) return null
-  const diff = current - previous
-  if (diff === 0) return <Badge variant="secondary" className="gap-1 text-xs"><Minus className="size-3" />0</Badge>
-  if (diff > 0) return <Badge className="gap-1 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-xs"><ArrowUp className="size-3" />+{diff}</Badge>
-  return <Badge className="gap-1 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-xs"><ArrowDown className="size-3" />{diff}</Badge>
+function TrendIcon({ trend }: { trend: string }) {
+  if (trend === 'up') return <ArrowUp aria-hidden="true" className="size-3 text-success" />
+  if (trend === 'down') return <ArrowDown aria-hidden="true" className="size-3 text-destructive" />
+  return <Minus aria-hidden="true" className="size-3 text-muted-foreground" />
 }
 
 export function Analytics() {
   const { user } = useAuth()
   const { t } = useI18n()
-  const reduceMotion = useReducedMotion()
 
   const [overview, setOverview] = useState<OverviewStats | null>(null)
-  const [dayOverDay, setDayOverDay] = useState<DayOverDay | null>(null)
-  const [weeklyTrend, setWeeklyTrend] = useState<WeeklyTrend>([])
-  const [rankings, setRankings] = useState<ManagerRanking>([])
+  const [dod, setDod] = useState<DayOverDay | null>(null)
+  const [weekly, setWeekly] = useState<WeeklyTrend>([])
+  const [rankings, setRankings] = useState<Ranking[]>([])
   const [calls, setCalls] = useState<Call[]>([])
-  const [selectedEmployee, setSelectedEmployee] = useState<{ id: number; name: string } | null>(null)
-  const [empCalls, setEmpCalls] = useState<Call[]>([])
-  const [empLoading, setEmpLoading] = useState(false)
+  const [sources, setSources] = useState<Record<string, number>>({})
+  const [problems, setProblems] = useState<ProblemCall[]>([])
+  const [selected, setSelected] = useState<{ id: number; name: string } | null>(null)
+  const [selectedCalls, setSelectedCalls] = useState<Call[]>([])
+  const [selectedLoading, setSelectedLoading] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  const load = useCallback(async () => {
-    try {
-      const [ov, dod, wt, mr, cl] = await Promise.all([
-        api.getOverviewStats(),
-        api.getDayOverDay(),
-        api.getWeeklyTrend(),
-        api.getManagerRankings(),
-        api.listCalls(),
-      ])
-      setOverview(ov)
-      setDayOverDay(dod)
-      setWeeklyTrend(wt)
-      setRankings(mr)
-      setCalls(cl)
-    } catch {
-      toast.error('Failed to load analytics')
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([
+      api.getOverviewStats(),
+      api.getDayOverDay(),
+      api.getWeeklyTrend(),
+      api.getManagerRankings(),
+      api.listCalls(),
+      api.getSourceBreakdown().catch(() => ({}) as Record<string, number>),
+      api.getProblemCalls().catch(() => [] as ProblemCall[]),
+    ])
+      .then(([ov, day, wt, mr, cl, src, pb]) => {
+        if (cancelled) return
+        setOverview(ov)
+        setDod(day)
+        setWeekly(wt)
+        setRankings(mr)
+        setCalls(cl)
+        setSources(src)
+        setProblems(pb)
+      })
+      .catch(() => {
+        /* leave the skeletons up only until first settle; partial data renders */
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
-
-  const loadEmpCalls = useCallback(async (emp: { id: number; name: string }) => {
-    setSelectedEmployee(emp)
-    setEmpLoading(true)
-    try {
-      const cl = await api.listManagerCalls(emp.id)
-      setEmpCalls(cl)
-    } catch {
-      setEmpCalls([])
-    } finally {
-      setEmpLoading(false)
+  useEffect(() => {
+    if (!selected) {
+      setSelectedCalls([])
+      return
     }
-  }, [])
+    let cancelled = false
+    setSelectedLoading(true)
+    api
+      .listManagerCalls(selected.id)
+      .then((cl) => {
+        if (!cancelled) setSelectedCalls(cl)
+      })
+      .catch(() => {
+        if (!cancelled) setSelectedCalls([])
+      })
+      .finally(() => {
+        if (!cancelled) setSelectedLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selected])
 
-  const scoreDistData = (() => {
-    const done = calls.filter((c) => c.status === 'done' && typeof c.analysis?.scorecard?.overall === 'number')
-    return SCORE_COLORS.map((b) => ({
-      name: b.range,
-      count: done.filter((c) => c.analysis.scorecard!.overall >= b.min && c.analysis.scorecard!.overall < b.max).length,
-      color: b.color,
-    }))
-  })()
+  const weeklyData = useMemo(
+    () =>
+      weekly.map((d) => ({
+        day: new Date(d.day).toLocaleDateString(undefined, { weekday: 'short' }),
+        calls: d.total_calls,
+      })),
+    [weekly]
+  )
 
-  const weeklyData = weeklyTrend.map((d) => ({
-    day: new Date(d.day).toLocaleDateString('en', { weekday: 'short' }),
-    calls: d.total_calls,
-    score: d.avg_score,
-  }))
+  /* The leaderboard is the "xodimlar" concept: solved vs unsolved problems.
+     Only `yonalish` rows participate; anything else is a different view. */
+  const leaders = useMemo(() => rankings.filter((r) => r.role === 'yonalish'), [rankings])
 
-  if (loading) {
-    return (
-      <div>
-        <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
-        </div>
-        <div className="mb-6 grid gap-4 md:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-56 rounded-xl" />)}
-        </div>
-      </div>
-    )
-  }
+  if (loading) return <DashboardSkeleton />
 
   return (
     <div>
-      {/* Welcome */}
-      <motion.div
-        initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        className="mb-8"
-      >
-        <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-card p-6 shadow-xs">
-          <div className="absolute -top-12 -right-12 size-40 rounded-full bg-primary/5 blur-2xl pointer-events-none" />
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative">
-            <div className="flex items-center gap-4">
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-xs">
-                <TrendingUp className="size-6" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-foreground">{t('analytics.title')}</h1>
-                <p className="text-sm text-muted-foreground mt-0.5">{user?.name ? `${t('dashboard.welcome_desc')} · ${user.name}` : t('dashboard.welcome_desc')}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 self-start sm:self-auto">
-              <Badge variant="secondary" className="text-xs font-medium px-3 py-1">
-                {new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-              </Badge>
-            </div>
-          </div>
-        </div>
-      </motion.div>
+      <header className="mb-6">
+        <h1 className="text-xl font-semibold tracking-[-0.02em]">
+          {user?.name ? t('dashboard.welcome', { name: user.name }) : t('analytics.title')}
+        </h1>
+        <p className="mt-1 text-xs text-muted-foreground">{t('dashboard.welcome_desc')}</p>
+      </header>
 
-      {/* KPI Cards */}
-      {reduceMotion ? (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard icon={PhoneCall} label={t('analytics.total_calls')} value={overview?.total_calls ?? 0} variant="solid" />
-          <StatCard icon={Gauge} label={t('analytics.avg_score')} value={overview?.avg_score ?? 0} valueClass={scoreColor(overview?.avg_score ?? 0)} variant="accent" progress={overview?.avg_score ?? 0} progressClass={(overview?.avg_score ?? 0) >= 70 ? 'bg-emerald-500' : (overview?.avg_score ?? 0) >= 40 ? 'bg-amber-500' : 'bg-red-500'} />
-          <StatCard icon={Clock} label={t('analytics.today_calls')} value={overview?.calls_today ?? 0} variant="solid" />
-          <StatCard icon={Users} label={t('analytics.active_managers')} value={overview?.total_managers ?? 0} variant="outline" />
-        </div>
-      ) : (
-        <Stagger className="mb-10 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <motion.div variants={fadeUp}><StatCard icon={PhoneCall} label={t('analytics.total_calls')} value={overview?.total_calls ?? 0} variant="solid" /></motion.div>
-          <motion.div variants={fadeUp}><StatCard icon={Gauge} label={t('analytics.avg_score')} value={overview?.avg_score ?? 0} valueClass={scoreColor(overview?.avg_score ?? 0)} variant="accent" progress={overview?.avg_score ?? 0} progressClass={(overview?.avg_score ?? 0) >= 70 ? 'bg-emerald-500' : (overview?.avg_score ?? 0) >= 40 ? 'bg-amber-500' : 'bg-red-500'} /></motion.div>
-          <motion.div variants={fadeUp}><StatCard icon={Clock} label={t('analytics.today_calls')} value={overview?.calls_today ?? 0} variant="solid" /></motion.div>
-          <motion.div variants={fadeUp}><StatCard icon={Users} label={t('analytics.active_managers')} value={overview?.total_managers ?? 0} variant="outline" /></motion.div>
-        </Stagger>
-      )}
+      <Stagger className="mb-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <motion.div variants={fadeUp}>
+          <StatCard icon={PhoneCall} label={t('analytics.total_calls')} value={overview?.total_calls ?? 0} />
+        </motion.div>
+        <motion.div variants={fadeUp}>
+          <StatCard
+            icon={Gauge}
+            label={t('analytics.avg_score')}
+            value={overview?.avg_score ?? 0}
+            valueClass={scoreColor(overview?.avg_score)}
+            progress={overview?.avg_score ?? null}
+          />
+        </motion.div>
+        <motion.div variants={fadeUp}>
+          <StatCard icon={Clock} label={t('analytics.today_calls')} value={overview?.calls_today ?? 0} />
+        </motion.div>
+        <motion.div variants={fadeUp}>
+          <StatCard icon={Users} label={t('analytics.active_managers')} value={overview?.total_managers ?? 0} />
+        </motion.div>
+      </Stagger>
 
-      {/* Day-over-Day Comparison */}
-      {dayOverDay && (
-        <div className="mb-10 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {dod && (
+        <section className="mb-4 grid grid-cols-2 gap-2 lg:grid-cols-4" aria-label={t('analytics.day_comparison')}>
           {[
             {
+              key: 'calls',
               label: t('analytics.calls'),
-              today: dayOverDay.today.calls,
-              yesterday: dayOverDay.yesterday.calls,
-              icon: PhoneCall,
-              gradient: 'from-blue-500/10 to-indigo-500/10 dark:from-blue-500/5 dark:to-indigo-500/5',
-              iconBg: 'bg-blue-200 dark:bg-blue-900/30',
-              iconColor: 'text-blue-600 dark:text-blue-400',
-              barColor: 'bg-blue-500',
-              format: (v: number | null) => v != null ? String(v) : '—',
+              today: dod.today.calls,
+              yesterday: dod.yesterday.calls,
+              format: (v: number | null) => (v != null ? String(v) : '—'),
+              delta: (a: number, b: number) => Math.round(a - b),
             },
             {
+              key: 'score',
               label: t('analytics.score'),
-              today: dayOverDay.today.avg_score,
-              yesterday: dayOverDay.yesterday.avg_score,
-              icon: Gauge,
-              gradient: 'from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/5 dark:to-teal-500/5',
-              iconBg: 'bg-emerald-200 dark:bg-emerald-900/30',
-              iconColor: 'text-emerald-600 dark:text-emerald-400',
-              barColor: 'bg-emerald-500',
-              format: (v: number | null) => v != null ? String(v) : '—',
-              scoreBased: true,
+              today: dod.today.avg_score,
+              yesterday: dod.yesterday.avg_score,
+              format: (v: number | null) => (v != null ? String(v) : '—'),
+              score: true,
+              delta: (a: number, b: number) => Math.round(a - b),
             },
             {
+              key: 'duration',
               label: t('analytics.duration'),
-              today: dayOverDay.today.avg_duration,
-              yesterday: dayOverDay.yesterday.avg_duration,
-              icon: Clock,
-              gradient: 'from-amber-500/10 to-orange-500/10 dark:from-amber-500/5 dark:to-orange-500/5',
-              iconBg: 'bg-amber-200 dark:bg-amber-900/30',
-              iconColor: 'text-amber-600 dark:text-amber-400',
-              barColor: 'bg-amber-500',
-              format: (v: number | null) => v != null ? formatDuration(v) : '—',
+              today: dod.today.avg_duration,
+              yesterday: dod.yesterday.avg_duration,
+              format: (v: number | null) => (v != null ? formatDuration(v) : '—'),
+              delta: (a: number, b: number) => {
+                const secs = Math.abs(a - b)
+                return `${secs >= 60 ? `${Math.floor(secs / 60)}m` : Math.round(secs)}s`
+              },
             },
             {
+              key: 'talk',
               label: t('analytics.talk_ratio'),
-              today: dayOverDay.today.avg_talk_ratio,
-              yesterday: dayOverDay.yesterday.avg_talk_ratio,
-              icon: Users,
-              gradient: 'from-purple-500/10 to-pink-500/10 dark:from-purple-500/5 dark:to-pink-500/5',
-              iconBg: 'bg-purple-100 dark:bg-purple-900/30',
-              iconColor: 'text-purple-600 dark:text-purple-400',
-              barColor: 'bg-purple-500',
-              format: (v: number | null) => v != null ? `${Math.round(v * 100)}%` : '—',
+              today: dod.today.avg_talk_ratio,
+              yesterday: dod.yesterday.avg_talk_ratio,
+              format: (v: number | null) => (v != null ? `${Math.round(v * 100)}%` : '—'),
+              delta: (a: number, b: number) => `${Math.round((a - b) * 100)}pp`,
             },
-          ].map((item) => {
-            const todayVal = typeof item.today === 'number' ? item.today : null
-            const yestVal = typeof item.yesterday === 'number' ? item.yesterday : null
-            const maxVal = Math.max(todayVal ?? 0, yestVal ?? 0, 1)
-            const todayPct = ((todayVal ?? 0) / maxVal) * 100
-            const yestPct = ((yestVal ?? 0) / maxVal) * 100
-            const Icon = item.icon
-
+          ].map((m) => {
+            const today = typeof m.today === 'number' ? m.today : null
+            const yesterday = typeof m.yesterday === 'number' ? m.yesterday : null
+            const max = Math.max(today ?? 0, yesterday ?? 0, 1)
             return (
-              <Card key={item.label} className={`overflow-hidden bg-gradient-to-br ${item.gradient} border-border/50`}>
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className={`flex size-8 items-center justify-center rounded-lg ${item.iconBg}`}>
-                      <Icon className={`size-4 ${item.iconColor}`} />
-                    </div>
-                    <DiffBadge current={todayVal} previous={yestVal} />
+              <Card key={m.key} size="sm">
+                <CardContent className="space-y-2 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="eyebrow truncate">{m.label}</p>
+                    <DeltaChip
+                      delta={today != null && yesterday != null ? m.delta(today, yesterday) : null}
+                    />
                   </div>
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1">{item.label}</p>
-                    <p className={`text-2xl font-bold tabular-nums ${
-                      item.scoreBased ? scoreColor(todayVal ?? 0) : 'text-foreground'
-                    }`}>
-                      {item.format(item.today)}
-                    </p>
-                  </div>
-                  <div className="space-y-1.5">
+                  <p
+                    className={cn(
+                      'text-2xl leading-none font-semibold tracking-[-0.02em] tabular-nums',
+                      m.score ? scoreColor(today) : 'text-foreground'
+                    )}
+                  >
+                    {m.format(today)}
+                  </p>
+                  <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted/50">
-                        <div className={`h-full rounded-full ${item.barColor} opacity-20`} style={{ width: `${yestPct}%` }} />
+                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-surface-sunken">
+                        <motion.div
+                          className="h-full rounded-full bg-border-strong"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${((yesterday ?? 0) / max) * 100}%` }}
+                          transition={SPRING.gentle}
+                        />
                       </div>
-                      <span className="text-[10px] text-muted-foreground tabular-nums w-12 text-right">
-                        {t('analytics.yesterday')}: {item.format(item.yesterday)}
+                      <span className="w-20 shrink-0 text-right text-2xs tabular-nums text-muted-foreground">
+                        {t('analytics.yesterday')} {m.format(yesterday)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted/50">
-                        <div className={`h-full rounded-full ${item.barColor}`} style={{ width: `${todayPct}%` }} />
+                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-surface-sunken">
+                        <motion.div
+                          className="h-full rounded-full bg-primary"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${((today ?? 0) / max) * 100}%` }}
+                          transition={SPRING.gentle}
+                        />
                       </div>
-                      <span className="text-[10px] font-medium tabular-nums w-12 text-right">
-                        {t('analytics.today')}: {item.format(item.today)}
+                      <span className="w-20 shrink-0 text-right text-2xs font-medium tabular-nums">
+                        {t('analytics.today')} {m.format(today)}
                       </span>
                     </div>
                   </div>
@@ -284,187 +249,336 @@ export function Analytics() {
               </Card>
             )
           })}
-        </div>
+        </section>
       )}
 
-      {/* Charts Row */}
-      <div className="mb-6 grid gap-4 md:grid-cols-2">
-        {/* Weekly Trend */}
-        <Card>
-          <CardHeader className="mb-5">
-            <CardTitle className="text-center text-xl font-medium">{t('analytics.weekly_trend')}</CardTitle>
+      <div className="mb-4 grid gap-3 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-1">
+            <CardTitle>{t('analytics.weekly_trend')}</CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent>
             {weeklyData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={weeklyData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+              <ResponsiveContainer width="100%" height={190}>
+                <AreaChart data={weeklyData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                   <defs>
-                    <linearGradient id="callsGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.02} />
+                    <linearGradient id="callsFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.22} />
+                      <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity={0.01} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="day" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} axisLine={false} tickLine={false} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    cursor={{ stroke: 'var(--color-chart-1)', strokeWidth: 1, strokeDasharray: '4 4' }}
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-card)' }}
-                  />
+                  <XAxis dataKey="day" axisLine={false} tickLine={false} dy={4} />
+                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} width={32} />
+                  <Tooltip cursor={{ stroke: 'var(--color-border-strong)', strokeDasharray: '3 3' }} contentStyle={CHART_TOOLTIP} />
                   <Area
                     type="monotone"
                     dataKey="calls"
                     stroke="var(--color-chart-1)"
-                    strokeWidth={2.5}
-                    fill="url(#callsGradient)"
-                    dot={{ r: 3, fill: 'var(--color-chart-1)', strokeWidth: 0 }}
-                    activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--color-card)' }}
+                    strokeWidth={2}
+                    fill="url(#callsFill)"
+                    dot={{ r: 2.5, fill: 'var(--color-chart-1)', strokeWidth: 0 }}
+                    activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--color-surface)' }}
                   />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">{t('analytics.no_problems')}</div>
+              <div className="flex h-[190px] items-center justify-center text-xs text-muted-foreground">
+                {t('dashboard.chart.no_data')}
+              </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Score Distribution */}
-        <Card>
-          <CardHeader className="pb-5">
-            <CardTitle className="text-xl text-center font-medium">{t('analytics.score_distribution')}</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {scoreDistData.some((d) => d.count > 0) ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={scoreDistData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} axisLine={false} tickLine={false} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    cursor={{ fill: 'var(--color-muted)', opacity: 0.5 }}
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-card)' }}
-                  />
-                  <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                    {scoreDistData.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} fillOpacity={0.85} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">{t('analytics.no_problems')}</div>
-            )}
-          </CardContent>
-        </Card>
+        {/* These two components existed as dead files while Analytics
+            re-implemented them inline. They are now the single source. */}
+        <ScoreDistributionChart calls={calls} />
+        <CallTypePieChart calls={calls} />
+        <SourceBreakdown sources={sources} />
       </div>
 
-      {/* Manager Rankings */}
-      <div className="block">
-        <Card className="border-border/70 shadow-xs">
-          <CardHeader className="pb-4 border-b border-border/50">
-            <CardTitle className="text-lg font-bold flex items-center gap-2 text-foreground">
-              <BarChart3 className="size-5 text-primary" />
-              {t('analytics.manager_rankings')}
-            </CardTitle>
+      <Card>
+        <Tabs defaultValue="employees">
+          <CardHeader className="border-b border-border-subtle pb-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle>{t('analytics.manager_rankings')}</CardTitle>
+              <TabsList>
+                <TabsTrigger value="employees">{t('analytics.tab_employees')}</TabsTrigger>
+                <TabsTrigger value="problems">
+                  {t('analytics.tab_problems')}
+                  {problems.length > 0 && (
+                    <span className="ml-1 rounded-full bg-destructive-soft px-1.5 text-2xs font-semibold tabular-nums text-destructive-soft-foreground">
+                      {problems.length}
+                    </span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+            </div>
           </CardHeader>
-          <CardContent className="pt-4">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              <div className="space-y-2 max-h-80 overflow-y-auto lg:col-span-7 min-w-0 pr-1">
-                {rankings
-                  .filter((r) => (r as { role?: string }).role === 'yonalish')
-                  .map((r, i) => {
-                    const isSelected = selectedEmployee?.id === r.id
-                    const rankClass = i === 0
-                      ? 'bg-amber-100 text-amber-800 border border-amber-300/80 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/50'
-                      : i === 1
-                      ? 'bg-slate-100 text-slate-700 border border-slate-300/80 dark:bg-slate-800 dark:text-slate-300'
-                      : i === 2
-                      ? 'bg-orange-100 text-orange-800 border border-orange-300/80 dark:bg-orange-950/40 dark:text-orange-300'
-                      : 'bg-muted text-muted-foreground border border-border/60'
 
-                    return (
-                      <div
-                        key={r.id}
-                        onClick={() => loadEmpCalls({ id: r.id, name: r.name })}
-                        className={`flex items-center gap-3 rounded-xl border p-3 text-sm cursor-pointer transition-all duration-200 ${
-                          isSelected
-                            ? 'bg-primary/5 border-primary shadow-xs ring-1 ring-primary'
-                            : 'bg-card border-border/70 hover:bg-muted/50 hover:border-border'
-                        }`}
+          <CardContent className="pt-3">
+            <TabsContent value="employees">
+            <div className="grid gap-4 lg:grid-cols-12">
+            <ol className="min-w-0 max-h-[26rem] space-y-1 overflow-y-auto pr-1 lg:col-span-7">
+              {leaders.length === 0 ? (
+                <li className="py-10 text-center text-xs text-muted-foreground">
+                  {t('analytics.no_problems')}
+                </li>
+              ) : (
+                leaders.map((r, i) => {
+                  const isSelected = selected?.id === r.id
+                  return (
+                    <li key={r.id}>
+                      <button
+                        type="button"
+                        onClick={() => setSelected({ id: r.id, name: r.name })}
+                        aria-pressed={isSelected}
+                        className={cn(
+                          'flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left transition-colors duration-150',
+                          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                          isSelected ? 'bg-primary-soft ring-1 ring-primary/25' : 'hover:bg-surface-hover'
+                        )}
                       >
-                        <span className={`flex size-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold tabular-nums shadow-2xs ${rankClass}`}>
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            'flex size-6 shrink-0 items-center justify-center rounded-sm text-2xs font-semibold tabular-nums ring-1 ring-inset',
+                            i === 0
+                              ? 'bg-warning-soft text-warning-soft-foreground ring-warning/25'
+                              : 'bg-surface-sunken text-muted-foreground ring-border-subtle'
+                          )}
+                        >
                           {i + 1}
                         </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-foreground truncate">{r.name}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-1.5">
+                            <span className="truncate text-sm font-medium">{r.name}</span>
                             <TrendIcon trend={r.trend} />
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">
+                          </span>
+                          <span className="mt-0.5 block text-2xs text-muted-foreground">
                             {r.total_calls} {t('analytics.calls').toLowerCase()}
-                            {r.avg_score != null && <> · <span className={`font-semibold ${scoreColor(r.avg_score)}`}>{r.avg_score} pts</span></>}
-                            {((r as { solved_problems?: number }).solved_problems ?? 0) > 0 && (
-                              <span className="text-emerald-600 font-medium"> · {(r as { solved_problems?: number }).solved_problems ?? 0} {t('analytics.solved')}</span>
+                            {r.avg_score != null && (
+                              <> · <span className={cn('font-semibold', scoreColor(r.avg_score))}>{r.avg_score}</span></>
                             )}
-                            {((r as { unsolved_problems?: number }).unsolved_problems ?? 0) > 0 && (
-                              <span className="text-red-500 font-medium"> · {(r as { unsolved_problems?: number }).unsolved_problems ?? 0} {t('analytics.unsolved')}</span>
+                            {(r.solved_problems ?? 0) > 0 && (
+                              <span className="text-success"> · {r.solved_problems} {t('analytics.solved')}</span>
                             )}
-                          </p>
-                        </div>
+                            {(r.unsolved_problems ?? 0) > 0 && (
+                              <span className="text-destructive"> · {r.unsolved_problems} {t('analytics.unsolved')}</span>
+                            )}
+                          </span>
+                        </span>
                         {r.best_score != null && (
-                          <div className="text-right shrink-0">
-                            <span className="text-[10px] text-muted-foreground uppercase block font-semibold">Best</span>
-                            <span className={`text-xs font-bold ${scoreColor(r.best_score)}`}>{r.best_score}</span>
-                          </div>
+                          <span className="shrink-0 text-right">
+                            <span className="eyebrow block">{t('analytics.best')}</span>
+                            <span className={cn('text-xs font-semibold tabular-nums', scoreColor(r.best_score))}>
+                              {r.best_score}
+                            </span>
+                          </span>
                         )}
-                      </div>
-                    )
-                  })}
-              </div>
-              <div className="lg:col-span-5 w-full border border-border/70 rounded-xl bg-muted/20 p-3 overflow-y-auto max-h-80">
-                {selectedEmployee ? (
-                  empLoading ? (
-                    <div className="flex items-center justify-center h-48 text-xs text-muted-foreground">{t('analytics.loading')}</div>
-                  ) : empCalls.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-48 gap-2 text-xs text-muted-foreground">
-                      <p>{t('analytics.no_calls_for', { name: selectedEmployee.name })}</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between pb-2 border-b border-border/50">
-                        <p className="text-xs font-semibold text-foreground truncate">{selectedEmployee.name}</p>
-                        <Badge variant="secondary" className="text-[10px]">{empCalls.length} {t('analytics.calls').toLowerCase()}</Badge>
-                      </div>
-                      {empCalls.map((c) => (
-                        <div key={c.id} className="rounded-lg border border-border/60 bg-card p-2.5 text-xs shadow-2xs hover:border-border transition-colors">
-                          <p className="font-semibold truncate text-foreground">{c.name}</p>
-                          <div className="flex items-center gap-2 mt-1 text-muted-foreground text-[11px]">
-                            {c.analysis?.scorecard?.overall != null && (
-                              <span className={`font-semibold ${scoreColor(c.analysis.scorecard.overall)}`}>
-                                {c.analysis.scorecard.overall}/100
-                              </span>
-                            )}
-                            {c.client_name && <span className="truncate">· {c.client_name}</span>}
-                            {c.duration_sec != null && <span>· {formatDuration(c.duration_sec)}</span>}
-                          </div>
-                          {c.analysis && 'action_items' in c.analysis && c.analysis.action_items?.[0]?.description && (
-                            <p className="text-[11px] text-muted-foreground mt-1.5 line-clamp-2 bg-muted/40 p-1 rounded">
-                              {c.analysis.action_items[0].description}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                      </button>
+                    </li>
                   )
+                })
+              )}
+            </ol>
+
+            <div className="lg:col-span-5 lg:min-h-[26rem]">
+              <AnimatePresence mode="wait">
+                {selected ? (
+                  <motion.div
+                    key={selected.id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={SPRING.standard}
+                  >
+                    <div className="flex items-center justify-between gap-2 border-b border-border-subtle pb-2">
+                      <p className="truncate text-xs font-semibold">{selected.name}</p>
+                      <Badge variant="secondary">
+                        {selectedCalls.length} {t('analytics.calls').toLowerCase()}
+                      </Badge>
+                    </div>
+                    {selectedLoading ? (
+                      <div className="mt-2 space-y-1.5">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                          <Skeleton key={i} className="h-14 rounded-md" />
+                        ))}
+                      </div>
+                    ) : selectedCalls.length === 0 ? (
+                      <p className="py-10 text-center text-xs text-muted-foreground">
+                        {t('analytics.no_calls_for', { name: selected.name })}
+                      </p>
+                    ) : (
+                      <ul className="mt-2 max-h-72 space-y-1 overflow-y-auto">
+                        {selectedCalls.map((c) => {
+                          const overall = overallScore(c.analysis)
+                          const actionItem = Array.isArray(asActionItems(c))
+                            ? asActionItems(c)[0]
+                            : undefined
+                          return (
+                            <li key={c.id}>
+                              <Link
+                                to={`/calls/${c.id}`}
+                                className="block rounded-md px-2.5 py-2 transition-colors duration-150 hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                              >
+                                <span className="flex items-baseline justify-between gap-2">
+                                  <span className="truncate text-xs font-medium">{callTitle(c)}</span>
+                                  <ScoreChip score={overall} />
+                                </span>
+                                <span className="mt-0.5 block text-2xs text-muted-foreground">
+                                  {[c.client_name, c.duration_sec != null ? formatDuration(c.duration_sec) : null]
+                                    .filter(Boolean)
+                                    .join(' · ')}
+                                </span>
+                                {actionItem && (
+                                  <span className="mt-1 block truncate rounded-sm bg-surface-sunken px-1.5 py-0.5 text-2xs text-muted-foreground">
+                                    {actionItem}
+                                  </span>
+                                )}
+                              </Link>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+                  </motion.div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-48 gap-2 text-xs text-muted-foreground text-center p-4">
-                    <Users className="size-8 text-muted-foreground/40 mb-1" />
-                    <p>{t('analytics.click_employee')}</p>
-                  </div>
+                  <motion.div
+                    key="empty"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex flex-col items-center justify-center gap-2 py-16 text-center"
+                  >
+                    <UsersRound aria-hidden="true" className="size-7 text-muted-foreground/40" />
+                    <p className="max-w-[24ch] text-xs text-muted-foreground">{t('analytics.click_employee')}</p>
+                  </motion.div>
                 )}
-              </div>
+              </AnimatePresence>
             </div>
+            </div>
+            </TabsContent>
+
+            <TabsContent value="problems">
+              {problems.length === 0 ? (
+                <p className="py-12 text-center text-xs text-muted-foreground">
+                  {t('analytics.no_problems')}
+                </p>
+              ) : (
+                <ul className="max-h-[26rem] space-y-1 overflow-y-auto pr-1">
+                  {problems.map((p) => (
+                    <li key={p.id}>
+                      <Link
+                        to={`/calls/${p.id}`}
+                        className="block rounded-md px-2.5 py-2 transition-colors duration-150 hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                      >
+                        <span className="flex items-baseline justify-between gap-2">
+                          <span className="min-w-0 truncate text-xs font-medium">{p.name}</span>
+                          <ScoreChip score={p.score} />
+                        </span>
+                        {p.summary && (
+                          <span className="mt-1 block line-clamp-2 text-2xs leading-relaxed text-muted-foreground">
+                            {p.summary}
+                          </span>
+                        )}
+                        <span className="mt-1 flex flex-wrap items-center gap-x-2 text-2xs text-muted-foreground">
+                          <span className="tabular-nums">{formatDuration(p.duration_sec)}</span>
+                          <span className="capitalize">{p.source_type.replace(/_/g, ' ')}</span>
+                          {p.outcome && <span className="capitalize">{p.outcome}</span>}
+                          {p.uploader_name && <span>· {p.uploader_name}</span>}
+                          <span className="tabular-nums">· {formatDate(p.created_at)}</span>
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </TabsContent>
           </CardContent>
-        </Card>
-      </div>
+        </Tabs>
+      </Card>
     </div>
   )
 }
+
+/** Where calls come from. Uses the previously-unused `/api/stats/source-breakdown`. */
+function SourceBreakdown({ sources }: { sources: Record<string, number> }) {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.entries(sources)
+        .filter(([, n]) => n > 0)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6),
+    [sources]
+  )
+  const total = rows.reduce((s, [, n]) => s + n, 0) || 1
+
+  return (
+    <Card size="sm" className="lg:col-span-2">
+      <CardHeader className="pb-1">
+        <CardTitle>{t('analytics.source_breakdown')}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {rows.length === 0 ? (
+          <div className="flex h-[190px] items-center justify-center text-xs text-muted-foreground">
+            {t('dashboard.chart.no_data')}
+          </div>
+        ) : (
+          <ul className="space-y-2.5 pt-1">
+            {rows.map(([source, count], i) => (
+              <li key={source} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
+                <span className="truncate text-xs capitalize">{source.replace(/_/g, ' ')}</span>
+                <span className="text-xs font-semibold tabular-nums">
+                  {count}
+                  <span className="ml-1.5 text-2xs font-normal text-muted-foreground">
+                    {Math.round((count / total) * 100)}%
+                  </span>
+                </span>
+                <div className="col-span-2 h-1 overflow-hidden rounded-full bg-surface-sunken">
+                  <m.div
+                    className="h-full rounded-full"
+                    style={{ backgroundColor: `var(--color-chart-${(i % 6) + 1})` }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${(count / total) * 100}%` }}
+                    transition={{ ...SPRING.gentle, delay: i * 0.04 }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function asActionItems(call: Call): string[] {
+  const raw = call.analysis as { action_items?: unknown }
+  if (!Array.isArray(raw.action_items)) return []
+  return raw.action_items
+    .map((a) => (a as { description?: unknown })?.description)
+    .filter((d): d is string => typeof d === 'string' && d.trim() !== '')
+}
+
+function DashboardSkeleton() {
+  return (
+    <div aria-busy="true" aria-label="loading">
+      <div className="mb-6 space-y-2">
+        <Skeleton className="h-6 w-56 rounded-md" />
+        <Skeleton className="h-3 w-72 rounded" />
+      </div>
+      <div className="mb-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-20 rounded-lg" />
+        ))}
+      </div>
+      <div className="mb-4 grid gap-3 lg:grid-cols-3">
+        <Skeleton className="h-56 rounded-lg lg:col-span-2" />
+        <Skeleton className="h-56 rounded-lg" />
+      </div>
+      <Skeleton className="h-80 rounded-lg" />
+    </div>
+  )
+}
+
+export default Analytics

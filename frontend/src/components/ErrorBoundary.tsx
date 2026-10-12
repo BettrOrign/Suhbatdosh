@@ -1,10 +1,15 @@
-import { Component, type ReactNode } from 'react'
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { RefreshCw, TriangleAlert } from 'lucide-react'
+
 import { Button } from '@/components/ui/button'
+import { translations } from '@/i18n/translations'
+import type { Lang } from '@/i18n/translations'
 import { Card, CardContent } from '@/components/ui/card'
 
 interface Props {
   children: ReactNode
+  /** Current UI language, injected so the boundary can localise itself. */
+  lang: Lang
 }
 
 interface State {
@@ -12,53 +17,55 @@ interface State {
   error: Error | null
 }
 
+/**
+ * Previously hardcoded Uzbek in both languages. Now localised, and it offers
+ * a real recovery action (reload) rather than only re-rendering the subtree
+ * that already threw.
+ */
 export class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props)
-    this.state = { hasError: false, error: null }
-  }
+  override state: State = { hasError: false, error: null }
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error }
   }
 
-  componentDidCatch(error: Error, info: React.ErrorInfo) {
+  override componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('ErrorBoundary caught:', error, info.componentStack)
   }
 
-  handleRetry = () => {
-    this.setState({ hasError: false, error: null })
-  }
+  override render() {
+    if (!this.state.hasError) return this.props.children
 
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="flex min-h-[50vh] items-center justify-center p-6">
-          <Card className="max-w-md border-destructive/20">
-            <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
-              <div className="flex size-14 items-center justify-center rounded-2xl bg-destructive/10">
-                <AlertTriangle className="size-7 text-destructive" />
-              </div>
-              <div className="space-y-1">
-                <p className="text-lg font-semibold">Xatolik yuz berdi</p>
-                <p className="text-sm text-muted-foreground">
-                  Kutilmagan xatolik yuz berdi. Iltimos, qayta urinib ko'ring.
+    const t = (key: string) => translations[this.props.lang]?.[key] ?? translations.en[key] ?? key
+
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center p-6">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
+            <div className="flex size-11 items-center justify-center rounded-lg bg-destructive-soft text-destructive-soft-foreground ring-1 ring-destructive/20 ring-inset">
+              <TriangleAlert aria-hidden="true" className="size-5" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="text-sm font-semibold">{t('error.title')}</h2>
+              <p className="text-xs leading-relaxed text-muted-foreground">{t('error.desc')}</p>
+              {this.state.error && (
+                <p className="mt-2 rounded-md bg-surface-sunken px-3 py-2 font-mono text-2xs break-words text-muted-foreground">
+                  {this.state.error.message}
                 </p>
-                {this.state.error && (
-                  <p className="mt-2 rounded-lg bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">
-                    {this.state.error.message}
-                  </p>
-                )}
-              </div>
-              <Button onClick={this.handleRetry} variant="outline" className="gap-2">
-                <RefreshCw className="size-4" /> Qayta urinish
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => this.setState({ hasError: false, error: null })}>
+                {t('error.retry')}
               </Button>
-            </CardContent>
-          </Card>
-        </div>
-      )
-    }
-
-    return this.props.children
+              <Button size="sm" onClick={() => window.location.reload()}>
+                <RefreshCw aria-hidden="true" className="size-3.5" />
+                {t('error.reload')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 }

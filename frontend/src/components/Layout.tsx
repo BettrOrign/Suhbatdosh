@@ -1,213 +1,262 @@
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LogOut, Mic, Users, BarChart3, Menu, X, LayoutDashboard, ChevronDown } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { useState } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import {
+  BarChart3,
+  ChevronDown,
+  Cloud,
+  Lock,
+  LogOut,
+  Menu,
+  Mic,
+  Search,
+  TriangleAlert,
+  X,
+} from 'lucide-react'
+
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { CommandPalette, OPEN_EVENT } from '@/components/CommandPalette'
+import { LanguageToggleIcon } from '@/i18n/LanguageToggle'
+import { NotificationBell } from '@/components/NotificationBell'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/i18n/i18n'
-import { LanguageToggleIcon } from '@/i18n/LanguageToggle'
-import { ThemeToggle } from '@/components/ThemeToggle'
-import { Button } from '@/components/ui/button'
-import { NotificationBell } from '@/components/NotificationBell'
+import { useMode } from '@/lib/mode'
+import { SPRING, fadeUp } from '@/lib/motion'
+import { NAV, isManagersPath, isNavActive, visibleNav, type NavItem } from '@/components/nav-items'
+import { cn } from '@/lib/utils'
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
   const { t } = useI18n()
   const location = useLocation()
+  const reduced = useReducedMotion()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [managersOpen, setManagersOpen] = useState(false)
+  const { loading: modeLoading, sttUnavailable } = useMode()
 
-  const links: { to: string; labelKey: string; icon: any; show: boolean }[] = [
-    { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard, show: true },
-    { to: '/calls', labelKey: 'nav.calls', icon: Mic, show: true },
-    { to: '/clients', labelKey: 'nav.clients', icon: Users, show: true },
-    { to: '/users', labelKey: 'nav.team', icon: Users, show: user?.role === 'admin' },
-  ]
+  const items = visibleNav(user?.role)
+  const managersGroup = items.filter((i) => isManagersPath(i.to))
+  const topLevel = items.filter((i) => !isManagersPath(i.to))
+  const managersActive = isManagersPath(location.pathname)
 
-  const subItems = [
-    { label: t('nav.submenu.admin'), to: '/managers/admin' },
-    { label: t('nav.submenu.managers'), to: '/managers' },
-    { label: t('nav.submenu.directions'), to: '/managers/directions' },
-  ]
+  useEffect(() => {
+    setSidebarOpen(false)
+    if (managersActive) setManagersOpen(true)
+  }, [location.pathname, managersActive])
+
+  const breadcrumb = useBreadcrumb(location.pathname, t, items)
 
   return (
-    <div className="min-h-screen flex">
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <motion.aside
-        className={`fixed left-0 top-0 z-50 h-screen w-64 overflow-y-auto bg-card border-r border-border/70 shadow-lg transform transition-transform duration-300 ease-smooth ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } lg:translate-x-0 lg:shadow-none`}
+    <div className="min-h-dvh">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-100 focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:text-sm focus:ring-1 focus:ring-border"
       >
-        <div className="flex h-full flex-col">
-          {/* Logo at top of sidebar */}
-          <div className="flex items-center gap-3 px-5 py-4 border-b border-border/60">
-            <Link to="/" onClick={() => setSidebarOpen(false)} className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer focus:outline-none rounded-xl">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-sm">
-                <Mic className="size-4 text-white" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-base font-bold tracking-tight text-foreground">{t('brand.name')}</span>
-                <p className="text-[11px] font-medium text-muted-foreground">Call Analytics AI</p>
-              </div>
+        {t('a11y.skip_to_content')}
+      </a>
+
+      <div className="flex min-h-dvh">
+        {sidebarOpen && (
+          <motion.button
+            type="button"
+            aria-label={t('common.close')}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 z-40 bg-neutral-1000/30 backdrop-blur-[2px] lg:hidden"
+          />
+        )}
+
+        {/* ---------------------------------------------------------------- */}
+        {/* Sidebar                                                          */}
+        {/* ---------------------------------------------------------------- */}
+        <motion.aside
+          aria-label={t('nav.sidebar')}
+          animate={{ x: 0 }}
+          initial={false}
+          className={cn(
+            'fixed inset-y-0 left-0 z-50 flex w-60 flex-col border-r border-sidebar-border bg-sidebar',
+            'transition-transform duration-200 ease-standard lg:translate-x-0',
+            sidebarOpen ? 'translate-x-0 shadow-e4' : '-translate-x-full'
+          )}
+        >
+          <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-sidebar-border px-4">
+            <Link
+              to="/"
+              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                <Mic aria-hidden="true" className="size-3.5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold tracking-[-0.01em]">
+                  {t('brand.name')}
+                </span>
+                <span className="block truncate text-2xs text-muted-foreground">
+                  {t('brand.tagline')}
+                </span>
+              </span>
             </Link>
-            <Button variant="ghost" size="icon" className="lg:hidden ml-auto shrink-0 size-8" onClick={() => setSidebarOpen(false)}>
-              <X className="size-4" />
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="lg:hidden"
+              onClick={() => setSidebarOpen(false)}
+              aria-label={t('common.close')}
+            >
+              <X aria-hidden="true" className="size-4" />
             </Button>
           </div>
 
-          {/* Section label */}
-          <div className="px-5 pt-5 pb-2">
-            <span className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-widest">
-              Navigation
-            </span>
-          </div>
+          <nav className="flex-1 overflow-y-auto px-2.5 py-3" aria-label={t('nav.primary')}>
+            <NavGroup items={topLevel} pathname={location.pathname} />
 
-          {/* Nav links */}
-          <nav className="flex flex-1 flex-col gap-1 px-3">
-              {links
-                .filter((l) => l.show)
-                .map((l) => {
-                  const isActive = location.pathname === l.to
-                  return (
-                    <Link
-                      key={l.to}
-                      to={l.to}
-                      onClick={() => setSidebarOpen(false)}
-                      className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
-                        isActive
-                          ? 'bg-primary/10 text-primary font-semibold shadow-xs'
-                          : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground cursor-pointer'
-                      }`}
-                    >
-                      {isActive && (
-                        <motion.div
-                          layoutId="sidebar-pill"
-                          className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-primary"
-                          transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-                        />
-                      )}
-                      <l.icon className={`size-4 shrink-0 transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`} />
-                      {t(l.labelKey)}
-                    </Link>
-                  )
-                })}
-
-            {/* Managers dropdown */}
-            {(user?.role === 'admin' || user?.role === 'yonalish') && (
-              <div>
+            {managersGroup.length > 0 && (
+              <>
+                <div className="my-3 h-px bg-sidebar-border" />
                 <button
-                  onClick={() => setManagersOpen(!managersOpen)}
-                  className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
-                    location.pathname === '/managers' || location.pathname.startsWith('/managers/')
-                      ? 'bg-primary/10 text-primary font-semibold shadow-xs'
-                      : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground cursor-pointer'
-                  }`}
+                  type="button"
+                  onClick={() => setManagersOpen((o) => !o)}
+                  aria-expanded={managersOpen}
+                  aria-controls="managers-submenu"
+                  className={cn(
+                    'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm font-medium outline-none',
+                    'transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                    managersActive
+                      ? 'text-sidebar-accent-foreground'
+                      : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
+                  )}
                 >
-                  {location.pathname === '/managers' || location.pathname.startsWith('/managers/') ? (
-                    <motion.div
-                      layoutId="sidebar-pill"
-                      className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-primary"
-                      transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-                    />
-                  ) : null}
-                  <BarChart3 className="size-4 shrink-0" />
-                  {t('nav.managers')}
-                  <ChevronDown className={`ml-auto size-4 transition-transform duration-200 ${managersOpen ? 'rotate-180' : ''}`} />
+                  <BarChart3 aria-hidden="true" className="size-4 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate text-left">{t('nav.managers')}</span>
+                  <motion.span
+                    animate={{ rotate: managersOpen ? 180 : 0 }}
+                    transition={SPRING.snappy}
+                    className="shrink-0"
+                  >
+                    <ChevronDown aria-hidden="true" className="size-3.5" />
+                  </motion.span>
                 </button>
-                  <AnimatePresence>
-                    {managersOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, maxHeight: 0 }}
-                        animate={{ opacity: 1, maxHeight: 300 }}
-                        exit={{ opacity: 0, maxHeight: 0 }}
-                        transition={{ duration: 0.2 }}
-                        style={{ overflow: 'hidden' }}
-                        className="flex flex-col gap-0.5 pl-8 pr-2 py-1"
-                      >
-                        {subItems.map((item) => {
-                          const isActive = location.pathname === item.to
-                          return (
-                            <Link
-                              key={item.to}
-                              to={item.to}
-                              onClick={() => setSidebarOpen(false)}
-                              className={`rounded-lg px-3 py-2 text-xs font-medium transition-all ${
-                                isActive
-                                  ? 'bg-primary/10 text-primary font-semibold'
-                                  : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground cursor-pointer'
-                              }`}
-                            >
-                              {item.label}
-                            </Link>
-                          )
-                        })}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-              </div>
+                <AnimatePresence initial={false}>
+                  {managersOpen && (
+                    <motion.ul
+                      id="managers-submenu"
+                      initial={reduced ? false : { height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={reduced ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                      transition={SPRING.standard}
+                      className="overflow-hidden"
+                    >
+                      <div className="mt-0.5 space-y-0.5 border-l border-sidebar-border pl-2.5">
+                        {managersGroup.map((item) => (
+                          <NavLink key={item.to} item={item} pathname={location.pathname} nested />
+                        ))}
+                      </div>
+                    </motion.ul>
+                  )}
+                </AnimatePresence>
+              </>
             )}
           </nav>
 
-          {/* User info at bottom */}
-          {user && (
-            <div className="border-t border-border/60 p-3">
-              <div className="flex items-center gap-3 rounded-xl p-2 bg-muted/40 border border-border/50">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary font-bold text-sm">
-                  {user.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-foreground truncate">{user.name}</p>
-                  <p className="text-[11px] text-muted-foreground capitalize">{user.role}</p>
-                </div>
-                <button
-                  onClick={logout}
-                  title={t('nav.logout')}
-                  className="rounded-lg p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                >
-                  <LogOut className="size-4" />
-                </button>
+          {/* Private-mode warning lives in the sidebar so it is impossible to
+              miss, but it only appears when the local model is unusable. */}
+          {sttUnavailable && (
+            <div className="border-t border-sidebar-border px-3 py-2.5">
+              <div className="flex items-start gap-2 rounded-md bg-warning-soft px-2.5 py-2 text-warning-soft-foreground">
+                <TriangleAlert aria-hidden="true" className="mt-px size-3.5 shrink-0" />
+                <p className="text-2xs leading-relaxed">{t('mode.stt_unavailable_sidebar')}</p>
               </div>
             </div>
           )}
-        </div>
-      </motion.aside>
 
-      {/* Main content */}
-      <div className="flex flex-1 flex-col min-w-0 lg:ml-64">
-        {/* Top bar */}
-        <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-xl">
-          <div className="flex h-14 items-center justify-between px-4 sm:px-6">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="lg:hidden size-8">
-                <Menu className="size-4" />
-              </Button>
-              <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground">ViaCall</span>
-                <span>/</span>
-                <span className="capitalize">
-                  {location.pathname === '/' ? t('nav.dashboard') :
-                   location.pathname.startsWith('/calls') ? t('nav.calls') :
-                   location.pathname.startsWith('/clients') ? t('nav.clients') :
-                   location.pathname.startsWith('/managers') ? t('nav.managers') :
-                   location.pathname.startsWith('/users') ? t('nav.team') : ''}
+          {user && (
+            <div className="border-t border-sidebar-border p-2.5">
+              <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary-soft-foreground">
+                  {user.name.charAt(0).toUpperCase()}
                 </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium">{user.name}</p>
+                  <p className="truncate text-2xs text-muted-foreground">
+                    {t(`nav.role.${user.role}`)}
+                  </p>
+                </div>
+                <Button
+                  variant="destructive-ghost"
+                  size="icon-sm"
+                  onClick={() => void logout()}
+                  aria-label={t('nav.logout')}
+                  title={t('nav.logout')}
+                >
+                  <LogOut aria-hidden="true" className="size-3.5" />
+                </Button>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="hidden md:flex items-center gap-1.5 mr-2 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium border border-emerald-500/20">
-                <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Online</span>
-              </div>
+          )}
+        </motion.aside>
+
+        {/* ---------------------------------------------------------------- */}
+        {/* Main column                                                      */}
+        {/* ---------------------------------------------------------------- */}
+        <div className="flex min-w-0 flex-1 flex-col lg:pl-60">
+          <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-md">
+            <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="lg:hidden"
+                onClick={() => setSidebarOpen(true)}
+                aria-label={t('nav.open_menu')}
+              >
+                <Menu aria-hidden="true" className="size-4" />
+              </Button>
+
+              <nav aria-label={t('nav.breadcrumb')} className="min-w-0 flex-1">
+                <ol className="flex min-w-0 items-center gap-1.5 text-xs">
+                  <li className="hidden shrink-0 text-muted-foreground sm:block">
+                    {t('brand.name')}
+                  </li>
+                  {breadcrumb.map((crumb) => (
+                    <li key={crumb.label} className="flex min-w-0 items-center gap-1.5">
+                      <span aria-hidden="true" className="hidden text-muted-foreground/50 sm:block">
+                        /
+                      </span>
+                      {crumb.to ? (
+                        <Link
+                          to={crumb.to}
+                          className="truncate text-muted-foreground transition-colors hover:text-foreground hover:underline"
+                        >
+                          {crumb.label}
+                        </Link>
+                      ) : (
+                        <span aria-current="page" className="truncate font-medium">
+                          {crumb.label}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </nav>
+
+              <ModeBadge />
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.dispatchEvent(new Event(OPEN_EVENT))}
+                className="hidden text-muted-foreground sm:inline-flex"
+              >
+                <Search aria-hidden="true" className="size-3.5" />
+                <span className="text-xs">{t('command.open')}</span>
+                <kbd className="rounded-sm border border-border bg-surface-sunken px-1 font-mono text-2xs">
+                  ⌘K
+                </kbd>
+              </Button>
+
               {user && (
                 <>
                   <NotificationBell />
@@ -216,11 +265,113 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </>
               )}
             </div>
-          </div>
-        </header>
+          </header>
 
-        <main className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-8 w-full">{children}</main>
+          <motion.main
+            id="main"
+            key={location.pathname}
+            variants={fadeUp}
+            initial="hidden"
+            animate="visible"
+            className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 sm:px-6 sm:py-8"
+          >
+            {children}
+          </motion.main>
+        </div>
       </div>
+
+      {modeLoading && <div className="sr-only">{t('analytics.loading')}</div>}
+      <CommandPalette />
     </div>
   )
+}
+
+/* -------------------------------------------------------------------------- */
+
+function NavGroup({ items, pathname }: { items: NavItem[]; pathname: string }) {
+  return (
+    <ul className="space-y-0.5">
+      {items.map((item) => (
+        <li key={item.to}>
+          <NavLink item={item} pathname={pathname} />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function NavLink({ item, pathname, nested = false }: { item: NavItem; pathname: string; nested?: boolean }) {
+  const { t } = useI18n()
+  const active = isNavActive(pathname, item)
+  const Icon = item.icon
+
+  return (
+    <Link
+      to={item.to}
+      aria-current={active ? 'page' : undefined}
+      className={cn(
+        'group/nav relative flex items-center gap-2.5 rounded-md text-sm outline-none',
+        'transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+        nested ? 'px-2 py-1.5 text-xs' : 'px-2 py-1.5',
+        active
+          ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
+          : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
+      )}
+    >
+      {active && (
+        <motion.span
+          layoutId="sidebar-active"
+          transition={SPRING.snappy}
+          className="absolute inset-y-1.5 -left-2.5 w-0.5 rounded-full bg-primary"
+          aria-hidden="true"
+        />
+      )}
+      <Icon aria-hidden="true" className={cn('shrink-0', nested ? 'size-3.5' : 'size-4')} />
+      <span className="truncate">{t(item.labelKey)}</span>
+    </Link>
+  )
+}
+
+/** Top-bar processing-mode indicator. Reads the shared mode seam. */
+function ModeBadge() {
+  const { t } = useI18n()
+  const { mode, loading, sttUnavailable } = useMode()
+
+  if (loading) return <Skeleton className="h-5 w-24 rounded-full" />
+
+  const Icon = mode === 'private' ? Lock : Cloud
+  return (
+    <span
+      title={sttUnavailable ? t('mode.stt_unavailable_sidebar') : undefined}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-medium ring-1 ring-inset',
+        sttUnavailable
+          ? 'bg-warning-soft text-warning-soft-foreground ring-warning/25'
+          : mode === 'private'
+            ? 'bg-surface-sunken text-muted-foreground ring-border-subtle'
+            : 'bg-success-soft text-success-soft-foreground ring-success/25'
+      )}
+    >
+      <Icon aria-hidden="true" className="size-3" />
+      {mode === 'private' ? t('settings.mode.private') : t('settings.mode.online')}
+      {sttUnavailable && <TriangleAlert aria-hidden="true" className="size-3" />}
+    </span>
+  )
+}
+
+function useBreadcrumb(
+  pathname: string,
+  t: (k: string) => string,
+  items: NavItem[],
+): { label: string; to: string | undefined }[] {
+  return useMemo(() => {
+    // Fall back to the full nav so a user deep-linking to a route they cannot
+    // see in the sidebar still gets an accurate trail.
+    const pool = items.length > 0 ? [...items, ...NAV] : NAV
+    const best = pool
+      .filter((i) => isNavActive(pathname, i) && i.to !== '/managers/admin')
+      .sort((a, b) => b.to.length - a.to.length)[0]
+    if (!best) return []
+    return [{ label: t(best.labelKey), to: best.exact ? undefined : best.to }]
+  }, [pathname, t, items])
 }

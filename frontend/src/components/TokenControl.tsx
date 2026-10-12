@@ -4,6 +4,7 @@ import { Check, Copy, Eye, EyeOff, RefreshCw } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n/i18n'
+import { cn } from '@/lib/utils'
 
 interface TokenControlProps {
   token: string | null
@@ -13,7 +14,7 @@ interface TokenControlProps {
 
 function mask(token: string): string {
   if (token.length <= 8) return '•'.repeat(token.length)
-  return `${token.slice(0, 4)}${'•'.repeat(token.length - 8)}${token.slice(-4)}`
+  return `${token.slice(0, 4)}${'•'.repeat(12)}${token.slice(-4)}`
 }
 
 export function TokenControl({ token, onRegenerate, disabled }: TokenControlProps) {
@@ -22,12 +23,15 @@ export function TokenControl({ token, onRegenerate, disabled }: TokenControlProp
   const [visible, setVisible] = useState(false)
   const { t } = useI18n()
 
-  const copy = async () => {
-    if (!token) return
+  const flash = () => {
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1500)
+  }
+
+  const copy = async (value: string) => {
     try {
-      await navigator.clipboard.writeText(token)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1500)
+      await navigator.clipboard.writeText(value)
+      flash()
     } catch {
       toast.error(t('token.copy_failed'))
     }
@@ -43,6 +47,7 @@ export function TokenControl({ token, onRegenerate, disabled }: TokenControlProp
         await navigator.clipboard.writeText(next)
         toast.success(t('token.new_copied'))
       } catch {
+        // Clipboard API is blocked in some contexts (insecure origin, iframe).
         const ta = document.createElement('textarea')
         ta.value = next
         ta.style.position = 'fixed'
@@ -60,29 +65,43 @@ export function TokenControl({ token, onRegenerate, disabled }: TokenControlProp
     }
   }
 
-  const display = token ? (visible ? token : mask(token)) : '—'
+  const iconButton = (label: string, onClick: () => void, icon: React.ReactNode, extra?: string) => (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className={cn('shrink-0', extra)}
+    >
+      {icon}
+    </Button>
+  )
 
   return (
-    <div className="flex min-w-0 items-center gap-1.5">
-      <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 font-mono text-[11px] text-muted-foreground tabular-nums">
-        {display}
-      </code>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => setVisible((v) => !v)}
-        disabled={!token || disabled}
-        aria-label={visible ? t('token.hide') : t('token.show')}
-        title={visible ? t('token.hide') : t('token.reveal')}
+    <div className="flex min-w-0 flex-1 items-center gap-0.5">
+      <code
+        data-numeric
+        className="min-w-0 flex-1 truncate rounded-sm bg-surface-sunken px-1.5 py-1 font-mono text-2xs text-muted-foreground ring-1 ring-border-subtle ring-inset"
       >
-        {visible ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-      </Button>
-      <Button variant="ghost" size="icon" onClick={copy} disabled={!token || disabled} aria-label={t('token.copy')} title={t('token.copy')}>
-        {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-      </Button>
-      <Button variant="ghost" size="icon" onClick={regenerate} disabled={busy || disabled} aria-label={t('token.regenerate')} title={t('token.regenerate')}>
-        <RefreshCw className={`size-3.5 ${busy ? 'animate-spin' : ''}`} />
-      </Button>
+        {token ? (visible ? token : mask(token)) : '—'}
+      </code>
+      {iconButton(
+        visible ? t('token.hide') : t('token.reveal'),
+        () => setVisible((v) => !v),
+        visible ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />
+      )}
+      <div className="opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 focus-within:opacity-100 has-[button:focus-visible]:opacity-100">
+        {iconButton(
+          t('token.copy'),
+          () => {
+            if (token) void copy(token)
+          },
+          copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />
+        )}
+        {iconButton(t('token.regenerate'), () => void regenerate(), <RefreshCw className={cn('size-3.5', busy && 'animate-spin')} />)}
+      </div>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import type { Call, Client, Manager, User, Notification, Tag, YoutubeWhitelistEntry } from './types'
+import type { Call, Client, Notification, Settings, User } from './types'
 
 const TOKEN_KEY = 'suhbatdosh_token'
 
@@ -61,8 +61,7 @@ export const api = {
   deleteUser: (id: number) =>
     request<{ ok: boolean }>(`/api/users/${id}`, { method: 'DELETE' }),
 
-  // managers (admin analytics)
-  listManagers: () => request<Manager[]>('/api/managers'),
+  // managers
   listManagerCalls: (id: number) => request<Call[]>(`/api/managers/${id}/calls`),
 
   // clients
@@ -102,9 +101,13 @@ export const api = {
   deleteCall: (id: number) =>
     request<{ ok: boolean }>(`/api/calls/${id}`, { method: 'DELETE' }),
 
+  // settings (docs/CONTRACT.md — backend-owned)
+  getSettings: () => request<Settings>('/api/settings'),
+  updateSettings: (data: Partial<Pick<Settings, 'mode'>>) =>
+    request<Settings>('/api/settings', jsonBody('PATCH', data)),
+
   // notifications
-  listNotifications: (unreadOnly?: boolean, limit?: number) => {
-    const params = new URLSearchParams()
+  listNotifications: (unreadOnly?: boolean, limit?: number) => {    const params = new URLSearchParams()
     if (unreadOnly) params.set('unread_only', 'true')
     if (limit) params.set('limit', String(limit))
     const qs = params.toString()
@@ -113,32 +116,6 @@ export const api = {
   getUnreadCount: () => request<{ count: number }>('/api/notifications/unread-count'),
   markNotificationRead: (id: number) => request<{ ok: boolean }>(`/api/notifications/${id}/read`, { method: 'PATCH' }),
   markAllNotificationsRead: () => request<{ ok: boolean }>('/api/notifications/read-all', { method: 'POST' }),
-
-  // telegram
-  linkTelegram: (data: { telegram_id: number; username?: string; first_name?: string; last_name?: string }) =>
-    request<{ ok: boolean }>('/api/telegram/link', jsonBody('POST', data)),
-  unlinkTelegram: () => request<{ ok: boolean }>('/api/telegram/unlink', { method: 'DELETE' }),
-
-  // tags
-  listTags: () => request<Tag[]>('/api/tags'),
-  createTag: (data: { name: string; color?: string }) =>
-    request<Tag>('/api/tags', jsonBody('POST', data)),
-  deleteTag: (id: number) =>
-    request<{ ok: boolean }>(`/api/tags/${id}`, { method: 'DELETE' }),
-  tagCall: (callId: number, tagId: number) =>
-    request<{ ok: boolean }>(`/api/calls/${callId}/tags`, jsonBody('POST', { tag_id: tagId })),
-  untagCall: (callId: number, tagId: number) =>
-    request<{ ok: boolean }>(`/api/calls/${callId}/tags/${tagId}`, { method: 'DELETE' }),
-  getCallTags: (callId: number) => request<Tag[]>(`/api/calls/${callId}/tags`),
-
-  // youtube
-  listYoutubeWhitelist: () => request<YoutubeWhitelistEntry[]>('/api/youtube/whitelist'),
-  addYoutubeWhitelist: (data: { channel_id?: string; channel_name?: string; pattern?: string }) =>
-    request<{ id: number }>('/api/youtube/whitelist', jsonBody('POST', data)),
-  removeYoutubeWhitelist: (id: number) =>
-    request<{ ok: boolean }>(`/api/youtube/whitelist/${id}`, { method: 'DELETE' }),
-  processYoutube: (url: string) =>
-    request<{ ok: boolean; call_id: number }>('/api/youtube/process', jsonBody('POST', { url })),
 
   // analytics
   getOverviewStats: () => request<{
@@ -152,15 +129,7 @@ export const api = {
     date_today: string; date_yesterday: string;
   }>('/api/stats/day-over-day'),
   getWeeklyTrend: () => request<{ day: string; total_calls: number; done_calls: number; avg_score: number | null; avg_duration: number | null }[]>('/api/stats/weekly-trend'),
-  getMonthlyTrend: () => request<{ week: string; total_calls: number; done_calls: number; avg_score: number | null }[]>('/api/stats/monthly-trend'),
   getProblemCalls: () => request<{ id: number; name: string; duration_sec: number; source_type: string; created_at: string; score: number | null; outcome: string; summary: string; uploader_name: string | null }[]>('/api/stats/problem-calls'),
   getManagerRankings: () => request<{ id: number; name: string; email: string; role?: string; total_calls: number; avg_score: number | null; avg_talk_ratio: number | null; calls_today: number; calls_yesterday: number; trend: string; best_score: number | null; solved_problems?: number; unsolved_problems?: number }[]>('/api/stats/manager-rankings'),
   getSourceBreakdown: () => request<Record<string, number>>('/api/stats/source-breakdown'),
-
-  // zadarma
-  getZadarmaConfig: () => request<{ configured: boolean; balance?: number; currency?: string; error?: string }>('/api/zadarma/config'),
-  saveZadarmaConfig: (data: { api_key: string; api_secret: string }) =>
-    request<{ ok: boolean; configured: boolean }>('/api/zadarma/config', jsonBody('POST', data)),
-  syncZadarma: (opts?: { start?: string; end?: string }) =>
-    request<{ ok: boolean; status: string; start: string; end: string }>('/api/zadarma/sync', jsonBody('POST', opts || {})),
 }

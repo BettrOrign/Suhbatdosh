@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, Check, Clock, AlertTriangle, User } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Bell, Check, Clock, TriangleAlert, UserRound } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -11,77 +11,95 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Skeleton } from '@/components/ui/skeleton'
 import { formatDate } from '@/lib/format'
 import { useI18n } from '@/i18n/i18n'
 import { api } from '@/lib/api'
+import { fadeUp } from '@/lib/motion'
+import { cn } from '@/lib/utils'
 import type { Notification } from '@/lib/types'
 
-const TYPE_ICONS: Record<string, typeof Bell> = {
-  action_item: AlertTriangle,
-}
+const TYPE_ICONS: Record<string, typeof Bell> = { action_item: TriangleAlert }
 
-const PRIORITY_COLORS: Record<string, string> = {
-  high: 'bg-destructive/10 text-destructive border-destructive/20',
-  medium: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800/50',
-  low: 'bg-muted text-muted-foreground border-border',
-}
-
-function NotificationItem({ notification, onClick, onRead }: { notification: Notification; onClick: () => void; onRead: () => void }) {
+function NotificationItem({
+  notification,
+  onOpen,
+  onRead,
+}: {
+  notification: Notification
+  onOpen: () => void
+  onRead: () => void
+}) {
   const { t } = useI18n()
-  const Icon = TYPE_ICONS[notification.type] || Bell
-  const priority = (notification.metadata?.priority as string) || 'medium'
-  const dueDate = notification.metadata?.due_date as string | undefined
-  const assignee = notification.metadata?.assignee as string | undefined
+  const Icon = TYPE_ICONS[notification.type] ?? Bell
+  const meta = notification.metadata as { priority?: string; due_date?: string; assignee?: string }
+  const priority = meta?.priority ?? 'medium'
+  const unread = !notification.read
 
   return (
-    <motion.div
-      key={notification.id}
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 10 }}
-      className={`mb-2 flex cursor-pointer gap-3 rounded-xl border p-3 transition-all last:mb-0 ${
-        notification.read ? 'bg-muted/30' : 'bg-primary/5 border-primary/20'
-      }`}
-      onClick={onClick}
-    >
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-        <Icon className="size-4" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
-          <p className={`min-w-0 text-sm ${notification.read ? 'font-medium' : 'font-semibold'} text-foreground`}>
-            {notification.title}
-          </p>
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-            {dueDate && (
-              <Badge variant="outline" className="text-xs gap-1 px-2 py-0.5">
-                <Clock className="size-2.5" />
-                {t('notifications.due', { date: formatDate(dueDate) })}
+    <motion.li variants={fadeUp} layout className="list-none">
+      <div
+        className={cn(
+          'group/n flex cursor-pointer gap-2.5 rounded-md p-2.5 ring-1 transition-colors duration-150',
+          unread ? 'bg-primary-soft/40 ring-primary/20' : 'bg-transparent ring-transparent hover:bg-surface-hover'
+        )}
+        onClick={onOpen}
+      >
+        <span
+          className={cn(
+            'flex size-7 shrink-0 items-center justify-center rounded-md ring-1 ring-inset',
+            unread
+              ? 'bg-primary-soft text-primary-soft-foreground ring-primary/20'
+              : 'bg-surface-sunken text-muted-foreground ring-border-subtle'
+          )}
+        >
+          <Icon aria-hidden="true" className="size-3.5" />
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <p className={cn('min-w-0 flex-1 text-xs leading-snug', unread ? 'font-semibold' : 'font-medium')}>
+              {notification.title}
+            </p>
+            {unread && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRead()
+                }}
+                aria-label={t('notifications.mark_read')}
+              >
+                <Check aria-hidden="true" className="size-3 text-success" />
+              </Button>
+            )}
+          </div>
+          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{notification.message}</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="text-2xs text-muted-foreground">{formatDate(notification.created_at)}</span>
+            {meta?.due_date && (
+              <Badge variant="outline" className="h-4 gap-1 text-2xs">
+                <Clock aria-hidden="true" className="size-2.5" />
+                {t('notifications.due', { date: formatDate(meta.due_date) })}
               </Badge>
             )}
-            {assignee && (
-              <Badge variant="outline" className="text-xs gap-1 px-2 py-0.5">
-                <User className="size-2.5" />
-                {t('notifications.assignee', { assignee })}
+            {meta?.assignee && (
+              <Badge variant="outline" className="h-4 gap-1 text-2xs">
+                <UserRound aria-hidden="true" className="size-2.5" />
+                {meta.assignee}
               </Badge>
             )}
             <Badge
-              variant="outline"
-              className={`text-xs gap-1 px-2 py-0.5 ${PRIORITY_COLORS[priority] || PRIORITY_COLORS.medium}`}
+              variant={priority === 'high' ? 'destructive' : priority === 'low' ? 'secondary' : 'warning'}
+              className="h-4 text-2xs"
             >
               {t(`notifications.priority_${priority}`)}
             </Badge>
           </div>
         </div>
-        <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{notification.message}</p>
-        <p className="mt-1.5 text-xs text-muted-foreground">{formatDate(notification.created_at)}</p>
       </div>
-      {!notification.read && (
-        <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); onRead(); }}>
-          <Check className="size-4 text-emerald-600 dark:text-emerald-400" />
-        </Button>
-      )}
-    </motion.div>
+    </motion.li>
   )
 }
 
@@ -92,9 +110,11 @@ export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const fetching = useRef(false)
 
-  const fetchNotifications = async () => {
+  const fetchAll = useCallback(async () => {
+    if (fetching.current) return
+    fetching.current = true
     try {
       const [notifs, count] = await Promise.all([
         api.listNotifications(false, 20),
@@ -102,108 +122,120 @@ export function NotificationBell() {
       ])
       setNotifications(notifs)
       setUnreadCount(count.count)
-    } catch (e) {
-      console.error('Failed to fetch notifications:', e)
+    } catch {
+      /* the bell must never break the shell */
     } finally {
+      fetching.current = false
       setLoading(false)
     }
-  }
-
-  const fetchUnreadCount = async () => {
-    try {
-      const count = await api.getUnreadCount()
-      setUnreadCount(count.count)
-    } catch (e) {
-      console.error('Failed to fetch unread count:', e)
-    }
-  }
-
-  useEffect(() => {
-    fetchNotifications()
-    const interval = setInterval(fetchUnreadCount, 30000)
-    return () => clearInterval(interval)
   }, [])
 
-  const handleRead = async (id: number) => {
+  const fetchCount = useCallback(async () => {
+    try {
+      const { count } = await api.getUnreadCount()
+      setUnreadCount(count)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchAll()
+    const interval = window.setInterval(fetchCount, 30000)
+    return () => window.clearInterval(interval)
+  }, [fetchAll, fetchCount])
+
+  const handleRead = useCallback(async (id: number) => {
     try {
       await api.markNotificationRead(id)
       setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)))
       setUnreadCount((prev) => Math.max(0, prev - 1))
-    } catch (e) {
-      console.error('Failed to mark notification read:', e)
+    } catch {
+      /* ignore */
     }
-  }
+  }, [])
 
-  const handleReadAll = async () => {
+  const handleReadAll = useCallback(async () => {
     try {
       await api.markAllNotificationsRead()
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
       setUnreadCount(0)
-    } catch (e) {
-      console.error('Failed to mark all read:', e)
+    } catch {
+      /* ignore */
     }
-  }
+  }, [])
 
-  const handleItemClick = (notification: Notification) => {
-    if (!notification.read) {
-      handleRead(notification.id)
-    }
-    if (notification.call_id) {
-      navigate(`/calls/${notification.call_id}`)
-    }
-    setOpen(false)
-  }
+  const handleOpen = useCallback(
+    (n: Notification) => {
+      if (!n.read) void handleRead(n.id)
+      if (n.call_id) navigate(`/calls/${n.call_id}`)
+      setOpen(false)
+    },
+    [handleRead, navigate]
+  )
 
   return (
-    <DropdownMenu open={open} onOpenChange={(o: boolean) => { setOpen(o); if (o) fetchNotifications() }}>
+    <DropdownMenu
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o)
+        if (o) void fetchAll()
+      }}
+    >
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="size-5" />
+        <Button variant="ghost" size="icon-sm" aria-label={t('notifications.title')} className="relative">
+          <Bell aria-hidden="true" className="size-4" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground tabular-nums">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        ref={dropdownRef}
         align="end"
-        className="max-h-[calc(100dvh-4rem)] w-[calc(100vw-2rem)] overflow-hidden p-0 sm:w-96"
+        className="flex max-h-[calc(100dvh-4rem)] w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:w-88"
       >
-        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b px-4 py-3">
-          <p className="min-w-0 flex-1 truncate text-sm font-semibold">{t('notifications.title')}</p>
+        <div className="flex items-center justify-between gap-2 border-b border-border-subtle px-3 py-2">
+          <p className="truncate text-xs font-semibold">{t('notifications.title')}</p>
           {unreadCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={handleReadAll}>
-              <Check className="size-3.5" />
+            <Button variant="ghost" size="xs" onClick={() => void handleReadAll()}>
+              <Check aria-hidden="true" className="size-3" />
               {t('notifications.mark_all_read')}
             </Button>
           )}
         </div>
-        <ScrollArea className="h-[min(400px,calc(100dvh-12rem))] p-2">
-          <AnimatePresence>
-            {loading ? (
-              <div key="loading" className="flex items-center justify-center h-32">
-                <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent" />
-              </div>
-            ) : notifications.length === 0 ? (
-              <div key="empty" className="flex flex-col items-center justify-center gap-2 h-32 text-muted-foreground">
-                <Bell className="size-8 opacity-50" />
-                <p className="text-sm">{t('notifications.empty')}</p>
-              </div>
-            ) : (
-              notifications.map((n) => (
-                <NotificationItem
-                  key={n.id}
-                  notification={n}
-                  onClick={() => handleItemClick(n)}
-                  onRead={() => handleRead(n.id)}
-                />
-              ))
-            )}
-          </AnimatePresence>
+        <ScrollArea className="h-[min(400px,calc(100dvh-12rem))] p-1.5">
+          {loading ? (
+            <div className="space-y-2 p-1" aria-busy="true">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 rounded-md" />
+              ))}
+            </div>
+          ) : notifications.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-10 text-muted-foreground">
+              <Bell aria-hidden="true" className="size-6 opacity-40" />
+              <p className="text-xs">{t('notifications.empty')}</p>
+            </div>
+          ) : (
+            <ul className="space-y-0.5">
+              <AnimatePresence initial={false}>
+                {notifications.map((n) => (
+                  <NotificationItem
+                    key={n.id}
+                    notification={n}
+                    onOpen={() => handleOpen(n)}
+                    onRead={() => void handleRead(n.id)}
+                  />
+                ))}
+              </AnimatePresence>
+            </ul>
+          )}
         </ScrollArea>
       </DropdownMenuContent>
+      <span className="sr-only" role="status" aria-live="polite">
+        {unreadCount > 0 ? t('notifications.unread_count', { n: unreadCount }) : ''}
+      </span>
     </DropdownMenu>
   )
 }

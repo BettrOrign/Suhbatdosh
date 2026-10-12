@@ -48,3 +48,14 @@ Thumbs.db
 # misc
 *.tmp
 *.bak
+
+# Offline STT model weights (215 MB, fetched separately — see local-stt/README.md)
+local-stt/model/*.onnx
+
+# Scratch / benchmarking
+test_ground/
+
+# Python
+__pycache__/
+*.pyc
+.venv/

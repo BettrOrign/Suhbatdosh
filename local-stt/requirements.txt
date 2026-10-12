@@ -1,0 +1,5 @@
+# Local offline STT — GigaAM 220M int8
+sherpa-onnx>=1.10,<2
+soundfile>=0.12
+numpy>=1.26
+# system dependency (not pip): ffmpeg, for compressed audio formats

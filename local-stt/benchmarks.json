@@ -1,0 +1,26 @@
+{
+ "benchmark": "FLEURS dev clips, 6 Uzbek + 6 Russian, word error rate (lower is better)",
+ "note": "GigaAM outputs lowercase/no-punctuation; scoring normalises case and punctuation.",
+ "models": {
+  "GigaAM-Multilingual 220M int8 (shipped)": {
+   "uz_wer_pct": 15.88,
+   "ru_wer_pct": 10.93,
+   "rtf_realtime_factor": 0.077
+  },
+  "GigaAM-Multilingual 600M int8": {
+   "uz_wer_pct": 15.29,
+   "ru_wer_pct": 9.29,
+   "rtf_realtime_factor": 0.155
+  },
+  "openai/whisper-large-v3 (auto language detect)": {
+   "uz_wer_pct": 101.18,
+   "ru_wer_pct": 6.01,
+   "rtf_realtime_factor": 4.746
+  },
+  "openai/whisper-large-v3 (language forced to uz)": {
+   "uz_wer_pct": 79.41,
+   "ru_wer_pct": 14.21,
+   "rtf_realtime_factor": 1.404
+  }
+ }
+}

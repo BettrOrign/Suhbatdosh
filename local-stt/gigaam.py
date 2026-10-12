@@ -49,39 +49,41 @@ def load(model_dir: Path | None = None, num_threads: int = 8) -> None:
 
 
 def to_16k_mono(path: str | Path) -> "tuple[list, int]":
-    """Decode any audio file to a 16 kHz mono float32 array.
+    """Decode any audio file to 16 kHz mono float32.
 
-    Uses ffmpeg for compressed formats so callers can hand over an .ogg /
-    .mp3 / .m4a / .mp4 recording directly.
+    ffmpeg does the work for every format, including wav/flac, because the
+    recognizer is built for exactly SAMPLE_RATE. Returning a WAV's native
+    rate instead crashes the encoder's positional-embedding lookup on
+    narrowband phone audio (8 kHz is common for Zadarma recordings).
     """
     import numpy as np
     import soundfile as sf
 
-    path = str(path)
-    tmp = None
-    if not path.lower().endswith((".wav", ".flac")):
-        tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+    tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-i", str(path),
+             "-ar", str(SAMPLE_RATE), "-ac", "1", "-acodec", "pcm_s16le", tmp],
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
         try:
-            subprocess.run(
-                ["ffmpeg", "-y", "-v", "error", "-i", path,
-                 "-ar", str(SAMPLE_RATE), "-ac", "1", tmp],
-                check=True,
-            )
-            path = tmp
-        except (subprocess.CalledProcessError, FileNotFoundError) as exc:
-            raise RuntimeError(f"could not decode audio: {exc}") from exc
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise RuntimeError(f"could not decode audio: {exc}") from exc
 
     try:
-        audio, sr = sf.read(path, dtype="float32")
+        audio, sr = sf.read(tmp, dtype="float32")
     finally:
-        if tmp:
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
 
     if audio.ndim > 1:
         audio = audio.mean(axis=1)
+    assert sr == SAMPLE_RATE, f"resample failed: got {sr}Hz"
     return np.ascontiguousarray(audio), sr
 
 

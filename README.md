@@ -49,10 +49,18 @@ chmod +x run.sh
 - **Backend API:** http://localhost:8123
 - **API Docs:** http://localhost:8123/docs
 
-### Default Credentials
+### First Login
 
-- Email: `admin@viacall.local`
-- Password: `admin1234`
+No account exists until you set one. Add to `backend/.env` before first run:
+
+```
+ADMIN_EMAIL=you@yourcompany.com
+ADMIN_PASSWORD=<a strong password>
+```
+
+That admin is created once, on an empty database. Demo accounts and demo
+calls are **off** by default; they only appear if you opt in with
+`SEED_DEMO_USERS=true` / `SEED_DEMO_CALLS=true`.
 
 ## Project Structure
 

@@ -6,7 +6,7 @@
 #   - Backend API (FastAPI/uvicorn) on <host>:8123  (serves the built frontend)
 #   - Frontend dev server (Vite)        on <host>:5173  (hot reload, proxies /api → backend)
 #
-# Default login: admin@suhbatdosh.local / admin1234
+# Login: ADMIN_EMAIL from backend/.env
 #
 # Usage:
 #   ./run.sh              # launch both, localhost only
@@ -53,7 +53,7 @@ Examples:
   ./run.sh --netLAN         Start accessible to everyone on the LAN
   ./run.sh --stop           Stop all Suhbatdosh servers
 
-Default login: admin@suhbatdosh.local / admin1234
+Login: ADMIN_EMAIL from backend/.env
 EOF
 }
 
@@ -180,7 +180,7 @@ if $NET_LAN; then
     echo "  On THIS machine:"
     echo "    → http://127.0.0.1:${BACKEND_PORT}"
     echo "============================================================"
-    echo "  Default login: admin@suhbatdosh.local / admin1234"
+    echo "  Login: ADMIN_EMAIL from backend/.env"
     echo "  Logs:  backend  $BACKEND_LOG"
     echo "         frontend $FRONTEND_LOG"
     echo "  Stop:  ./run.sh --stop"
@@ -196,7 +196,7 @@ else
     echo "  To make it accessible on the LAN:"
     echo "    ./run.sh --stop && ./run.sh --netLAN"
     echo "============================================================"
-    echo "  Default login: admin@suhbatdosh.local / admin1234"
+    echo "  Login: ADMIN_EMAIL from backend/.env"
     echo "  Logs:  backend  $BACKEND_LOG"
     echo "         frontend $FRONTEND_LOG"
     echo "  Stop:  ./run.sh --stop"

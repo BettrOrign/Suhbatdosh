@@ -286,6 +286,20 @@ def list_managers_with_stats() -> list[dict]:
         return out
 
 
+def list_active_managers() -> list[dict]:
+    """Id + name of active users with the ``manager`` role.
+
+    Narrow projection for the client form's manager picker, which receptionists
+    need but cannot get from ``GET /api/users`` (admin/yonalish only). Exposes
+    no email, no role fan-out and no API token.
+    """
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, name FROM users WHERE role = 'manager' AND active = 1 ORDER BY name"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
 def list_manager_calls(manager_id: int) -> list[dict]:
     """Return all ``call_type = 'manager'`` calls owned by ``manager_id``, newest first, with joined names."""
     sql = (

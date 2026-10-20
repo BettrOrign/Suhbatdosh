@@ -83,10 +83,28 @@ export interface PerformanceConfig {
   /** Label of the "calls for this person" button. */
   browseLabelKey: string
   browseDialogTitleKey: string
+  /**
+   * Noun for the browse-dialog count. It counts rows in `listManagerCalls`,
+   * which is *all* of that person's manager calls — never "problems solved".
+   */
   browseDialogCountKey: string
   browseEmptyKey: string
   /** First metric card label (calls vs solved problems). */
   primaryStatLabelKey: string
+  /**
+   * Which number `primaryStatLabelKey` actually labels. Without this the label
+   * and the value were chosen independently, so "Solved problems" was
+   * displayed next to the plain call count. Defaults to `total_calls`.
+   */
+  primaryStatKey?: keyof Pick<PerformanceStats, 'total_calls' | 'solved_problems' | 'unsolved_problems'>
+  /** Label of the people-wide stat strip tile matching `primaryStatKey`. */
+  primaryStatStripLabelKey?: string
+  /**
+   * What the browse dialog lists. `listManagerCalls` has no problem filter, so
+   * a page whose copy says "problems" filters client-side to `overall < 50`.
+   * Default: everything.
+   */
+  browseFilter?: 'all' | 'problems'
   /** Chart card titles — the two variants do not share key names. */
   chartLabelKeys: { volume: string; score: string; share: string }
 }
@@ -206,6 +224,16 @@ function CallsDialog({
   const { t } = useI18n()
   const [calls, setCalls] = useState<Call[]>([])
   const [loading, setLoading] = useState(false)
+  // `listManagerCalls` returns *every* manager call for the person. Where the
+  // copy promises "problems", filter to problem calls (score < 50 — the same
+  // definition `db.get_problem_calls` and the scorecard contract use).
+  const visible = useMemo(
+    () =>
+      config.browseFilter === 'problems'
+        ? calls.filter((c) => c.status === 'done' && (overallScore(c.analysis) ?? 100) < 50)
+        : calls,
+    [calls, config.browseFilter]
+  )
 
   useEffect(() => {
     if (!open || !person) return
@@ -237,7 +265,7 @@ function CallsDialog({
           <DialogTitle>
             {person ? t(config.browseDialogTitleKey, { name: person.name }) : ''}
           </DialogTitle>
-          <DialogDescription>{calls.length} {t(config.browseDialogCountKey)}</DialogDescription>
+          <DialogDescription>{visible.length} {t(config.browseDialogCountKey)}</DialogDescription>
         </DialogHeader>
         <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
           {loading ? (
@@ -246,13 +274,13 @@ function CallsDialog({
                 <Skeleton key={i} className="h-12 rounded-md" />
               ))}
             </div>
-          ) : calls.length === 0 ? (
+          ) : visible.length === 0 ? (
             <div className="py-8 text-center text-xs text-muted-foreground">
               {t(config.browseEmptyKey)}
             </div>
           ) : (
             <div className="divide-y divide-border-subtle overflow-hidden rounded-md ring-1 ring-border">
-              {calls.map((c) => (
+              {visible.map((c) => (
                 <div key={c.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm transition-colors hover:bg-surface-hover">
                   <div className="min-w-0">
                     <Link
@@ -295,6 +323,7 @@ function PersonCard({
 }) {
   const { t, lang } = useI18n()
   const { stats } = person
+  const primaryStatKey = config.primaryStatKey ?? 'total_calls'
 
   return (
     <Card interactive size="sm" className="h-full">
@@ -319,7 +348,9 @@ function PersonCard({
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-md bg-surface-sunken px-2.5 py-1.5 ring-1 ring-border-subtle ring-inset">
             <p className="eyebrow truncate">{t(config.primaryStatLabelKey)}</p>
-            <p className="data-value mt-0.5 text-lg leading-none">{stats.total_calls}</p>
+            <p className="data-value mt-0.5 text-lg leading-none">
+              {stats[primaryStatKey]}
+            </p>
           </div>
           <div className="rounded-md bg-surface-sunken px-2.5 py-1.5 ring-1 ring-border-subtle ring-inset">
             <p className="eyebrow truncate">{t('managers.avg_talk')}</p>
@@ -353,7 +384,11 @@ function PersonCard({
           </p>
         )}
 
-        <div className="flex items-center gap-2 border-t border-border-subtle pt-2">
+        {/* `group/row` is what TokenControl's `group-hover/row:opacity-100`
+            keys off. Without it on an ancestor the copy/regenerate buttons
+            stayed at opacity 0 on this page and /managers — hover-revealed
+            controls need a hover group to hover. */}
+        <div className="group/row flex items-center gap-2 border-t border-border-subtle pt-2">
           <KeyRound aria-hidden="true" className="size-3 shrink-0 text-muted-foreground" />
           <TokenControl
             token={person.api_token ?? null}
@@ -380,6 +415,7 @@ export function PerformanceDirectory({ config }: { config: PerformanceConfig }) 
   const { t } = useI18n()
   const isAdmin = user?.role === 'admin'
   const allowed = user?.role === 'admin' || user?.role === 'yonalish'
+  const primaryStatKey = config.primaryStatKey ?? 'total_calls'
 
   const { people, loading, refresh } = usePeopleDirectory(config.failureKey)
   const [rankings, setRankings] = useState<Awaited<ReturnType<typeof api.getManagerRankings>>>([])
@@ -431,8 +467,11 @@ export function PerformanceDirectory({ config }: { config: PerformanceConfig }) 
     const totalCalls = directory.reduce((s, p) => s + p.stats.total_calls, 0)
     const orgAvg = average(directory.map((p) => p.stats.avg_score))
     const apiTokens = directory.filter((p) => p.api_token).length
-    return { totalCalls, orgAvg, apiTokens }
-  }, [directory])
+    // Summing the same field the per-person card shows, so the page-level tile
+    // and the row metrics cannot drift apart.
+    const primary = directory.reduce((s, p) => s + p.stats[primaryStatKey], 0)
+    return { totalCalls, primary, orgAvg, apiTokens }
+  }, [directory, primaryStatKey])
 
   const charts = useMemo(() => {
     const short = (n: string) => n.split(' ')[0]
@@ -492,7 +531,11 @@ export function PerformanceDirectory({ config }: { config: PerformanceConfig }) 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {[
           { label: t(config.titleKey), value: directory.length, icon: UserRound },
-          { label: t(config.primaryStatLabelKey), value: stats.totalCalls, icon: BarChart3 },
+          {
+            label: t(config.primaryStatStripLabelKey ?? config.primaryStatLabelKey),
+            value: stats.primary,
+            icon: BarChart3,
+          },
           {
             label: t('managers.org_avg'),
             value: stats.orgAvg != null ? `${stats.orgAvg}/100` : '—',

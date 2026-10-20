@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
@@ -30,6 +30,12 @@ export interface ModeState {
   loaded: boolean
   canEdit: boolean
   mode: Mode
+  /**
+   * False until GET /api/settings has succeeded at least once, and false again
+   * if a later refresh fails. `mode` falls back to `online` in that case, so
+   * UI must not present it as fact — this is what says "we don't know yet".
+   */
+  modeKnown: boolean
   setMode: (next: Mode) => Promise<void>
   refresh: () => Promise<void>
   /** Local STT is missing/unusable while the mode is `private`. */
@@ -47,6 +53,13 @@ export function ModeProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  /**
+   * Guards `setMode` itself, not just the button. `saving` state lands a render
+   * too late for two rapid clicks: both PATCHes went out, and whichever
+   * response arrived last wrote its mode into the context — leaving the badge,
+   * the switcher and the server disagreeing.
+   */
+  const savingRef = useRef(false)
 
   const canEdit = user?.role === 'admin'
 
@@ -54,9 +67,11 @@ export function ModeProvider({ children }: { children: ReactNode }) {
     try {
       setSettings(await api.getSettings())
     } catch {
-      // A missing /api/settings is not a reason to break the shell. Stay on
-      // `online`, which is the backend default, and let Settings explain.
-      setSettings(null)
+      // Keep the last known settings. Blanking them made `mode` fall back to
+      // 'online', so a 500 or a dropped connection flipped the sidebar badge to
+      // "online" and hid the local-STT warning — the UI asserting the opposite
+      // of what the server actually does, on the one setting that describes
+      // where audio goes. Only the very first load (no prior value) falls back.
     } finally {
       setLoaded(true)
       setLoading(false)
@@ -76,7 +91,9 @@ export function ModeProvider({ children }: { children: ReactNode }) {
 
   const setMode = useCallback(
     async (next: Mode) => {
-      if (!canEdit) return
+      if (!canEdit || savingRef.current) return
+      if (settings?.mode === next) return
+      savingRef.current = true
       const previous = settings
       // Optimistic: the switcher animates immediately, and reverts if the
       // server disagrees (403 for non-admins, or the mode is unsupported).
@@ -91,6 +108,7 @@ export function ModeProvider({ children }: { children: ReactNode }) {
         setSettings(previous)
         toast.error(t('settings.mode.switch_failed', { error: (e as Error).message }))
       } finally {
+        savingRef.current = false
         setSaving(false)
       }
     },
@@ -103,6 +121,7 @@ export function ModeProvider({ children }: { children: ReactNode }) {
   }, [canEdit, setMode])
 
   const mode = settings?.mode ?? 'online'
+  const modeKnown = settings !== null
 
   const value = useMemo<ModeState>(() => {
     return {
@@ -113,12 +132,13 @@ export function ModeProvider({ children }: { children: ReactNode }) {
       loaded,
       canEdit,
       mode,
+      modeKnown,
       setMode,
       refresh,
-      sttUnavailable: mode === 'private' && settings?.stt?.available === false,
+      sttUnavailable: modeKnown && mode === 'private' && settings?.stt?.available === false,
       fallBackToOnline,
     }
-  }, [settings, loading, saving, loaded, canEdit, mode, setMode, refresh, fallBackToOnline])
+  }, [settings, loading, saving, loaded, canEdit, mode, modeKnown, setMode, refresh, fallBackToOnline])
 
   return <ModeContext.Provider value={value}>{children}</ModeContext.Provider>
 }

@@ -112,8 +112,11 @@ function usePolledCalls(intervalWhenBusy: number, intervalWhenIdle: number) {
 
   useEffect(() => {
     const tick = () => {
-      if (document.hidden) return
-      void refresh()
+      // Skip the request while hidden, but always re-arm. Returning early used
+      // to kill the chain for good: a throttled background-tab timeout fires,
+      // hits the guard, and never schedules the next one — so the list froze
+      // permanently once you switched tabs, and `loading` could stick at true.
+      if (!document.hidden) void refresh()
       timer.current = window.setTimeout(tick, delay.current)
     }
     timer.current = window.setTimeout(tick, 0)
@@ -377,14 +380,21 @@ function SegmentedControl<T extends string>({
   onChange,
   options,
   label,
+  labelId,
 }: {
   value: T
   onChange: (v: T) => void
   options: { value: T; label: string; icon?: LucideIcon }[]
   label: string
+  /** Id of the visible <Label>, so the tablist is tied to on-screen text. */
+  labelId?: string
 }) {
   return (
-    <div role="tablist" aria-label={label} className="inline-flex rounded-md bg-surface-sunken p-0.5 ring-1 ring-border-subtle ring-inset">
+    <div
+      role="tablist"
+      {...(labelId ? { 'aria-labelledby': labelId } : { 'aria-label': label })}
+      className="inline-flex rounded-md bg-surface-sunken p-0.5 ring-1 ring-border-subtle ring-inset"
+    >
       {options.map((opt) => {
         const active = value === opt.value
         const Icon = opt.icon
@@ -425,12 +435,19 @@ function Dropzone({ file, onFile }: { file: File | null; onFile: (f: File | null
 
   const accept = (f: File | null) => {
     if (!f) return onFile(null)
+    // Clear the input on every rejection. A browser only fires `change` when
+    // the value actually changes, so keeping the rejected file pinned in the
+    // input meant re-picking that same file did nothing — the user was stuck.
+    const reject = (message: string) => {
+      if (inputRef.current) inputRef.current.value = ''
+      toast.error(message)
+    }
     if (!(f.type.startsWith('audio/') || f.type.startsWith('video/'))) {
-      toast.error(t('dashboard.invalid_file_type'))
+      reject(t('dashboard.invalid_file_type'))
       return
     }
     if (f.size > MAX_FILE_SIZE) {
-      toast.error(t('dashboard.file_too_large', { size: formatBytes(f.size) }))
+      reject(t('dashboard.file_too_large', { size: formatBytes(f.size) }))
       return
     }
     onFile(f)
@@ -486,6 +503,12 @@ function Dropzone({ file, onFile }: { file: File | null; onFile: (f: File | null
               e.stopPropagation()
               onFile(null)
               if (inputRef.current) inputRef.current.value = ''
+            }}
+            onKeyDown={(e) => {
+              // The container is itself a role="button" that opens the file
+              // picker on Enter/Space; without this, keyboard-activating
+              // Cancel cleared the file and immediately reopened the dialog.
+              if (e.key === 'Enter' || e.key === ' ') e.stopPropagation()
             }}
             className="mt-1"
           >
@@ -604,8 +627,11 @@ function UploadDialog({
 
           {showTypeChoice && (
             <div className="space-y-1.5">
-              <Label>{t('upload.call_type')}</Label>
+              {/* Radix Select is not labelable by wrapping, so the label needs
+                  an explicit association. */}
+              <Label id="upload-call-type-label">{t('upload.call_type')}</Label>
               <SegmentedControl
+                labelId="upload-call-type-label"
                 label={t('upload.call_type')}
                 value={callType}
                 onChange={setCallType}
@@ -615,9 +641,9 @@ function UploadDialog({
           )}
 
           <div className="space-y-1.5">
-            <Label>{t('upload.client_optional')}</Label>
+            <Label htmlFor="upload-client">{t('upload.client_optional')}</Label>
             <Select value={clientId} onValueChange={setClientId}>
-              <SelectTrigger className="w-full" disabled={clientsLoading}>
+              <SelectTrigger id="upload-client" className="w-full" disabled={clientsLoading}>
                 <SelectValue
                   placeholder={clientsLoading ? t('call.loading_clients') : t('upload.no_client')}
                 />

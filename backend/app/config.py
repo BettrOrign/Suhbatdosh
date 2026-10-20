@@ -50,6 +50,12 @@ GEMINI_ANALYSIS_MODEL = _resolve(
 # backend/, so <repo>/local-stt/model is the default. Overridable for tests
 # and for deployments that stage the model elsewhere.
 REPO_DIR = BASE_DIR.parent
+# Weights may live anywhere (env override), but the implementation ships with
+# the repo. Deriving the module path from the model dir made private mode
+# unavailable for any deployment not using the default layout.
+LOCAL_STT_IMPL_PATH = Path(
+    _resolve("stt", "impl_path", "LOCAL_STT_IMPL_PATH", REPO_DIR / "local-stt" / "gigaam.py")
+)
 LOCAL_STT_MODEL_DIR = Path(
     _resolve("stt", "model_dir", "LOCAL_STT_MODEL_DIR", REPO_DIR / "local-stt" / "model")
 ).resolve()

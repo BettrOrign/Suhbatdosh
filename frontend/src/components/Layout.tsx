@@ -27,6 +27,32 @@ import { SPRING, fadeUp } from '@/lib/motion'
 import { NAV, isManagersPath, isNavActive, visibleNav, type NavItem } from '@/components/nav-items'
 import { cn } from '@/lib/utils'
 
+/** Platform-correct modifier label for the command palette hint. */
+function useIsMac(): boolean {
+  const [isMac, setIsMac] = useState(
+    () => typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent)
+  )
+  useEffect(() => {
+    setIsMac(/Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent))
+  }, [])
+  return isMac
+}
+
+/** True at the `lg` breakpoint and up, where the sidebar is always visible. */
+function useIsDesktop(): boolean {
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 64rem)').matches
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 64rem)')
+    const onChange = () => setIsDesktop(mq.matches)
+    onChange()
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return isDesktop
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
   const { t } = useI18n()
@@ -34,6 +60,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const reduced = useReducedMotion()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [managersOpen, setManagersOpen] = useState(false)
+  const isDesktop = useIsDesktop()
+  const isMac = useIsMac()
   const { loading: modeLoading, sttUnavailable } = useMode()
 
   const items = visibleNav(user?.role)
@@ -45,6 +73,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
     setSidebarOpen(false)
     if (managersActive) setManagersOpen(true)
   }, [location.pathname, managersActive])
+
+  // Escape closes the mobile drawer. There was no key handler at all: the only
+  // ways out were the X button and clicking the scrim.
+  useEffect(() => {
+    if (!sidebarOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSidebarOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [sidebarOpen])
 
   const breadcrumb = useBreadcrumb(location.pathname, t, items)
 
@@ -58,23 +97,34 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </a>
 
       <div className="flex min-h-dvh">
-        {sidebarOpen && (
-          <motion.button
-            type="button"
-            aria-label={t('common.close')}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setSidebarOpen(false)}
-            className="fixed inset-0 z-40 bg-neutral-1000/30 backdrop-blur-[2px] lg:hidden"
-          />
-        )}
+        {/* AnimatePresence was missing here, so `exit` never ran: the scrim
+            vanished the instant the state flipped while the drawer kept
+            sliding for another 200ms with nothing to click. */}
+        <AnimatePresence>
+          {sidebarOpen && (
+            <motion.button
+              type="button"
+              aria-label={t('common.close')}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSidebarOpen(false)}
+              className="fixed inset-0 z-40 bg-neutral-1000/30 backdrop-blur-[2px] lg:hidden"
+            />
+          )}
+        </AnimatePresence>
 
         {/* ---------------------------------------------------------------- */}
         {/* Sidebar                                                          */}
         {/* ---------------------------------------------------------------- */}
         <motion.aside
           aria-label={t('nav.sidebar')}
+          // `-translate-x-full` only moves it off-screen; every nav link stayed
+          // in the tab order, so keyboard users tabbed into an invisible
+          // drawer. `inert` removes it from focus and the a11y tree, but only
+          // while it is actually hidden — on desktop it is always visible
+          // regardless of `sidebarOpen`.
+          inert={!isDesktop && !sidebarOpen ? true : undefined}
           animate={{ x: 0 }}
           initial={false}
           className={cn(
@@ -150,11 +200,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       transition={SPRING.standard}
                       className="overflow-hidden"
                     >
-                      <div className="mt-0.5 space-y-0.5 border-l border-sidebar-border pl-2.5">
+                      {/* A <ul> may only contain <li>: the wrapper used to be a
+                          plain <div> holding bare links, so assistive tech saw
+                          an empty list. */}
+                      <li className="mt-0.5 space-y-0.5 border-l border-sidebar-border pl-2.5">
                         {managersGroup.map((item) => (
                           <NavLink key={item.to} item={item} pathname={location.pathname} nested />
                         ))}
-                      </div>
+                      </li>
                     </motion.ul>
                   )}
                 </AnimatePresence>
@@ -253,7 +306,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <Search aria-hidden="true" className="size-3.5" />
                 <span className="text-xs">{t('command.open')}</span>
                 <kbd className="rounded-sm border border-border bg-surface-sunken px-1 font-mono text-2xs">
-                  ⌘K
+                  {/* CommandPalette accepts metaKey *or* ctrlKey; advertising only
+                      ⌘ sent Linux and Windows users pressing a key that did
+                      nothing. */}
+                  {isMac ? '⌘K' : 'Ctrl K'}
                 </kbd>
               </Button>
 
@@ -335,25 +391,36 @@ function NavLink({ item, pathname, nested = false }: { item: NavItem; pathname: 
 /** Top-bar processing-mode indicator. Reads the shared mode seam. */
 function ModeBadge() {
   const { t } = useI18n()
-  const { mode, loading, sttUnavailable } = useMode()
+  const { mode, modeKnown, loading, sttUnavailable } = useMode()
 
   if (loading) return <Skeleton className="h-5 w-24 rounded-full" />
 
   const Icon = mode === 'private' ? Lock : Cloud
+  // Until the settings request has succeeded we genuinely do not know which
+  // mode the server is in; a confident green "Online" here would be a claim we
+  // cannot back up.
+  const tone = !modeKnown
+    ? 'bg-surface-sunken text-muted-foreground ring-border-subtle'
+    : sttUnavailable
+      ? 'bg-warning-soft text-warning-soft-foreground ring-warning/25'
+      : mode === 'private'
+        ? 'bg-surface-sunken text-muted-foreground ring-border-subtle'
+        : 'bg-success-soft text-success-soft-foreground ring-success/25'
+
   return (
     <span
       title={sttUnavailable ? t('mode.stt_unavailable_sidebar') : undefined}
       className={cn(
         'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-medium ring-1 ring-inset',
-        sttUnavailable
-          ? 'bg-warning-soft text-warning-soft-foreground ring-warning/25'
-          : mode === 'private'
-            ? 'bg-surface-sunken text-muted-foreground ring-border-subtle'
-            : 'bg-success-soft text-success-soft-foreground ring-success/25'
+        tone
       )}
     >
       <Icon aria-hidden="true" className="size-3" />
-      {mode === 'private' ? t('settings.mode.private') : t('settings.mode.online')}
+      {modeKnown
+        ? mode === 'private'
+          ? t('settings.mode.private')
+          : t('settings.mode.online')
+        : t('settings.mode.unknown')}
       {sttUnavailable && <TriangleAlert aria-hidden="true" className="size-3" />}
     </span>
   )
@@ -368,10 +435,23 @@ function useBreadcrumb(
     // Fall back to the full nav so a user deep-linking to a route they cannot
     // see in the sidebar still gets an accurate trail.
     const pool = items.length > 0 ? [...items, ...NAV] : NAV
-    const best = pool
-      .filter((i) => isNavActive(pathname, i) && i.to !== '/managers/admin')
-      .sort((a, b) => b.to.length - a.to.length)[0]
-    if (!best) return []
-    return [{ label: t(best.labelKey), to: best.exact ? undefined : best.to }]
+    const longest = (list: NavItem[]) =>
+      [...list].sort((a, b) => b.to.length - a.to.length)[0]
+
+    // 1. The nav entry for this page itself, minus the current page (a
+    //    breadcrumb must not link to where you already are).
+    const self = longest(pool.filter((i) => isNavActive(pathname, i) && i.to !== pathname))
+    if (self) return [{ label: t(self.labelKey), to: self.exact ? undefined : self.to }]
+
+    // 2. Otherwise a strict ancestor: `/managers/admin` is `exact`, and its
+    //    parent `/managers` is `exact` too, so nothing matched and the trail
+    //    used to render bare. `exact` decides nav highlighting, not ancestry.
+    if (pathname !== '/') {
+      const ancestor = longest(
+        pool.filter((i) => i.to !== pathname && pathname.startsWith(i.to + '/'))
+      )
+      if (ancestor) return [{ label: t(ancestor.labelKey), to: ancestor.to }]
+    }
+    return []
   }, [pathname, t, items])
 }

@@ -83,13 +83,22 @@ export function StatCard({
 export function DeltaChip({
   delta,
   className,
+  invert = false,
 }: {
   delta: number | string | null
   className?: string
+  /**
+   * For metrics where *down* is the good direction (average call duration):
+   * a rise is a regression and must not be painted green.
+   */
+  invert?: boolean
 }) {
   if (delta == null || delta === '' || delta === '0') return null
   const numeric = typeof delta === 'number' ? delta : Number.parseFloat(delta)
-  if (delta === 0) {
+  // Zero means "unchanged" for every metric. Deciding it with the string `0`
+  // comparison only caught the number 0, so a formatted delta like "0s" fell
+  // through to `numeric > 0` and rendered a red regression.
+  if (!Number.isFinite(numeric) || numeric === 0) {
     return (
       <span
         className={cn(
@@ -97,11 +106,11 @@ export function DeltaChip({
           className
         )}
       >
-        0
+        {delta}
       </span>
     )
   }
-  const up = typeof delta === 'number' ? delta > 0 : numeric > 0
+  const up = (numeric > 0) !== invert
   return (
     <span
       className={cn(

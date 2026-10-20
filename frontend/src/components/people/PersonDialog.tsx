@@ -162,24 +162,32 @@ export function PersonDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="person-role">{t('users.role')}</Label>
+              {/* When the role is locked there is no control to point at, so a
+                  `htmlFor` here labelled nothing — every "add person" dialog on
+                  the Admins and Employees pages renders it that way. */}
               {lockRoleTo ? (
-                <div className="flex h-8 items-center">
-                  <Badge variant={roleBadgeVariant(lockRoleTo)}>{t(`nav.role.${lockRoleTo}`)}</Badge>
-                </div>
+                <>
+                  <Label>{t('users.role')}</Label>
+                  <div className="flex h-8 items-center">
+                    <Badge variant={roleBadgeVariant(lockRoleTo)}>{t(`nav.role.${lockRoleTo}`)}</Badge>
+                  </div>
+                </>
               ) : (
-                <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-                  <SelectTrigger id="person-role" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ALL_ROLES.map((r) => (
-                      <SelectItem key={r} value={r}>
-                        {t(`nav.role.${r}`)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <>
+                  <Label htmlFor="person-role">{t('users.role')}</Label>
+                  <Select value={role} onValueChange={(v) => setRole(v as Role)}>
+                    <SelectTrigger id="person-role" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ALL_ROLES.map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {t(`nav.role.${r}`)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
               )}
             </div>
           </div>

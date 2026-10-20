@@ -63,6 +63,8 @@ export const api = {
 
   // managers
   listManagerCalls: (id: number) => request<Call[]>(`/api/managers/${id}/calls`),
+  /** Id + name of active managers, for pickers. Receptionists cannot read /api/users. */
+  listManagerOptions: () => request<{ id: number; name: string }[]>('/api/managers/options'),
 
   // clients
   listClients: () => request<Client[]>('/api/clients'),

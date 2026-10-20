@@ -13,6 +13,7 @@ import {
   Lightbulb,
   MessageSquare,
   PhoneCall,
+  Play,
   RefreshCw,
   Target,
   Trash2,
@@ -44,7 +45,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-import { WavePlayer } from '@/components/WavePlayer'
+import { WavePlayer, type WavePlayerHandle } from '@/components/WavePlayer'
 import { ScorecardView } from '@/components/ScorecardView'
 import { ScoreRing } from '@/components/ScoreRing'
 import { Reveal } from '@/lib/motion'
@@ -67,6 +68,7 @@ import {
   type Call,
   type CallType,
   type Client,
+  type Segment,
 } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -95,44 +97,109 @@ function speakerStyle(label: string): CSSProperties {
   return { color: c.fg, backgroundColor: c.bg, borderColor: c.fg }
 }
 
-function TranscriptView({ call }: { call: Call }) {
+/**
+ * A turn is "current" while the playhead sits inside it. Only private-mode
+ * segments carry `start`/`end`, so every check here tolerates their absence.
+ */
+function isCurrentTurn(s: Segment, currentTime: number, hasTimings: boolean): boolean {
+  if (!hasTimings || s.start == null || s.end == null) return false
+  return currentTime >= s.start && currentTime < s.end
+}
+
+function TranscriptView({
+  call,
+  currentTime,
+  onSeek,
+}: {
+  call: Call
+  currentTime: number
+  onSeek: (sec: number) => void
+}) {
+  const { t } = useI18n()
+
   if (call.segments.length > 0) {
+    const hasTimings = call.segments.some((s) => s.start != null)
+    const activeIndex = hasTimings
+      ? call.segments.findIndex((s) => isCurrentTurn(s, currentTime, hasTimings))
+      : -1
+
     return (
       <div className="max-h-[540px] space-y-2.5 overflow-y-auto pr-1">
-        {call.segments.map((s, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, x: -6 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: Math.min(i * 0.015, 0.4), duration: 0.25 }}
-            className="flex gap-2.5"
-          >
-            {(s.speaker_label || s.language_code) && (
-              <div className="flex w-20 shrink-0 flex-col items-end gap-1 pt-1">
-                {s.speaker_label && (
-                  <span
-                    className="max-w-full truncate rounded-sm px-1.5 py-0.5 text-2xs font-semibold ring-1 ring-inset"
-                    style={speakerStyle(s.speaker_label)}
-                    title={s.speaker_label}
-                  >
-                    {s.speaker_label}
-                  </span>
-                )}
-                {s.language_code && (
-                  <span className="inline-flex items-center gap-1 rounded-sm bg-surface-sunken px-1 py-px text-2xs uppercase tracking-wide text-muted-foreground">
-                    <Globe aria-hidden="true" className="size-2.5" />
-                    {s.language_code}
-                  </span>
-                )}
-              </div>
-            )}
-            <p className="flex-1 rounded-md px-3 py-2 text-sm leading-relaxed ring-1 ring-inset"
-              style={s.speaker_label ? { ...speakerStyle(s.speaker_label), backgroundColor: 'transparent', borderColor: 'var(--color-border)' } : { backgroundColor: 'var(--color-surface-sunken)' }}
+        {call.segments.map((s, i) => {
+          const start = s.start
+          const isActive = i === activeIndex
+          const seek = () => onSeek(start as number)
+          const onSeekKey = (e: React.KeyboardEvent) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              seek()
+            }
+          }
+
+          return (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: Math.min(i * 0.015, 0.4), duration: 0.25 }}
+              className="flex gap-2.5"
             >
-              {s.text}
-            </p>
-          </motion.div>
-        ))}
+              {(s.speaker_label || s.language_code || start != null) && (
+                <div className="flex w-20 shrink-0 flex-col items-end gap-1 pt-1">
+                  {s.speaker_label && (
+                    <span
+                      className="max-w-full truncate rounded-sm px-1.5 py-0.5 text-2xs font-semibold ring-1 ring-inset"
+                      style={speakerStyle(s.speaker_label)}
+                      title={s.speaker_label}
+                    >
+                      {s.speaker_label}
+                    </span>
+                  )}
+                  {start != null && (
+                    <button
+                      type="button"
+                      onClick={seek}
+                      title={t('call.jump_to_turn')}
+                      aria-label={`${t('call.jump_to_turn')} ${formatDuration(start)}`}
+                      className="flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-2xs font-medium tabular-nums text-muted-foreground outline-none transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    >
+                      <Play aria-hidden="true" className="size-2.5" />
+                      {formatDuration(start)}
+                    </button>
+                  )}
+                  {s.language_code && (
+                    <span className="inline-flex items-center gap-1 rounded-sm bg-surface-sunken px-1 py-px text-2xs uppercase tracking-wide text-muted-foreground">
+                      <Globe aria-hidden="true" className="size-2.5" />
+                      {s.language_code}
+                    </span>
+                  )}
+                </div>
+              )}
+              {/* The seek button in the gutter is the keyboard-accessible path;
+                  this is the convenient mouse equivalent. A bare onClick on a
+                  <p> would have made the transcript mouse-only. */}
+              <p
+                {...(start != null
+                  ? { onClick: seek, onKeyDown: onSeekKey, role: 'button', tabIndex: 0 }
+                  : {})}
+                className={cn(
+                  'flex-1 rounded-md px-3 py-2 text-sm leading-relaxed ring-1 ring-inset transition-colors',
+                  start != null && 'cursor-pointer outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                  isActive && 'bg-primary-soft text-primary-soft-foreground ring-primary/40'
+                )}
+                style={
+                  isActive
+                    ? undefined
+                    : s.speaker_label
+                      ? { ...speakerStyle(s.speaker_label), backgroundColor: 'transparent', borderColor: 'var(--color-border)' }
+                      : { backgroundColor: 'var(--color-surface-sunken)' }
+                }
+              >
+                {s.text}
+              </p>
+            </motion.div>
+          )
+        })}
       </div>
     )
   }
@@ -173,15 +240,29 @@ export function CallDetail() {
   const [editClient, setEditClient] = useState<string>(NO_CLIENT)
   const [clients, setClients] = useState<Client[]>([])
   const [clientsLoading, setClientsLoading] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
 
   const timer = useRef<number | null>(null)
+  const playerRef = useRef<WavePlayerHandle>(null)
+  // The poll timer reads cadence through refs, never through `call`: the effect
+  // deliberately does not re-arm on status change, so a captured `call` would
+  // stay `null` forever and POLL_IDLE_MS would be unreachable.
+  const statusRef = useRef<Call['status'] | null>(null)
+  const callRef = useRef<Call | null>(null)
 
   const refresh = useCallback(async () => {
     try {
-      setCall(await api.getCall(callId))
+      const next = await api.getCall(callId)
+      statusRef.current = next.status
+      callRef.current = next
+      setCall(next)
       setMissing(false)
     } catch (e) {
-      setMissing(true)
+      // A transient failure (500, a 502 from the proxy, a dropped connection)
+      // is not "this call does not exist". Only fall back to the not-found
+      // screen when we never managed to load the call at all — otherwise one
+      // blip tore down the whole page mid-view and flashed a toast per poll.
+      if (callRef.current === null) setMissing(true)
       toast.error(t('call.load_failed', { error: (e as Error).message }))
     } finally {
       setLoading(false)
@@ -199,14 +280,26 @@ export function CallDetail() {
       navigate('/calls', { replace: true })
       return
     }
+    setCurrentTime(0)
+    // Navigating to another call must not keep the previous one's data on
+    // screen, and the refs below decide whether a fetch failure means
+    // "not found" or "transient" — both are per-call.
+    statusRef.current = null
+    callRef.current = null
+    setCall(null)
+    setMissing(false)
+    setLoading(true)
     void refresh()
-    let delay = POLL_ACTIVE_MS
     const tick = () => {
       if (!document.hidden) void refresh()
-      delay = call && !isInFlight(call.status) ? POLL_IDLE_MS : POLL_ACTIVE_MS
+      // Read through statusRef, not the captured `call`: this effect is not
+      // allowed to re-arm on status change, so a captured value would stay
+      // `null` and every call would be polled every 4s forever.
+      const status = statusRef.current
+      const delay = status && !isInFlight(status) ? POLL_IDLE_MS : POLL_ACTIVE_MS
       timer.current = window.setTimeout(tick, delay)
     }
-    timer.current = window.setTimeout(tick, delay)
+    timer.current = window.setTimeout(tick, POLL_ACTIVE_MS)
     const onVisible = () => {
       if (!document.hidden) void refresh()
     }
@@ -215,9 +308,6 @@ export function CallDetail() {
       if (timer.current) window.clearTimeout(timer.current)
       document.removeEventListener('visibilitychange', onVisible)
     }
-    // `call` is read inside the timer for cadence only; re-arming on every
-    // status change would restart the poll mid-flight.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [callId, refresh, navigate])
 
   const saveTranscript = useCallback(async () => {
@@ -421,7 +511,11 @@ export function CallDetail() {
       <Reveal>
         <Card size="sm">
           <CardContent className="py-3">
-            <WavePlayer url={api.audioUrl(callId)} />
+            <WavePlayer
+              ref={playerRef}
+              url={api.audioUrl(callId)}
+              onTimeUpdate={setCurrentTime}
+            />
           </CardContent>
         </Card>
       </Reveal>
@@ -754,7 +848,11 @@ export function CallDetail() {
                 aria-label={t('call.transcript')}
               />
             ) : call.transcript ? (
-              <TranscriptView call={call} />
+              <TranscriptView
+                call={call}
+                currentTime={currentTime}
+                onSeek={(sec) => playerRef.current?.seek(sec)}
+              />
             ) : (
               <div className="flex flex-col items-center gap-2 py-10 text-center">
                 <MessageSquare aria-hidden="true" className="size-7 text-muted-foreground/40" />

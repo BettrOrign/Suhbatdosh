@@ -38,12 +38,24 @@ function NotificationItem({
 
   return (
     <motion.li variants={fadeUp} layout className="list-none">
+      {/* A bare onClick div: the primary action (open the call) was reachable
+          with a mouse only — no role, no tabIndex, no key handler. */}
       <div
+        role="button"
+        tabIndex={0}
         className={cn(
           'group/n flex cursor-pointer gap-2.5 rounded-md p-2.5 ring-1 transition-colors duration-150',
+          'outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
           unread ? 'bg-primary-soft/40 ring-primary/20' : 'bg-transparent ring-transparent hover:bg-surface-hover'
         )}
         onClick={onOpen}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onOpen()
+          }
+        }}
+        aria-label={notification.title}
       >
         <span
           className={cn(
@@ -68,6 +80,11 @@ function NotificationItem({
                 onClick={(e) => {
                   e.stopPropagation()
                   onRead()
+                }}
+                onKeyDown={(e) => {
+                  // Otherwise Enter/Space here bubbles to the row and opens the
+                  // call instead of marking it read.
+                  if (e.key === 'Enter' || e.key === ' ') e.stopPropagation()
                 }}
                 aria-label={t('notifications.mark_read')}
               >
@@ -111,6 +128,13 @@ export function NotificationBell() {
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const fetching = useRef(false)
+  /**
+   * Bumped by every local mutation (mark read / read all). A poll that started
+   * before the bump and resolves after it carries a pre-mutation count, which
+   * used to overwrite the optimistic decrement and leave the badge too high
+   * until the next 30s tick. Such a response is dropped instead.
+   */
+  const mutations = useRef(0)
 
   const fetchAll = useCallback(async () => {
     if (fetching.current) return
@@ -131,8 +155,10 @@ export function NotificationBell() {
   }, [])
 
   const fetchCount = useCallback(async () => {
+    const stamp = mutations.current
     try {
       const { count } = await api.getUnreadCount()
+      if (mutations.current !== stamp) return
       setUnreadCount(count)
     } catch {
       /* ignore */
@@ -148,6 +174,7 @@ export function NotificationBell() {
   const handleRead = useCallback(async (id: number) => {
     try {
       await api.markNotificationRead(id)
+      mutations.current += 1
       setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)))
       setUnreadCount((prev) => Math.max(0, prev - 1))
     } catch {
@@ -158,6 +185,7 @@ export function NotificationBell() {
   const handleReadAll = useCallback(async () => {
     try {
       await api.markAllNotificationsRead()
+      mutations.current += 1
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
       setUnreadCount(0)
     } catch {

@@ -42,7 +42,8 @@ python stt.py call1.wav call2.mp3 --json
 GET  /health      -> {"status":"ok","offline":true,...}
 
 POST /transcribe  -> raw audio body, or multipart/form-data
-                    returns {"text":"...", "duration_sec":..., "rtf":...}
+                    returns {"text":"...", "turns":[{"start","end","text"},...],
+                             "duration_sec":..., "rtf":...}
 ```
 
 ```bash
@@ -56,13 +57,33 @@ curl -X POST -F "file=@call.ogg" http://127.0.0.1:8099/transcribe
 ### From Python
 
 ```python
-import requests
+import gigaam
 
-with open("call.ogg", "rb") as f:
-    r = requests.post("http://127.0.0.1:8099/transcribe", files={"file": f})
-
-print(r.json()["text"])
+gigaam.load()
+out = gigaam.transcribe_file("call.ogg")
+print(out["text"])
+for turn in out["turns"]:          # [{"start": 0.0, "end": 3.4, "text": "..."}]
+    print(f"[{turn['start']:.1f}s] {turn['text']}")
 ```
+
+## Timed turns
+
+`transcribe_file` / `transcribe_array` / `POST /transcribe` return `turns`: one
+entry per detected speech region, with `start`/`end` in seconds on the call's
+absolute timeline. Regions come from frame-energy voice activity detection on
+the waveform, not from the model's character timestamps — those are too coarse
+to separate two people talking.
+
+Turn boundaries are **not** speaker labels. `speaker_label` stays `None`; who
+spoke is still unknown.
+
+## Long recordings
+
+The CTC encoder tops out at 5000 frames (~200 s at 25 frames/sec), and
+attention past that is O(n²) in memory. Audio longer than that is decoded in
+90 s windows with a 3 s overlap, and the overlap is stitched away by comparing
+timestamps at the seam — so a word straddling a boundary survives whole.
+`CHUNK_SECONDS` / `CHUNK_OVERLAP_SECONDS` at the top of `gigaam.py` control it.
 
 ## Measured accuracy
 
@@ -85,8 +106,10 @@ Azerbaijani or Kazakh and outputs nonsense. Don't use Whisper for Uzbek.
   lowercase vocabulary. Fine as input to an LLM; not suitable for user-facing display
   without a punctuation/capitalisation model.
 - **Not streaming.** Full-utterance model — it needs the whole recording before it can
-  transcribe.
-- **No speaker diarization.** Returns one flat text stream, no speaker labels.
+  transcribe. Long recordings are chunked internally, but nothing is emitted until the
+  last chunk is done.
+- **No speaker diarization.** `turns` are separated by silence, not by speaker; nobody
+  is labelled.
 - Numbers are written out as words ("bir million to'rt yuz" not "1400000").
 
 ## Files
@@ -94,9 +117,16 @@ Azerbaijani or Kazakh and outputs nonsense. Don't use Whisper for Uzbek.
 ```
 model/model.int8.onnx   215 MB, int8 quantized weights
 model/tokens.txt        character vocabulary
-gigaam.py               core: load + transcribe
+gigaam.py               core: load, chunked transcribe, turns
 server.py               HTTP server
 stt.py                  CLI
+tests/                  pytest — chunk stitching, resampling, VAD (no model needed)
+```
+
+## Tests
+
+```bash
+python -m pytest tests        # fast, CPU-only: no weights and no sherpa-onnx
 ```
 
 ## License

@@ -81,6 +81,10 @@ function TabsContent({
   return (
     <TabsPrimitive.Content
       data-slot="tabs-content"
+      // No padding here: both call sites (CallDetail, Analytics) already sit
+      // inside a CardContent, which supplies px-(--card-spacing). Adding it a
+      // second time indented the panel 32px while the tab strip above stayed
+      // at 16px, so the two no longer lined up.
       className={cn("flex-1 text-sm outline-none", className)}
       {...props}
     />

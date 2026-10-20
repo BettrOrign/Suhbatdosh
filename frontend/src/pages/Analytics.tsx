@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowDown, ArrowUp, Clock, Gauge, Minus, PhoneCall, UsersRound, Users } from 'lucide-react'
+import { ArrowDown, ArrowUp, Clock, Gauge, Minus, PhoneCall, ShieldAlert, UsersRound, Users } from 'lucide-react'
 import { motion as m } from 'framer-motion'
 
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -14,6 +15,7 @@ import { DeltaChip, StatCard } from '@/components/StatCard'
 import { ScoreChip } from '@/components/ScoreRing'
 import { CallTypePieChart } from '@/components/CallTypePieChart'
 import { ScoreDistributionChart } from '@/components/ScoreDistributionChart'
+import { EmptyState } from '@/components/EmptyState'
 import { Stagger, fadeUp, SPRING } from '@/lib/motion'
 import { useAuth } from '@/lib/auth'
 import { api } from '@/lib/api'
@@ -41,9 +43,23 @@ function TrendIcon({ trend }: { trend: string }) {
   return <Minus aria-hidden="true" className="size-3 text-muted-foreground" />
 }
 
+/**
+ * Signed duration delta, e.g. `+45s`, `-2m`, `0s`. The absolute difference used
+ * to be shown, so a longer average call and a shorter one both rendered as a
+ * green improvement.
+ */
+function signedDuration(diffSeconds: number): string {
+  const rounded = Math.round(diffSeconds)
+  const sign = rounded > 0 ? '+' : rounded < 0 ? '-' : ''
+  const abs = Math.abs(rounded)
+  return abs >= 60 ? `${sign}${Math.floor(abs / 60)}m` : `${sign}${abs}s`
+}
+
 export function Analytics() {
   const { user } = useAuth()
   const { t } = useI18n()
+
+  const canViewOrgStats = user?.role === 'admin' || user?.role === 'yonalish'
 
   const [overview, setOverview] = useState<OverviewStats | null>(null)
   const [dod, setDod] = useState<DayOverDay | null>(null)
@@ -58,36 +74,55 @@ export function Analytics() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!canViewOrgStats) {
+      // `api.py:391` gates every /api/stats/* endpoint behind admin+yonalish.
+      // Calling them as a manager produced six 403s, and because Promise.all
+      // is fail-fast that discarded the one call that *did* succeed and
+      // rendered a silently empty dashboard. Don't ask for what we can't have.
+      let cancelled = false
+      api
+        .listCalls()
+        .then((cl) => {
+          if (!cancelled) setCalls(cl)
+        })
+        .catch(() => {
+          /* the denied state below is the whole story for this role */
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+      return () => {
+        cancelled = true
+      }
+    }
+
     let cancelled = false
+    // Every request settles on its own: one failing endpoint must not blank
+    // the six that worked.
     Promise.all([
-      api.getOverviewStats(),
-      api.getDayOverDay(),
-      api.getWeeklyTrend(),
-      api.getManagerRankings(),
-      api.listCalls(),
+      api.getOverviewStats().catch(() => null),
+      api.getDayOverDay().catch(() => null),
+      api.getWeeklyTrend().catch(() => [] as WeeklyTrend),
+      api.getManagerRankings().catch(() => [] as Ranking[]),
+      api.listCalls().catch(() => [] as Call[]),
       api.getSourceBreakdown().catch(() => ({}) as Record<string, number>),
       api.getProblemCalls().catch(() => [] as ProblemCall[]),
-    ])
-      .then(([ov, day, wt, mr, cl, src, pb]) => {
-        if (cancelled) return
-        setOverview(ov)
-        setDod(day)
-        setWeekly(wt)
-        setRankings(mr)
-        setCalls(cl)
-        setSources(src)
-        setProblems(pb)
-      })
-      .catch(() => {
-        /* leave the skeletons up only until first settle; partial data renders */
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+    ]).then(([ov, day, wt, mr, cl, src, pb]) => {
+      if (cancelled) return
+      setOverview(ov)
+      setDod(day)
+      setWeekly(wt)
+      setRankings(mr)
+      setCalls(cl)
+      setSources(src)
+      setProblems(pb)
+    }).finally(() => {
+      if (!cancelled) setLoading(false)
+    })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [canViewOrgStats])
 
   useEffect(() => {
     if (!selected) {
@@ -126,6 +161,26 @@ export function Analytics() {
   const leaders = useMemo(() => rankings.filter((r) => r.role === 'yonalish'), [rankings])
 
   if (loading) return <DashboardSkeleton />
+
+  if (!canViewOrgStats) {
+    return (
+      <div>
+        <header className="mb-6">
+          <h1 className="text-xl font-semibold tracking-[-0.02em]">{t('analytics.title')}</h1>
+        </header>
+        <EmptyState
+          icon={ShieldAlert}
+          title={t('analytics.no_access')}
+          description={t('analytics.no_access_desc')}
+          action={
+            <Button size="sm" variant="outline" asChild>
+              <Link to="/calls">{t('nav.calls')}</Link>
+            </Button>
+          }
+        />
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -167,6 +222,7 @@ export function Analytics() {
               yesterday: dod.yesterday.calls,
               format: (v: number | null) => (v != null ? String(v) : '—'),
               delta: (a: number, b: number) => Math.round(a - b),
+              invert: false,
             },
             {
               key: 'score',
@@ -176,6 +232,7 @@ export function Analytics() {
               format: (v: number | null) => (v != null ? String(v) : '—'),
               score: true,
               delta: (a: number, b: number) => Math.round(a - b),
+              invert: false,
             },
             {
               key: 'duration',
@@ -183,10 +240,9 @@ export function Analytics() {
               today: dod.today.avg_duration,
               yesterday: dod.yesterday.avg_duration,
               format: (v: number | null) => (v != null ? formatDuration(v) : '—'),
-              delta: (a: number, b: number) => {
-                const secs = Math.abs(a - b)
-                return `${secs >= 60 ? `${Math.floor(secs / 60)}m` : Math.round(secs)}s`
-              },
+              delta: (a: number, b: number) => signedDuration(a - b),
+              // Longer calls are not an achievement.
+              invert: true,
             },
             {
               key: 'talk',
@@ -195,6 +251,7 @@ export function Analytics() {
               yesterday: dod.yesterday.avg_talk_ratio,
               format: (v: number | null) => (v != null ? `${Math.round(v * 100)}%` : '—'),
               delta: (a: number, b: number) => `${Math.round((a - b) * 100)}pp`,
+              invert: false,
             },
           ].map((m) => {
             const today = typeof m.today === 'number' ? m.today : null
@@ -207,6 +264,7 @@ export function Analytics() {
                     <p className="eyebrow truncate">{m.label}</p>
                     <DeltaChip
                       delta={today != null && yesterday != null ? m.delta(today, yesterday) : null}
+                      invert={m.invert}
                     />
                   </div>
                   <p

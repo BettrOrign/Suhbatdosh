@@ -52,16 +52,27 @@ async def _local_transcribe(wav_path: Path) -> dict:
     beyond "fall back to Gemini") when the model or dependency is missing.
     """
     try:
-        text = await asyncio.to_thread(local_stt.transcribe_wav, wav_path)
+        result = await asyncio.to_thread(local_stt.transcribe, wav_path)
     except (RuntimeError, OSError, ImportError) as exc:
         raise LocalSttUnavailable(str(exc)) from exc
-    # The CTC model emits one flat stream with no speaker labels and no
-    # punctuation; a single segment is the honest representation.
-    segments = (
-        [{"text": text, "finished": True, "speaker_label": None, "language_code": None}]
-        if text
-        else []
-    )
+
+    text = result.get("text") or ""
+    turns = result.get("turns") or []
+    segments = [
+        {
+            "text": t["text"].strip(),
+            "finished": True,
+            "speaker_label": None,
+            "language_code": None,
+            "start": t.get("start"),
+            "end": t.get("end"),
+        }
+        for t in turns
+        if t.get("text") and t["text"].strip()
+    ]
+    if not segments and text:
+        segments = [{"text": text, "finished": True,
+                     "speaker_label": None, "language_code": None}]
     return {"text": text, "language_code": None, "segments": segments}
 
 

@@ -9,15 +9,19 @@ from app.transcribe import LocalSttUnavailable, Transcriber
 class _FakeLocal:
     """Stand-in for the sherpa-onnx wrapper so the tests need no model."""
 
-    def __init__(self, text="analiz shart emas bir yarim million", boom=None):
+    def __init__(self, text="analiz shart emas bir yarim million", boom=None,
+                 turns=None):
         self.text = text
         self.boom = boom
         self.fallback_reason = None
+        self.turns = turns if turns is not None else (
+            [{"start": 0.0, "end": 2.5, "text": text}] if text else []
+        )
 
-    def transcribe_wav(self, path):
+    def transcribe(self, path):
         if self.boom:
             raise self.boom
-        return self.text
+        return {"text": self.text, "turns": self.turns, "duration_sec": 2.5}
 
     def set_fallback_reason(self, reason):
         self.fallback_reason = reason
@@ -90,7 +94,7 @@ def test_private_mode_falls_back_to_gemini_when_model_missing(monkeypatch):
 
 def test_local_transcribe_wraps_runtime_error_as_unavailable(monkeypatch):
     monkeypatch.setattr(
-        local_stt, "transcribe_wav", lambda p: (_ for _ in ()).throw(RuntimeError("boom"))
+        local_stt, "transcribe", lambda p: (_ for _ in ()).throw(RuntimeError("boom"))
     )
     try:
         _run(transcribe._local_transcribe("/tmp/whatever.wav"))
@@ -101,10 +105,24 @@ def test_local_transcribe_wraps_runtime_error_as_unavailable(monkeypatch):
 
 
 def test_local_transcribe_returns_the_shared_shape(monkeypatch):
-    monkeypatch.setattr(local_stt, "transcribe_wav", lambda p: "analiz shart emas")
+    monkeypatch.setattr(
+        local_stt, "transcribe",
+        lambda p: {
+            "text": "analiz shart emas",
+            "turns": [
+                {"start": 0.0, "end": 2.5, "text": "analiz shart emas"},
+                {"start": 3.0, "end": 5.0, "text": "bir yarim million"},
+            ],
+            "duration_sec": 5.0,
+        },
+    )
     result = _run(transcribe._local_transcribe("/tmp/whatever.wav"))
     assert set(result) == {"text", "language_code", "segments"}
     assert result["segments"][0]["text"] == "analiz shart emas"
+    # each timed turn becomes its own segment, ready for a speaker label
+    assert len(result["segments"]) == 2
+    assert result["segments"][1]["start"] == 3.0
+    assert all(s["speaker_label"] is None for s in result["segments"])
 
 
 def test_transcriber_does_not_need_a_gemini_key_to_construct():
@@ -112,7 +130,6 @@ def test_transcriber_does_not_need_a_gemini_key_to_construct():
     deployment with no GEMINI_API_KEY even though it never calls Gemini."""
     t = Transcriber(api_key="")
     assert t._client is None
-    assert t._api_key == ""
 
 
 def test_local_stt_status_shape():

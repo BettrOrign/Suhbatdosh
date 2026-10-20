@@ -64,7 +64,12 @@ def update_client(client_id: int, payload: dict, user: dict = Depends(require_ro
     if user["role"] == "manager" and c["manager_id"] not in (None, user["id"]):
         raise HTTPException(403, "Forbidden")
     fields = {k: payload[k] for k in ("name", "phone", "company", "email", "notes", "manager_id") if k in payload}
-    if "manager_id" in fields and user["role"] != "admin":
+    # POST /api/clients lets a receptionist supply manager_id (and a manager is
+    # forced to themselves); refusing it on PATCH made the reception desk's
+    # assignment silently vanish on every edit after the first save. Keep the
+    # two endpoints consistent: whoever may create a client with an owner may
+    # reassign one. `manager` still may not — they only edit their own records.
+    if "manager_id" in fields and user["role"] not in ("admin", "receptionist"):
         fields.pop("manager_id", None)
     db.update_client(client_id, **fields)
     return db.get_client(client_id)

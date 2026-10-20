@@ -39,6 +39,10 @@ export interface Segment {
   finished: boolean | null
   speaker_label: string | null
   language_code: string | null
+  /** Seconds on the call's timeline. Absent for Gemini transcripts — only the
+   *  local private-mode STT produces them. */
+  start?: number | null
+  end?: number | null
 }
 
 export interface Scorecard {

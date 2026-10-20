@@ -1,23 +1,22 @@
-"""In-process offline speech-to-text (private mode).
+"""Private-mode speech-to-text: an adapter over the portable ``local-stt`` module.
 
-Thin wrapper over sherpa-onnx running the GigaAM-Multilingual 220M int8 CTC
-model that ships read-only in ``local-stt/model``. The model is loaded lazily
-and cached for the lifetime of the process, so the backend boots fine on a
-machine with neither the dependency nor the weights — :func:`available` simply
-reports ``False`` and callers degrade (private mode falls back to Gemini).
+The GigaAM implementation itself lives in ``local-stt/gigaam.py`` — one copy,
+so facts like the encoder's 5000-frame ceiling and the chunking policy are
+learned once and apply everywhere. This module owns only what is specific to
+the app: which model directory to use, whether it is usable right now, and why
+private mode fell back to Gemini.
 
-The recogniser is not thread-safe for concurrent ``decode_stream`` calls, so
-decoding is serialised on a lock.
+``local-stt`` stays standalone and portable; it is loaded by path because its
+directory name is not a valid Python package name.
 """
 
 from __future__ import annotations
 
+import importlib.util
 import logging
-import os
-import subprocess
-import tempfile
 import threading
 from pathlib import Path
+from types import ModuleType
 
 from . import config
 
@@ -25,18 +24,11 @@ logger = logging.getLogger("suhbatdosh.local_stt")
 
 SAMPLE_RATE = config.LOCAL_STT_SAMPLE_RATE
 
-# OMP oversubscription makes sherpa-onnx slower than single-digit threads here.
-os.environ.setdefault("OMP_NUM_THREADS", str(config.LOCAL_STT_THREADS))
-
-_encoder: Path = config.LOCAL_STT_MODEL_DIR / "model.int8.onnx"
-_tokens: Path = config.LOCAL_STT_MODEL_DIR / "tokens.txt"
-
-_recognizer = None
-_load_lock = threading.Lock()
-_infer_lock = threading.Lock()
-
 # Reason the most recent private-mode fallback to Gemini, so callers can surface it.
 _last_fallback_reason: str | None = None
+_unavailable_reason: str | None = None
+_module: ModuleType | None = None
+_module_lock = threading.Lock()
 
 
 def last_fallback_reason() -> str | None:
@@ -49,16 +41,13 @@ def set_fallback_reason(reason: str | None) -> None:
     _last_fallback_reason = reason
 
 
-# Reason the last availability probe failed, for logs and the settings endpoint.
-_unavailable_reason: str | None = None
-
-
 def model_dir() -> Path:
     return config.LOCAL_STT_MODEL_DIR
 
 
 def model_present() -> bool:
-    return _encoder.is_file() and _tokens.is_file()
+    d = model_dir()
+    return (d / "model.int8.onnx").is_file() and (d / "tokens.txt").is_file()
 
 
 def dependency_present() -> bool:
@@ -69,18 +58,52 @@ def dependency_present() -> bool:
     return True
 
 
+def _implementation() -> ModuleType | None:
+    """Load ``local-stt/gigaam.py`` by path, or None if it is not there.
+
+    Resolved from config, not from the model directory: weights are relocatable
+    but the implementation ships with the repo, and coupling the two made
+    private mode silently unavailable under any non-default layout.
+    """
+    global _module, _unavailable_reason
+    if _module is not None:
+        return _module
+    with _module_lock:
+        if _module is not None:
+            return _module
+        path = Path(config.LOCAL_STT_IMPL_PATH)
+        if not path.is_file():
+            _unavailable_reason = f"local STT implementation missing at {path}"
+            return None
+        spec = importlib.util.spec_from_file_location("local_stt_gigaam", path)
+        if spec is None or spec.loader is None:
+            _unavailable_reason = f"could not load {path}"
+            return None
+        mod = importlib.util.module_from_spec(spec)
+        try:
+            spec.loader.exec_module(mod)
+        except Exception as exc:
+            _unavailable_reason = f"failed to import local STT: {exc}"
+            return None
+        _module = mod
+        return _module
+
+
 def status() -> dict:
     """Describe the local STT backend for the settings endpoint.
 
-    Never raises and never loads the model — it only inspects the dependency
-    and the weights on disk.
+    Never raises and never loads the model — it only inspects the dependency,
+    the implementation and the weights on disk.
     """
     global _unavailable_reason
     reason: str | None = None
     if not dependency_present():
         reason = "sherpa-onnx is not installed in the backend environment"
     elif not model_present():
-        reason = f"local STT model missing at {config.LOCAL_STT_MODEL_DIR}"
+        reason = f"local STT model missing at {model_dir()}"
+    else:
+        _implementation()  # populates _unavailable_reason if it cannot load
+        reason = _unavailable_reason
     if reason:
         _unavailable_reason = reason
     return {
@@ -98,74 +121,32 @@ def unavailable_reason() -> str | None:
 
 
 def load() -> None:
-    """Load the recogniser into memory. Safe to call repeatedly; raises if unusable."""
-    global _recognizer, _unavailable_reason
-    if _recognizer is not None:
-        return
-    with _load_lock:
-        if _recognizer is not None:
-            return
-        st = status()
-        if not st["available"]:
-            raise RuntimeError(_unavailable_reason or "local STT unavailable")
-        import sherpa_onnx
-
-        _recognizer = sherpa_onnx.OfflineRecognizer.from_nemo_ctc(
-            model=str(_encoder),
-            tokens=str(_tokens),
-            num_threads=config.LOCAL_STT_THREADS,
-            sample_rate=SAMPLE_RATE,
-            feature_dim=80,
-            decoding_method="greedy_search",
-            provider="cpu",
-            debug=False,
-        )
-        _unavailable_reason = None
-        logger.info(
-            "Local STT loaded from %s (%d threads)", config.LOCAL_STT_MODEL_DIR, config.LOCAL_STT_THREADS
-        )
+    """Warm the model into memory. Safe to call repeatedly; raises if unusable."""
+    if not status()["available"]:
+        raise RuntimeError(_unavailable_reason or "local STT unavailable")
+    mod = _implementation()
+    assert mod is not None
+    mod.load(model_dir=model_dir(), num_threads=config.LOCAL_STT_THREADS)
 
 
-def to_16k_mono(path: str | Path) -> tuple[list, int]:
-    """Decode any recording to 16 kHz mono float32, using ffmpeg for compressed formats."""
-    import numpy as np
-    import soundfile as sf
+def transcribe(path: str | Path) -> dict:
+    """Transcribe a recording offline.
 
-    path = str(path)
-    tmp = None
-    if not path.lower().endswith((".wav", ".flac")):
-        tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
-        try:
-            subprocess.run(
-                ["ffmpeg", "-y", "-v", "error", "-i", path, "-ar", str(SAMPLE_RATE), "-ac", "1", tmp],
-                check=True,
-            )
-            path = tmp
-        except (subprocess.CalledProcessError, FileNotFoundError) as exc:
-            raise RuntimeError(f"could not decode audio: {exc}") from exc
-
-    try:
-        audio, sr = sf.read(path, dtype="float32")
-    finally:
-        if tmp:
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
-
-    if audio.ndim > 1:
-        audio = audio.mean(axis=1)
-    return np.ascontiguousarray(audio), sr
+    Returns ``{"text", "words", "duration_sec"}`` where each word carries
+    ``start``/``end`` on the call's absolute timeline. Raises if the local model
+    is unusable — callers decide whether to fall back to Gemini.
+    """
+    load()
+    mod = _implementation()
+    assert mod is not None
+    out = mod.transcribe_file(path)
+    return {
+        "text": out["text"],
+        "turns": out["turns"],
+        "duration_sec": out["duration_sec"],
+    }
 
 
 def transcribe_wav(path: str | Path) -> str:
-    """Transcribe a local audio file offline. Returns lowercase text with no punctuation."""
-    audio, sr = to_16k_mono(path)
-    if sr != SAMPLE_RATE:
-        raise RuntimeError(f"expected {SAMPLE_RATE} Hz audio, got {sr} Hz")
-    load()
-    with _infer_lock:
-        stream = _recognizer.create_stream()
-        stream.accept_waveform(sr, audio)
-        _recognizer.decode_stream(stream)
-        return (stream.result.text or "").strip()
+    """Backwards-compatible flat-text accessor over :func:`transcribe`."""
+    return transcribe(path)["text"]

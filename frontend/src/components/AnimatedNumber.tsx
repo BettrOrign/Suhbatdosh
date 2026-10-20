@@ -14,26 +14,36 @@ export function AnimatedNumber({ value, duration = 0.7, className, decimals = 0 
   // Read the previous value through a ref so the animation never restarts just
   // because the component re-rendered (the old `display` dep caused that).
   const fromRef = useRef(reduced ? value : 0)
+  // `display` in the cleanup closure is the value from the render the effect
+  // last ran on, not the frame we ended on: `setDisplay` re-renders without
+  // re-running the effect. Reading it there restarted the count from 0 on
+  // every 3s poll. This ref is written on every frame instead.
+  const shownRef = useRef(reduced ? value : 0)
 
   useEffect(() => {
     if (reduced) {
       fromRef.current = value
+      shownRef.current = value
       setDisplay(value)
       return
     }
     const controls = animate(fromRef.current, value, {
       duration,
       ease: [0.16, 1, 0.3, 1],
-      onUpdate: setDisplay,
+      onUpdate: (v) => {
+        shownRef.current = v
+        setDisplay(v)
+      },
       onComplete: () => {
         fromRef.current = value
+        shownRef.current = value
       },
     })
     return () => {
       controls.stop()
-      fromRef.current = display
+      // Resume from wherever the animation actually got to.
+      fromRef.current = shownRef.current
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, duration, reduced])
 
   return (

@@ -126,7 +126,13 @@ export function CommandPalette() {
             onKeyDown={onKeyDown}
             placeholder={t('command.placeholder')}
             aria-label={t('command.placeholder')}
+            role="combobox"
+            aria-expanded={results.length > 0}
             aria-controls="command-results"
+            // Focus stays in the input (arrows are handled in onKeyDown), so
+            // this is the only way a screen reader learns which option Enter
+            // would activate.
+            aria-activedescendant={results[active] ? `command-option-${active}` : undefined}
             className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/70"
           />
           <kbd className="hidden shrink-0 rounded-sm border border-border bg-surface-sunken px-1.5 py-0.5 font-mono text-2xs text-muted-foreground sm:block">
@@ -149,6 +155,7 @@ export function CommandPalette() {
             results.map((item, i) => (
               <motion.div
                 key={item.to}
+                id={`command-option-${i}`}
                 role="option"
                 aria-selected={i === active}
                 data-active={i === active}

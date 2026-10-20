@@ -6,7 +6,8 @@
 Endpoints
     GET  /health    -> {"status":"ok","model":"..."}
     POST /transcribe -> raw audio body OR multipart/form-data
-                        -> {"text": "...", "duration_sec": ..., ...}
+                        -> {"text": "...", "turns": [{"start","end","text"}],
+                            "duration_sec": ..., ...}
 
 Fully offline: no network calls, no API keys, CPU only.
 """
@@ -18,7 +19,6 @@ import json
 import logging
 import os
 import re
-import sys
 import tempfile
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -78,18 +78,20 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             audio = self._extract_audio(body)
-            text = gigaam.transcribe_array(*audio)
+            result = gigaam.transcribe_array(*audio)
         except Exception as exc:
             logger.exception("transcription failed")
             self._send(400, {"error": str(exc)})
             return
 
-        duration = len(audio[0]) / audio[1]
+        duration = result["duration_sec"]
+        elapsed = time.perf_counter() - started
         self._send(200, {
-            "text": text,
-            "duration_sec": round(duration, 2),
-            "process_sec": round(time.perf_counter() - started, 2),
-            "rtf": round((time.perf_counter() - started) / duration, 3) if duration else None,
+            "text": result["text"],
+            "turns": result["turns"],
+            "duration_sec": duration,
+            "process_sec": round(elapsed, 2),
+            "rtf": round(elapsed / duration, 3) if duration else None,
             "language": "uz/ru",
         })
 

@@ -29,7 +29,8 @@ backend/          FastAPI + SQLite + Gemini + python-telegram-bot
     analysis.py   Gemini scoring → CallAnalysis pydantic schema
     prompts.py    SCORING_SYSTEM_PROMPT (Uzbek). Add new prompts here.
     transcribe.py Mode-aware transcription → transcript + segments (Gemini or local)
-    local_stt.py  Offline GigaAM via sherpa-onnx, lazy-loaded, for private mode
+    local_stt.py  Thin adapter over local-stt/gigaam.py — availability + fallback
+                  reasons only. The model lives in local-stt/, loaded by path.
     live.py       Gemini Live streaming transcription — CURRENTLY ORPHANED, see gotchas
     audio.py      ffmpeg normalisation to 16k mono WAV
     zadarma.py    Zadarma REST client (HMAC-SHA1 signing)
@@ -42,8 +43,8 @@ backend/          FastAPI + SQLite + Gemini + python-telegram-bot
 frontend/         Vite 8 + React 19 + TS + Tailwind v4 + shadcn/ui
   src/lib/        api.ts (single fetch wrapper), auth.tsx, types.ts, format.ts
   src/pages/      Analytics, Calls, CallDetail, Clients, ManagersList,
-                  ManagersDirections, ManagersAdmin, Users, Login
-  src/i18n/       i18n.tsx + translations.ts (349 flat keys, en/uz, symmetric)
+                  ManagersDirections, ManagersAdmin, Users, Login, Settings
+  src/i18n/       i18n.tsx + translations.ts (430 flat keys, en/uz, symmetric)
 nginx/            suhbatdosh.conf, suhbatdoshai.conf (prod vhosts)
 run.sh            One-command launcher. ./run.sh | --netLAN | --stop
 ```
@@ -61,7 +62,10 @@ cp backend/.env.example backend/.env   # set GEMINI_API_KEY at minimum
 - Backend serves `frontend/dist` too, so `:8123` alone is a working app.
 - Vite proxies `/api` → `127.0.0.1:8123` (`frontend/vite.config.ts:14`).
 - Lint: `cd frontend && npm run lint` (oxlint). Typecheck: `npm run build`.
-- Backend tests: `cd backend && uv run pytest` (34 tests, `TestClient`).
+- Backend tests: `cd backend && uv run pytest` (48 tests, `TestClient`).
+- Offline-STT tests are a **separate** suite outside `testpaths`:
+  `cd local-stt && ./.venv/bin/python -m pytest tests` (20 tests, no weights needed —
+  they inject a fake `decode`). Run both; backend `pytest` will not see them.
 - Private-mode STT needs `sherpa-onnx` **and** `sherpa-onnx-core` (the latter ships
   the native `.so` the former dlopens — installing only `sherpa-onnx` gives a
   confusing `ImportError: /usr/lib/libonnxruntime.so: version VERS_1.28.2 not found`).
@@ -97,12 +101,19 @@ Status flow:
 - `_process_call`: `Transcriber().transcribe_wav()` via `asyncio.run(wait_for(…,120))`,
   3 retries with 2/4/8s backoff on 503/429/UNAVAILABLE.
 - **Processing modes.** `bot_settings.processing_mode` is `online` (default) or
-  `private`. `private` transcribes audio locally with GigaAM (`local_stt.py`,
-  sherpa-onnx, model in the read-only `local-stt/model`); audio never leaves the
-  machine, but the **transcript still goes to Gemini** for analysis. If the local
-  model is unusable it logs a warning and falls back to Gemini — a call never
-  hangs. Read/written via `GET|PATCH /api/settings` (`routes_settings.py`).
+  `private`. `private` transcribes audio locally with GigaAM — `local_stt.py`
+  is only an adapter; the implementation is `local-stt/gigaam.py`, loaded by
+  path via `config.LOCAL_STT_IMPL_PATH` (weights via `LOCAL_STT_MODEL_DIR`,
+  default `local-stt/model`). Audio never leaves the machine, but the
+  **transcript still goes to Gemini** for analysis. If the local model is
+  unusable it logs a warning and falls back to Gemini — a call never hangs.
+  Read/written via `GET|PATCH /api/settings` (`routes_settings.py`).
   `Transcriber`'s Gemini client is built lazily for exactly this reason.
+- **Local segments carry timings.** The GigaAM path returns `turns`
+  (`start`/`end`/`text` per speech region, found by energy VAD, stitched across
+  the 90 s chunk windows), so private-mode `calls.segments` rows have
+  `start`/`end`. The Gemini path does not, so both are optional — see the
+  `Segment` type and `CallDetail`'s `TranscriptView`.
 - `_analyze_call`: polls up to 30×1s for a transcript, then `Analyzer().analyze()`
   (60s timeout, 5 retries), then a **second** Gemini call `extract_action_items` that
   fans out into `notifications` rows. On success the call's `name` is overwritten by
@@ -180,6 +191,9 @@ Two derived business concepts live in SQL, not code:
   `i18n/translations.ts`. Keys are flat dotted strings.
 - UI is bilingual en/uz; `lib/format.ts:scoreLabel` returns Uzbek unconditionally —
   a known wart, don't propagate it.
+- `WavePlayer` is a `forwardRef` exposing `seek(sec)` — the WaveSurfer instance
+  lives inside it, so a parent that wants to drive playback (e.g. `CallDetail`
+  jumping from a timed transcript turn) must go through that handle.
 
 ## Known landmines — read before you debug
 

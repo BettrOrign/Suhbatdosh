@@ -31,9 +31,15 @@ import { useAuth } from '@/lib/auth'
 import { api } from '@/lib/api'
 import { useI18n } from '@/i18n/i18n'
 import { formatDate, matches } from '@/lib/format'
-import type { Client, User } from '@/lib/types'
+import type { Client } from '@/lib/types'
 
 const NO_MANAGER = '__none__'
+
+/** `/api/managers/options` projection — deliberately not a full User. */
+interface ManagerOption {
+  id: number
+  name: string
+}
 
 function ClientDialog({
   mode,
@@ -45,7 +51,7 @@ function ClientDialog({
 }: {
   mode: 'create' | 'edit'
   client: Client | null
-  managers: User[]
+  managers: ManagerOption[]
   showManagerField: boolean
   onClose: () => void
   onSaved: () => void
@@ -189,11 +195,13 @@ function ClientDialog({
 
 function ClientRow({
   client,
+  canEdit,
   canDelete,
   onEdit,
   onChanged,
 }: {
   client: Client
+  canEdit: boolean
   canDelete: boolean
   onEdit: (c: Client) => void
   onChanged: () => void
@@ -256,14 +264,16 @@ function ClientRow({
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => onEdit(client)}
-          aria-label={`${t('clients.edit_btn')}: ${client.name}`}
-        >
-          <Pencil aria-hidden="true" className="size-3.5" />
-        </Button>
+        {canEdit && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => onEdit(client)}
+            aria-label={`${t('clients.edit_btn')}: ${client.name}`}
+          >
+            <Pencil aria-hidden="true" className="size-3.5" />
+          </Button>
+        )}
         {canDelete && (
           <Button
             variant="destructive-ghost"
@@ -285,9 +295,13 @@ export function Clients() {
   const role = user?.role
   const isAdmin = role === 'admin'
   const showManagerField = isAdmin || role === 'receptionist'
+  // routes_clients.py allows writes for admin/manager/receptionist only. The
+  // nav still shows /clients to yonalish, so without this they filled the whole
+  // dialog and got a 403 on save.
+  const canWrite = isAdmin || role === 'manager' || role === 'receptionist'
 
   const [clients, setClients] = useState<Client[]>([])
-  const [managers, setManagers] = useState<User[]>([])
+  const [managers, setManagers] = useState<ManagerOption[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [dialog, setDialog] = useState<{ mode: 'create' } | { mode: 'edit'; client: Client } | null>(null)
@@ -308,9 +322,12 @@ export function Clients() {
 
   useEffect(() => {
     if (!showManagerField) return
+    // Not listUsers(): that endpoint is admin/yonalish only, so a receptionist
+    // got a 403, it was swallowed, and the "Manager" select offered nothing
+    // but "Unassigned" while still being sent on save.
     api
-      .listUsers()
-      .then((us) => setManagers(us.filter((u) => u.role === 'manager')))
+      .listManagerOptions()
+      .then(setManagers)
       .catch(() => setManagers([]))
   }, [showManagerField])
 
@@ -343,10 +360,12 @@ export function Clients() {
                 className="w-56 pl-8"
               />
             </div>
-            <Button onClick={() => setDialog({ mode: 'create' })}>
-              <Plus aria-hidden="true" className="size-3.5" />
-              {t('clients.add')}
-            </Button>
+            {canWrite && (
+              <Button onClick={() => setDialog({ mode: 'create' })}>
+                <Plus aria-hidden="true" className="size-3.5" />
+                {t('clients.add')}
+              </Button>
+            )}
           </>
         }
       />
@@ -377,6 +396,7 @@ export function Clients() {
             <ClientRow
               key={c.id}
               client={c}
+              canEdit={canWrite}
               canDelete={isAdmin}
               onEdit={(client) => setDialog({ mode: 'edit', client })}
               onChanged={refresh}

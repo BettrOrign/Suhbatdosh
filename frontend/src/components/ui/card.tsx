@@ -41,6 +41,10 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="card-header"
       className={cn(
         "@container/card-header grid auto-rows-min items-start gap-1 rounded-t-lg px-(--card-spacing)",
+        // Only the outer edges get padding: the gap between a header and the
+        // content is the card's own `gap`, so padding both would double it.
+        // Without this the title sat flush against the top ring.
+        "first:pt-(--card-spacing)",
         "has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto]",
         "[.border-b]:pb-(--card-spacing)",
         className
@@ -86,7 +90,22 @@ function CardAction({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 function CardContent({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="card-content" className={cn("px-(--card-spacing)", className)} {...props} />
+  return (
+    <div
+      data-slot="card-content"
+      className={cn(
+        "px-(--card-spacing)",
+        // Same reasoning as CardHeader: pad the outer edges only. This slot was
+        // px-only, so a card whose content set no padding of its own ran its
+        // text straight into the border. Callers that pass p-*/py-*/pt-* still
+        // win — tailwind-merge keeps their plain utilities, and the variants
+        // only apply at the true edges.
+        "first:pt-(--card-spacing) last:pb-(--card-spacing)",
+        className
+      )}
+      {...props}
+    />
+  )
 }
 
 function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
@@ -95,6 +114,11 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="card-footer"
       className={cn(
         "flex items-center rounded-b-lg border-t bg-surface-sunken px-(--card-spacing) py-2",
+        // A footer is the last child, so CardContent's `last:pb-*` never
+        // applies to it — but it is not a first child either, so it needs no
+        // top padding beyond its own py-2. Kept here for the case where a card
+        // is footer-only.
+        "first:pt-(--card-spacing)",
         className
       )}
       {...props}

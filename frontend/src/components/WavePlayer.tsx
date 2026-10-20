@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 import { Loader2, Pause, Play, RotateCw } from 'lucide-react'
 
@@ -7,14 +7,25 @@ import { cn } from '@/lib/utils'
 
 interface Props {
   url: string
+  /** Fired on every frame of playback, so a transcript can follow along. */
+  onTimeUpdate?: (sec: number) => void
+}
+
+/** Imperative handle — the WaveSurfer instance lives inside this component. */
+export interface WavePlayerHandle {
+  /** Jump to `sec`. Resolves nothing; safe to call before the audio is ready. */
+  seek: (sec: number) => void
 }
 
 const SPEEDS = [1, 1.25, 1.5, 2]
 
 function formatTime(sec: number): string {
   if (!Number.isFinite(sec) || sec < 0) return '0:00'
-  const m = Math.floor(sec / 60)
-  const s = Math.round(sec % 60)
+  // Round first, then split: rounding only the seconds half produced "0:60"
+  // for any instant in [59.5, 60).
+  const total = Math.round(sec)
+  const m = Math.floor(total / 60)
+  const s = total % 60
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
@@ -24,11 +35,15 @@ function formatTime(sec: number): string {
  * down and rebuild the entire WaveSurfer instance mid-playback (the bug the
  * old `exhaustive-deps` warning was pointing at).
  */
-export function WavePlayer({ url }: Props) {
+export const WavePlayer = forwardRef<WavePlayerHandle, Props>(function WavePlayer(
+  { url, onTimeUpdate },
+  ref
+) {
   const { t } = useI18n()
   const containerRef = useRef<HTMLDivElement>(null)
   const waveRef = useRef<WaveSurfer | null>(null)
   const speedRef = useRef(1)
+  const onTimeUpdateRef = useRef(onTimeUpdate)
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -37,6 +52,21 @@ export function WavePlayer({ url }: Props) {
   const [duration, setDuration] = useState(0)
   const [speed, setSpeed] = useState(1)
   const [retryCount, setRetryCount] = useState(0)
+
+  useEffect(() => {
+    onTimeUpdateRef.current = onTimeUpdate
+  }, [onTimeUpdate])
+
+  useImperativeHandle(ref, () => ({
+    seek(sec: number) {
+      const ws = waveRef.current
+      if (!ws || !Number.isFinite(sec)) return
+      const clamped = Math.max(0, Math.min(sec, ws.getDuration() || sec))
+      ws.setTime(clamped)
+      setCurrentTime(clamped)
+      onTimeUpdateRef.current?.(clamped)
+    },
+  }))
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -77,7 +107,10 @@ export function WavePlayer({ url }: Props) {
     ws.on('play', () => setIsPlaying(true))
     ws.on('pause', () => setIsPlaying(false))
     ws.on('finish', () => setIsPlaying(false))
-    ws.on('timeupdate', (time: number) => setCurrentTime(time))
+    ws.on('timeupdate', (time: number) => {
+      setCurrentTime(time)
+      onTimeUpdateRef.current?.(time)
+    })
 
     return () => {
       ws.destroy()
@@ -123,21 +156,28 @@ export function WavePlayer({ url }: Props) {
         )}
       </button>
 
-      <div className="min-w-0 flex-1">
-        {isError ? (
+      {/* The waveform host stays mounted in every state. Swapping it out for
+          the error button unmounted it, which nulled `containerRef`; the effect
+          then bailed on its `if (!containerRef.current) return` guard before it
+          could clear `isError`, so retry could never recover the player. The
+          error UI is an overlay instead. */}
+      <div className="relative min-w-0 flex-1">
+        <div
+          ref={containerRef}
+          className={cn(
+            'transition-opacity duration-150',
+            (isLoading || isError) && 'pointer-events-none opacity-40'
+          )}
+        />
+        {isError && (
           <button
             type="button"
             onClick={() => setRetryCount((c) => c + 1)}
-            className="flex w-full items-center justify-center gap-2 rounded-md bg-destructive-soft px-3 py-2 text-xs text-destructive-soft-foreground ring-1 ring-destructive/20 ring-inset transition-colors hover:opacity-80"
+            className="absolute inset-0 flex w-full items-center justify-center gap-2 rounded-md bg-destructive-soft px-3 py-2 text-xs text-destructive-soft-foreground ring-1 ring-destructive/20 ring-inset transition-colors hover:opacity-80"
           >
             <RotateCw aria-hidden="true" className="size-3.5" />
             {t('call.audio_error')}
           </button>
-        ) : (
-          <div
-            ref={containerRef}
-            className={cn('transition-opacity duration-150', isLoading && 'pointer-events-none opacity-40')}
-          />
         )}
       </div>
 
@@ -158,4 +198,4 @@ export function WavePlayer({ url }: Props) {
       </span>
     </div>
   )
-}
+})

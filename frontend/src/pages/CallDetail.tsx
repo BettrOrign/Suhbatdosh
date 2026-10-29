@@ -210,12 +210,19 @@ function DetailSkeleton() {
   return (
     <div aria-busy="true" aria-label="loading">
       <Skeleton className="mb-4 h-36 rounded-lg" />
-      <Skeleton className="mb-4 h-16 rounded-lg" />
-      <div className="mb-4 grid gap-3 lg:grid-cols-5">
-        <Skeleton className="h-56 rounded-lg lg:col-span-2" />
-        <Skeleton className="h-56 rounded-lg lg:col-span-3" />
+      <div className="mb-4 grid gap-3 lg:grid-cols-5 lg:items-start">
+        <div className="order-2 space-y-3 lg:col-span-2 lg:col-start-1 lg:row-start-1">
+          <Skeleton className="h-52 rounded-lg" />
+          <Skeleton className="h-64 rounded-lg" />
+          <Skeleton className="h-72 rounded-lg" />
+        </div>
+        <div className="order-1 lg:col-span-3 lg:col-start-3 lg:row-start-1">
+          <Skeleton className="h-16 rounded-lg" />
+        </div>
+        <div className="order-3 lg:col-span-3 lg:col-start-3 lg:row-start-2">
+          <Skeleton className="h-96 rounded-lg" />
+        </div>
       </div>
-      <Skeleton className="mb-4 h-64 rounded-lg" />
       <Skeleton className="h-72 rounded-lg" />
     </div>
   )
@@ -508,18 +515,6 @@ export function CallDetail() {
         </Card>
       </Reveal>
 
-      <Reveal>
-        <Card size="sm">
-          <CardContent className="py-3">
-            <WavePlayer
-              ref={playerRef}
-              url={api.audioUrl(callId)}
-              onTimeUpdate={setCurrentTime}
-            />
-          </CardContent>
-        </Card>
-      </Reveal>
-
       {(processing || call.status === 'error') && (
         <Reveal>
           <div
@@ -551,11 +546,11 @@ export function CallDetail() {
         </Reveal>
       )}
 
+      <div className="grid gap-3 lg:grid-cols-5 lg:items-start">
       {hasAnalysis && (
-        <>
+        <div className="order-2 space-y-3 lg:col-span-2 lg:col-start-1 lg:row-start-1">
           <Reveal>
-            <div className="grid gap-3 lg:grid-cols-5">
-              <Card className="lg:col-span-2">
+            <Card>
                 <div
                   aria-hidden="true"
                   className={cn(
@@ -576,8 +571,10 @@ export function CallDetail() {
                   </p>
                 </CardContent>
               </Card>
+            </Reveal>
 
-              <Card className="lg:col-span-3">
+            <Reveal>
+              <Card>
                 <CardHeader className="border-b border-border-subtle pb-2.5">
                   <CardTitle className="flex items-center gap-1.5">
                     <Lightbulb aria-hidden="true" className="size-3.5 text-warning" />
@@ -622,8 +619,7 @@ export function CallDetail() {
                   ) : null}
                 </CardContent>
               </Card>
-            </div>
-          </Reveal>
+            </Reveal>
 
           {problem && (
             <Reveal>
@@ -788,10 +784,27 @@ export function CallDetail() {
               </Tabs>
             </Card>
           </Reveal>
-        </>
+        </div>
       )}
 
-      <Reveal>
+        <div className="order-1 space-y-3 lg:col-span-3 lg:col-start-3 lg:row-start-1">
+          {call.audio_path && (
+          <Reveal>
+            <div className="z-20 lg:sticky lg:top-16">
+              <Card size="sm">
+                <CardContent className="py-3">
+                  <WavePlayer
+                    ref={playerRef}
+                    url={api.audioUrl(callId)}
+                    onTimeUpdate={setCurrentTime}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+          </Reveal>
+          )}
+
+          <Reveal>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 border-b border-border-subtle pb-2.5">
             <CardTitle className="flex items-center gap-1.5">
@@ -860,8 +873,10 @@ export function CallDetail() {
               </div>
             )}
           </CardContent>
-        </Card>
-      </Reveal>
+          </Card>
+          </Reveal>
+        </div>
+      </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="sm:max-w-md">

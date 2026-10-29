@@ -10,7 +10,7 @@ import json
 import sqlite3
 import threading
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import config
@@ -778,6 +778,128 @@ def get_bot_setting_row(key: str) -> dict | None:
             "SELECT key, value, updated_at FROM bot_settings WHERE key = ?", (key,)
         ).fetchone()
         return dict(row) if row else None
+
+
+# ---------------------------------------------------------------------------
+# Organization profile + feature flags
+# ---------------------------------------------------------------------------
+# Both live in bot_settings: the profile as one JSON document, flags as
+# "true"/"false" strings. They ground the Gemini prompts (see prompts.py) and
+# switch real pipeline behaviour (transcription formatting, notification
+# gating, audio retention, local STT device).
+
+ORG_PROFILE_KEY = "org_profile"
+
+ORG_PROFILE_FIELDS = (
+    "name",        # muassasa nomi
+    "direction",   # faoliyat yo'nalishi (o'quv markaz / call-markaz / ...)
+    "services",    # xizmatlar va tariflar
+    "rules",       # ideal qo'ng'iroq qoidalari (skript)
+    "flaws",       # nima nuqson (nuqson) hisoblanadi
+    "metrics",     # maqsadli ko'rsatkichlar
+    "summary",     # birlashgan tavsif (Gemini tomonidan yoziladi)
+    "custom_instructions",  # Admin qo'shimcha ko'rsatmalari
+)
+
+# Feature flags behind the Settings page toggles. Defaults keep the exact
+# behaviour the app had before the toggles existed.
+FLAG_DEFAULTS = {
+    "punctuation": True,
+    "speaker_labels": False,
+    "problem_alerts": True,
+    "gpu": False,
+}
+
+RETENTION_CHOICES = (0, 30, 90)
+
+
+def get_org_profile() -> dict:
+    raw = get_bot_setting(ORG_PROFILE_KEY, "")
+    if not raw:
+        return {}
+    try:
+        profile = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    return profile if isinstance(profile, dict) else {}
+
+
+def set_org_profile(profile: dict) -> dict:
+    """Merge into the stored profile and return the merged result.
+
+    A field sent as "" clears it; every kept value is non-empty text.
+    """
+    merged = {
+        **get_org_profile(),
+        **{k: str(v).strip() for k, v in profile.items()},
+    }
+    merged = {k: v for k, v in merged.items() if v}
+    set_bot_setting(ORG_PROFILE_KEY, json.dumps(merged, ensure_ascii=False))
+    return merged
+
+
+def get_flag(key: str) -> bool:
+    if key not in FLAG_DEFAULTS:
+        raise ValueError(f"unknown flag: {key}")
+    raw = get_bot_setting(f"flag_{key}", "").strip().lower()
+    if raw in ("true", "false"):
+        return raw == "true"
+    return FLAG_DEFAULTS[key]
+
+
+def set_flag(key: str, value: bool) -> None:
+    if key not in FLAG_DEFAULTS:
+        raise ValueError(f"unknown flag: {key}")
+    set_bot_setting(f"flag_{key}", "true" if value else "false")
+
+
+def all_flags() -> dict:
+    return {key: get_flag(key) for key in FLAG_DEFAULTS}
+
+
+def get_retention_days() -> int:
+    raw = get_bot_setting("retention_days", "0")
+    try:
+        days = int(raw)
+    except ValueError:
+        return 0
+    return days if days in RETENTION_CHOICES else 0
+
+
+def set_retention_days(days: int) -> None:
+    set_bot_setting("retention_days", str(days))
+
+
+def expired_audio(days: int) -> list[dict]:
+    """Calls whose audio is older than ``days`` — candidates for audio purge.
+
+    Returns ``[{"id", "audio_path"}]``; transcripts and analyses stay.
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT id, audio_path FROM calls "
+            "WHERE audio_path IS NOT NULL AND audio_path != '' AND created_at < ?",
+            (cutoff,),
+        ).fetchall()
+    return [{"id": r[0], "audio_path": r[1]} for r in rows]
+
+
+def clear_audio(call_id: int) -> None:
+    with get_db() as db:
+        db.execute("UPDATE calls SET audio_path = NULL WHERE id = ?", (call_id,))
+
+
+def list_analysable_call_ids(limit: int = 200) -> list[int]:
+    """IDs of 'done' calls with a transcript — the bulk re-analysis pool."""
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT id FROM calls "
+            "WHERE status = 'done' AND transcript IS NOT NULL AND transcript != '' "
+            "ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [r[0] for r in rows]
 
 
 # ---------------------------------------------------------------------------

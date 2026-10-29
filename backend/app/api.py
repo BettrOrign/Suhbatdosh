@@ -122,7 +122,11 @@ def _analyze_call(call_id: int):
                 asyncio.wait_for(analyzer.analyze(call["transcript"]), timeout=60)
             )
 
-            if call.get("user_id") and "error" not in result:
+            if (
+                call.get("user_id")
+                and "error" not in result
+                and db.get_flag("problem_alerts")
+            ):
                 action_analyzer = Analyzer()
                 action_items = asyncio.run(
                     asyncio.wait_for(action_analyzer.extract_action_items(call["transcript"]), timeout=30)
@@ -297,6 +301,21 @@ async def reanalyze(call_id: int, background: BackgroundTasks, user: dict = Depe
     _check_call_access(call, user)
     background.add_task(_analyze_call, call_id)
     return {"ok": True}
+
+
+@router.post("/calls/reanalyze-all")
+async def reanalyze_all(background: BackgroundTasks, user: dict = Depends(require_role("admin"))):
+    """Queue re-analysis of every analysed call (cap 200, newest first). Admin only.
+
+    The point of bulk re-analysis: after editing the organization profile or
+    the settings flags, all existing scorecards are re-scored under the new
+    rules instead of describing a mixture of old and new regimes.
+    """
+    ids = db.list_analysable_call_ids(limit=200)
+    for call_id in ids:
+        background.add_task(_analyze_call, call_id)
+    logger.info("Bulk re-analysis queued for %d call(s) by %s", len(ids), user["email"])
+    return {"ok": True, "queued": len(ids)}
 
 
 @router.delete("/calls/{call_id}")

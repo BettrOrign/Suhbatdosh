@@ -29,7 +29,9 @@ _recognizer = None
 _lock = threading.Lock()
 
 
-def load(model_dir: Path | None = None, num_threads: int = 8) -> None:
+def load(
+    model_dir: Path | None = None, num_threads: int = 8, provider: str = "cpu"
+) -> None:
     """Load the model into memory. Safe to call repeatedly."""
     global _recognizer
     with _lock:
@@ -51,7 +53,7 @@ def load(model_dir: Path | None = None, num_threads: int = 8) -> None:
             sample_rate=SAMPLE_RATE,
             feature_dim=80,
             decoding_method="greedy_search",
-            provider="cpu",
+            provider=provider,
             debug=False,
         )
 

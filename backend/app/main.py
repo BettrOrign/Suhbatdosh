@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -9,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from . import config, db
+from . import audio, config, db
 from .api import router as api_router, start_reanalysis_task
 from .auth import hash_password
 from .routes_auth import router as auth_router
@@ -27,6 +28,24 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 _telegram_app = None
 
 
+async def _retention_worker():
+    """Hourly audio-retention pass; reads the setting fresh so edits apply live."""
+    while True:
+        try:
+            days = db.get_retention_days()
+            if days:
+                removed = audio.purge_expired_audio(days)
+                if removed:
+                    logging.getLogger("suhbatdosh.main").info(
+                        "Audio retention: deleted %d recording(s) older than %d days",
+                        removed,
+                        days,
+                    )
+        except Exception:
+            logging.getLogger("suhbatdosh.main").exception("Audio retention pass failed")
+        await asyncio.sleep(3600)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _telegram_app
@@ -38,6 +57,7 @@ async def lifespan(app: FastAPI):
         _seed_demo_calls()
     if config.SEED_DEMO_USERS or config.SEED_DEMO_CALLS:
         start_reanalysis_task()
+    asyncio.create_task(_retention_worker())
     if config.TELEGRAM_ENABLED:
         _telegram_app = create_bot_application()
         if _telegram_app:

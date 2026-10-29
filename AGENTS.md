@@ -118,6 +118,23 @@ Status flow:
   (60s timeout, 5 retries), then a **second** Gemini call `extract_action_items` that
   fans out into `notifications` rows. On success the call's `name` is overwritten by
   the LLM's `topic`.
+
+**Org profile grounds the prompts.** `bot_settings["org_profile"]` (JSON:
+name / direction / services / rules / flaws / metrics / summary /
+custom_instructions) is injected into the scoring system prompt on every
+analysis (`prompts.scoring_system_prompt`). Filled from the Settings page or
+the Telegram admin wizard (`/org` — bot interviews the admin, Gemini
+normalizes the Q&A into the profile; raw answers are saved if Gemini fails).
+The Settings page also has a "find automatically" mode:
+`POST /api/settings/org/search` grounds Gemini in Google Search and returns a
+**proposal** (profile + sources) that is only persisted when the admin
+confirms it.
+The Settings page toggles are all real: `flags` (punctuation / speaker_labels /
+problem_alerts / gpu) and `retention_days` persist in `bot_settings` and change
+pipeline behaviour live (`transcribe._transcribe_prompt`, notification gating in
+`_analyze_call`, `local_stt.load` provider, hourly `_retention_worker` in
+`main.py`). `POST /api/calls/reanalyze-all` re-scores analysed calls under the
+current rules; `POST /api/settings/purge-audio` runs the retention purge now.
 - Background execution is inconsistent on purpose-ish: `BackgroundTasks` in some
   paths, raw `threading.Thread` in `routes_zadarma.py`, a throwaway
   `ThreadPoolExecutor(max_workers=2)` per Telegram message. **Every path spawns both
@@ -194,6 +211,15 @@ Two derived business concepts live in SQL, not code:
 - `WavePlayer` is a `forwardRef` exposing `seek(sec)` — the WaveSurfer instance
   lives inside it, so a parent that wants to drive playback (e.g. `CallDetail`
   jumping from a timed transcript turn) must go through that handle.
+
+## CallLens testground (MIT, external clone)
+
+`test_ground/CallLens/` holds a self-hosted clone of `yablokolabs/CallLens`
+(conversation intelligence: configurable rubrics, evidence-cited scores, agent
+Coach that decides NO_ACTION/COACH/ESCALATE, MCP server). Docker Compose stack
+on :3000/:8000. State, licensing notes, UI praise to emulate, and steal-list live
+in `test_ground/AGENT_README.md` — read it before touching the testground or
+porting its ideas into ViaCall.
 
 ## Known landmines — read before you debug
 

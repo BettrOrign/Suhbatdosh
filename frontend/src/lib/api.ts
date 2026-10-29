@@ -1,4 +1,15 @@
-import type { Call, Client, Notification, Settings, User } from './types'
+import type {
+  Call,
+  Client,
+  Notification,
+  OrgProfile,
+  OrgProfileResponse,
+  OrgSearchResult,
+  ProcessingMode,
+  Settings,
+  SettingsFlags,
+  User,
+} from './types'
 
 const TOKEN_KEY = 'suhbatdosh_token'
 
@@ -100,13 +111,24 @@ export const api = {
     request<Call>(`/api/calls/${id}`, jsonBody('PATCH', data)),
   reanalyze: (id: number) =>
     request<{ ok: boolean }>(`/api/calls/${id}/reanalyze`, { method: 'POST' }),
+  reanalyzeAll: () =>
+    request<{ ok: boolean; queued: number }>('/api/calls/reanalyze-all', { method: 'POST' }),
   deleteCall: (id: number) =>
     request<{ ok: boolean }>(`/api/calls/${id}`, { method: 'DELETE' }),
 
   // settings (docs/CONTRACT.md — backend-owned)
   getSettings: () => request<Settings>('/api/settings'),
-  updateSettings: (data: Partial<Pick<Settings, 'mode'>>) =>
-    request<Settings>('/api/settings', jsonBody('PATCH', data)),
+  updateSettings: (
+    data: Partial<{ mode: ProcessingMode; flags: Partial<SettingsFlags>; retention_days: number }>,
+  ) => request<Settings>('/api/settings', jsonBody('PATCH', data)),
+  getOrgProfile: () => request<OrgProfileResponse>('/api/settings/org'),
+  updateOrgProfile: (data: Partial<OrgProfile>) =>
+    request<OrgProfileResponse>('/api/settings/org', jsonBody('PATCH', data)),
+  searchOrgProfile: (data: { name: string; description?: string }) =>
+    request<OrgSearchResult>('/api/settings/org/search', jsonBody('POST', data)),
+  getSystemPrompt: () => request<{ system_prompt: string }>('/api/settings/prompt'),
+  purgeAudio: () =>
+    request<{ ok: boolean; purged: number }>('/api/settings/purge-audio', { method: 'POST' }),
 
   // notifications
   listNotifications: (unreadOnly?: boolean, limit?: number) => {    const params = new URLSearchParams()

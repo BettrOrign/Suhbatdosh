@@ -130,9 +130,41 @@ export interface AnalysisInfo {
 
 export interface Settings {
   mode: ProcessingMode
+  flags: SettingsFlags
+  retention_days: number
   stt: SttInfo
   analysis: AnalysisInfo
   updated_at: string
+}
+
+export interface SettingsFlags {
+  punctuation: boolean
+  speaker_labels: boolean
+  problem_alerts: boolean
+  gpu: boolean
+}
+
+export interface OrgProfile {
+  name?: string
+  direction?: string
+  services?: string
+  rules?: string
+  flaws?: string
+  metrics?: string
+  summary?: string
+  custom_instructions?: string
+}
+
+export interface OrgProfileResponse {
+  profile: OrgProfile
+  updated_at: string | null
+}
+
+export interface OrgSearchResult {
+  found: boolean
+  profile: OrgProfile
+  sources: string[]
+  facts: string
 }
 
 export type ManagedUser = User & { active: boolean }

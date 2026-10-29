@@ -24,6 +24,23 @@ TRANSCRIBE_PROMPT = (
 )
 
 
+def _transcribe_prompt() -> str:
+    """TRANSCRIBE_PROMPT adjusted by the Settings feature flags.
+
+    Read fresh per transcription so toggling a setting applies to the next
+    call without a restart. Defaults keep the historical prompt byte-identical.
+    """
+    prompt = TRANSCRIBE_PROMPT
+    if not db.get_flag("punctuation"):
+        prompt += " Do not add punctuation - write the words as they were spoken."
+    if db.get_flag("speaker_labels"):
+        prompt += (
+            " Prefix each line with the speaker: 'Sotuvchi:' for the staff member "
+            "or 'Mijoz:' for the caller."
+        )
+    return prompt
+
+
 def get_mode() -> str:
     """Return the configured processing mode, defaulting to ``online``.
 
@@ -137,7 +154,7 @@ class Transcriber:
                 self.client.aio.models.generate_content(
                     model=config.GEMINI_ANALYSIS_MODEL,
                     contents=[
-                        types.Part(text=TRANSCRIBE_PROMPT),
+                        types.Part(text=_transcribe_prompt()),
                         types.Part(
                             inline_data=types.Blob(
                                 data=data,

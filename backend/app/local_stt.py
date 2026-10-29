@@ -18,7 +18,7 @@ import threading
 from pathlib import Path
 from types import ModuleType
 
-from . import config
+from . import config, db
 
 logger = logging.getLogger("suhbatdosh.local_stt")
 
@@ -126,7 +126,17 @@ def load() -> None:
         raise RuntimeError(_unavailable_reason or "local STT unavailable")
     mod = _implementation()
     assert mod is not None
-    mod.load(model_dir=model_dir(), num_threads=config.LOCAL_STT_THREADS)
+    provider = "cuda" if db.get_flag("gpu") else "cpu"
+    try:
+        mod.load(model_dir=model_dir(), num_threads=config.LOCAL_STT_THREADS, provider=provider)
+    except Exception:
+        if provider == "cuda":
+            # A CUDA-less sherpa build raises on provider="cuda" — degrade to
+            # CPU rather than failing private mode outright.
+            logger.warning("CUDA provider unavailable; local STT falling back to CPU")
+            mod.load(model_dir=model_dir(), num_threads=config.LOCAL_STT_THREADS, provider="cpu")
+        else:
+            raise
 
 
 def transcribe(path: str | Path) -> dict:

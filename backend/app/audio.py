@@ -59,3 +59,25 @@ def pcm_chunks(pcm_path: Path, chunk_ms: int = 100) -> list[bytes]:
     chunk_bytes = max(16000 * 2 * (chunk_ms // 1000), 1600)
     data = pcm_path.read_bytes()
     return [data[i : i + chunk_bytes] for i in range(0, len(data), chunk_bytes)]
+
+
+def purge_expired_audio(days: int) -> int:
+    """Delete recordings older than ``days`` (Settings → auto-delete).
+
+    Transcripts and analyses are kept; only the WAV (and its PCM cache) is
+    removed and ``calls.audio_path`` is NULLed so the UI stops offering a
+    player for a file that no longer exists. Returns how many were purged.
+    """
+    from . import db
+
+    removed = 0
+    for row in db.expired_audio(days):
+        wav = resolve_audio_path(row["audio_path"])
+        if wav is not None:
+            wav.unlink(missing_ok=True)
+            Path(config.PCM_DIR / f"{Path(row['audio_path']).stem}.pcm").unlink(
+                missing_ok=True
+            )
+        db.clear_audio(row["id"])
+        removed += 1
+    return removed

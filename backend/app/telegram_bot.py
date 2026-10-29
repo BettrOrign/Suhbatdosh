@@ -33,7 +33,7 @@ from telegram.ext import (
     filters,
 )
 
-from . import audio, config, db
+from . import analysis, audio, config, db
 from .reports import (
     generate_daily_comparison_report,
     generate_full_report,
@@ -137,6 +137,8 @@ async def _typing(update_or_query):
         chat_id = update_or_query.message.chat_id
     elif hasattr(update_or_query, "chat_id"):
         chat_id = update_or_query.chat_id
+    elif hasattr(update_or_query, "chat") and update_or_query.chat:
+        chat_id = update_or_query.chat.id
     if chat_id:
         try:
             await update_or_query.get_bot().send_chat_action(chat_id=chat_id, action="typing")
@@ -751,6 +753,131 @@ async def handle_text_search(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 # ---------------------------------------------------------------------------
+# Organization profile wizard (admin)
+# ---------------------------------------------------------------------------
+# The bot interviews the admin question by question, then hands the raw Q&A
+# to Gemini (prompts.ORG_SUMMARY_PROMPT) which normalizes it into the org
+# profile JSON. That profile is what the scoring prompt injects, so scoring
+# stops guessing what kind of institution it is looking at.
+
+_ORG_QUESTIONS = [
+    ("name", "What is the institution's name?"),
+    ("direction", "What is its field of activity? (training centre, call centre, ...)"),
+    ("services", "What services / tariffs does it sell?"),
+    ("rules", "What are the rules of an ideal call here? (script, sequence, tone)"),
+    ("flaws", "What counts as a flaw on a call? (mistakes worth scoring down)"),
+    ("metrics", "Any target metrics? (optional — send /skip to omit)"),
+]
+
+_ORG_SKIPPABLE = {"metrics"}
+
+
+def _org_intro(first_question: str) -> str:
+    total = len(_ORG_QUESTIONS)
+    return (
+        _header("[Org] Institution Profile")
+        + "\n"
+        + _divider()
+        + "\n\n"
+        + "I will ask a few questions about your institution, then Gemini will turn "
+        "the answers into the profile used to score calls.\n\n"
+        + f"<b>1/{total}.</b> {first_question}\n<i>Send /cancel to abort.</i>"
+    )
+
+
+async def org_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Begin the org-profile interview (admin only)."""
+    user = update.effective_user
+    if not _is_admin(user.id):
+        await update.message.reply_text(
+            "[X] Admin access required.\nSet TELEGRAM_ADMIN_IDS in .env."
+        )
+        return True
+    context.user_data["org_flow"] = {"step": 0, "answers": {}}
+    await update.message.reply_text(_org_intro(_ORG_QUESTIONS[0][1]), parse_mode="HTML")
+    return True
+
+
+async def _org_ask_next(message, flow) -> None:
+    step = flow["step"]
+    if step < len(_ORG_QUESTIONS):
+        key, question = _ORG_QUESTIONS[step]
+        hint = " <i>(/skip to omit)</i>" if key in _ORG_SKIPPABLE else ""
+        await message.reply_text(
+            f"<b>{step + 1}/{len(_ORG_QUESTIONS)}.</b> {question}{hint}",
+            parse_mode="HTML",
+        )
+        return
+    # Interview complete — let Gemini normalize the raw answers.
+    answers = {k: v for k, v in flow["answers"].items() if v}
+    if not answers:
+        await message.reply_text(
+            "Nothing was filled — profile not changed.",
+            reply_markup=InlineKeyboardMarkup([[_home_button()]]),
+        )
+        return
+    await _typing(message)
+    await message.reply_text("[..] Gemini is writing up the profile...")
+    try:
+        qa_text = "\n".join(f"{k}: {v}" for k, v in answers.items() if v)
+        profile = await analysis.summarize_org_profile(qa_text)
+        saved = db.set_org_profile(profile)
+    except Exception as exc:
+        logger.warning("Org profile summarization failed: %s", exc)
+        # Persist the raw answers anyway — an imperfect profile beats none.
+        saved = db.set_org_profile(answers)
+        await message.reply_text(
+            "[!] Gemini could not summarize (raw answers saved instead).\n"
+            f"<i>{exc if isinstance(exc, ValueError) else type(exc).__name__}</i>",
+            parse_mode="HTML",
+        )
+    await message.reply_text(
+        _header("[OK] Institution Profile Saved")
+        + "\n"
+        + _divider()
+        + "\n\n"
+        + (saved.get("summary") or "Profile saved.")
+        + "\n\nScoring prompts now include this context.",
+        reply_markup=InlineKeyboardMarkup([[_home_button()]]),
+    )
+
+
+async def handle_org_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Consume one answer per message while the interview is active."""
+    flow = context.user_data.get("org_flow")
+    if not flow:
+        return False
+    key = _ORG_QUESTIONS[flow["step"]][0]
+    flow["answers"][key] = (update.message.text or "").strip()
+    flow["step"] += 1
+    await _org_ask_next(update.message, flow)
+    return True
+
+
+async def org_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Skip the current (optional) question."""
+    flow = context.user_data.get("org_flow")
+    if not flow:
+        await update.message.reply_text("No interview in progress. Send /org to start.")
+        return
+    key = _ORG_QUESTIONS[flow["step"]][0]
+    if key not in _ORG_SKIPPABLE:
+        await update.message.reply_text("This question is required — please answer it.")
+        return
+    flow["answers"][key] = ""
+    flow["step"] += 1
+    await _org_ask_next(update.message, flow)
+
+
+async def org_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Abort the interview."""
+    if context.user_data.pop("org_flow", None) is not None:
+        await update.message.reply_text(
+            "Cancelled.", reply_markup=_main_menu_keyboard(True)
+        )
+
+
+# ---------------------------------------------------------------------------
 # Stats menu
 # ---------------------------------------------------------------------------
 
@@ -1001,6 +1128,9 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("> YouTube Whitelist", callback_data="admin:yt_wl"),
             InlineKeyboardButton("[Tag] Manage Tags", callback_data="admin:tags"),
         ],
+        [
+            InlineKeyboardButton("[Org] Institution Profile", callback_data="admin:org"),
+        ],
         [_home_button()],
     ])
 
@@ -1037,6 +1167,19 @@ async def admin_sub_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 lines.append(f"  - {t['name']}  <code>{t['color']}</code>")
         buttons = InlineKeyboardMarkup([[_home_button()]])
         await query.edit_message_text("\n".join(lines), parse_mode="HTML", reply_markup=buttons)
+
+    elif action == "org":
+        if not _is_admin(query.from_user.id):
+            await query.edit_message_text(
+                "[X] Admin access required.",
+                reply_markup=InlineKeyboardMarkup([[_home_button()]]),
+            )
+            return
+        context.user_data["org_flow"] = {"step": 0, "answers": {}}
+        question = _ORG_QUESTIONS[0][1]
+        await query.edit_message_text(
+            _org_intro(question), parse_mode="HTML"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1449,6 +1592,7 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
         if is_adm:
             lines.append("  Admin - Admin control panel")
+            lines.append("  /org - Fill the institution profile (admin)")
     else:
         lines.append("Use /link YOUR_API_TOKEN to link your account first.")
 
@@ -1584,6 +1728,9 @@ def create_bot_application() -> Application | None:
     application.add_handler(CommandHandler("help", help_cmd))
     application.add_handler(CommandHandler("link", link_cmd))
     application.add_handler(CommandHandler("unsubscribe", unsubscribe_cmd))
+    application.add_handler(CommandHandler("org", org_start))
+    application.add_handler(CommandHandler("skip", org_skip))
+    application.add_handler(CommandHandler("cancel", org_cancel))
 
     # --- Callback query handlers (inline keyboards) ---
     # Navigation
@@ -1639,8 +1786,10 @@ def create_bot_application() -> Application | None:
 
     application.add_handler(MessageHandler(filters.Document.ALL, document_handler))
 
-    # Text handlers (for search/YouTube input) - must be last
+    # Text handlers (for search/YouTube/org-profile input) - must be last
     async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if await handle_org_flow(update, context):
+            return
         if await handle_text_search(update, context):
             return
         if await handle_text_youtube(update, context):

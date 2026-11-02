@@ -22,7 +22,7 @@ model to answer in Uzbek, even for Russian-language calls. Keep that contract.
 ```
 backend/          FastAPI + SQLite + Gemini + python-telegram-bot
   app/
-    main.py       App assembly + lifespan + ~450 lines of DEMO SEEDING (see gotchas)
+    main.py       App assembly + lifespan + admin bootstrap + SPA static serving
     api.py        /api/calls + /api/stats  (the core read/write surface)
     db.py         All SQL + init_db() migrations + analytics queries (946 lines)
     auth.py       PBKDF2 passwords, sessions, get_current_user, require_role
@@ -62,7 +62,7 @@ cp backend/.env.example backend/.env   # set GEMINI_API_KEY at minimum
 - Backend serves `frontend/dist` too, so `:8123` alone is a working app.
 - Vite proxies `/api` → `127.0.0.1:8123` (`frontend/vite.config.ts:14`).
 - Lint: `cd frontend && npm run lint` (oxlint). Typecheck: `npm run build`.
-- Backend tests: `cd backend && uv run pytest` (48 tests, `TestClient`).
+- Backend tests: `cd backend && uv run pytest` (74 tests, `TestClient`).
 - Offline-STT tests are a **separate** suite outside `testpaths`:
   `cd local-stt && ./.venv/bin/python -m pytest tests` (20 tests, no weights needed —
   they inject a fake `decode`). Run both; backend `pytest` will not see them.
@@ -147,8 +147,8 @@ client cannot cross `asyncio.run()` loops (see the comment at `api.py:20`).
 ### Tests
 
 `cd backend && uv run pytest` — `tests/` uses `TestClient` against the real app with a
-temp `DATA_DIR` (set in `conftest.py` before the app import) and `APP_ENV=prod` so no
-demo accounts are seeded.
+temp `DATA_DIR` (set in `conftest.py` before the app import). No demo data is ever
+seeded — every user/client/call in a database is real.
 
 ## The scorecard contract
 
@@ -236,8 +236,9 @@ These are real, verified. Fix opportunistically, but don't be surprised by them.
 4. ~~`GET /api/clients/{id}` had no ownership check~~ — **FIXED**.
 5. ~~`/api/stats/*` returned org-wide data to any role~~ — **FIXED**; now
    `admin`/`yonalish` only. Managers must be shown an empty/403 state.
-6. ~~Demo seeding was unconditional~~ — **FIXED**. `SEED_DEMO_USERS` /
-   `SEED_DEMO_CALLS` default to `APP_ENV in (dev, unset)`; `APP_ENV=prod` seeds nothing.
+6. ~~Demo seeding was unconditional~~ — **REMOVED**. The seeder script and the
+   `_seed_default_users` / `_seed_demo_calls` blocks in `main.py` are gone. The only
+   row the app ever bootstraps is the admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
 7. ~~CORS was `allow_origins=["*"]`~~ — **FIXED**; now `config.CORS_ORIGINS`
    from the `CORS_ORIGINS` env var (comma-separated, `*` when unset).
 8. `api.audioUrl` puts the bearer token in a query string (`api.ts:91`) — leaks into
@@ -300,6 +301,6 @@ These are real, verified. Fix opportunistically, but don't be surprised by them.
 
 ## Naming note
 
-The repo directory is `ViaCall` and `Layout.tsx:195` still renders "ViaCall", but the
-product is **Suhbatdosh** (`translations.ts` `brand.name`). Domains:
-`suhbatdosh.uz`, `suhbatdoshai.uz`. Don't get confused by the mismatch.
+The repo directory is `ViaCall` but the product is **Suhbatdosh** — every user-facing
+string comes from `translations.ts` (`brand.name`). Domains: `suhbatdosh.uz`,
+`suhbatdoshai.uz`. Don't get confused by the directory name.

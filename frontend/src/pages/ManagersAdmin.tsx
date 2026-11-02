@@ -17,6 +17,7 @@ import { useAuth } from '@/lib/auth'
  */
 const CONFIG: PeoplePageConfig = {
   titleKey: 'managers.admin_section',
+  eyebrowKey: 'nav.submenu.admin',
   descriptionKey: 'managers.all_desc',
   roles: ['admin'],
   lockRoleTo: 'admin',

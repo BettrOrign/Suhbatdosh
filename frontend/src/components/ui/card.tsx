@@ -18,16 +18,15 @@ function Card({
       data-slot="card"
       data-size={size}
       className={cn(
-        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-lg bg-surface text-sm text-card-foreground",
-        "ring-1 ring-border shadow-[inset_0_1px_0_0_color-mix(in_oklch,white_60%,transparent),var(--shadow-e1)]",
-        "transition-[transform,box-shadow,background-color,ring-color] duration-150 ease-standard",
-        "dark:shadow-[inset_0_1px_0_0_color-mix(in_oklch,white_6%,transparent),var(--shadow-e1)]",
+        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl border border-border bg-surface text-sm text-card-foreground",
+        "shadow-[var(--shadow-e1)]",
+        "transition-[transform,box-shadow,border-color] duration-200 ease-standard",
         "has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0",
-        "*:[img:first-child]:rounded-t-lg *:[img:last-child]:rounded-b-lg",
-        "[--card-spacing:--spacing(4)]",
+        "*:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        "[--card-spacing:--spacing(5)]",
         "data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0",
         interactive &&
-          "cursor-pointer hover:ring-border-strong hover:shadow-e2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+          "cursor-pointer hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-e2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         className
       )}
       {...props}
@@ -40,7 +39,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-header"
       className={cn(
-        "@container/card-header grid auto-rows-min items-start gap-1 rounded-t-lg px-(--card-spacing)",
+        "@container/card-header grid auto-rows-min items-start gap-1.5 rounded-t-xl px-(--card-spacing)",
         // Only the outer edges get padding: the gap between a header and the
         // content is the card's own `gap`, so padding both would double it.
         // Without this the title sat flush against the top ring.
@@ -60,7 +59,7 @@ function CardTitle({ className, as: As = "h3", ...props }: React.ComponentProps<
     <As
       data-slot="card-title"
       className={cn(
-        "text-sm leading-snug font-semibold tracking-[-0.01em]",
+        "text-[15px] leading-snug font-semibold tracking-[-0.015em]",
         "group-data-[size=sm]/card:text-2xs",
         className
       )}
@@ -113,7 +112,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-footer"
       className={cn(
-        "flex items-center rounded-b-lg border-t bg-surface-sunken px-(--card-spacing) py-2",
+        "flex items-center rounded-b-xl border-t bg-surface-sunken px-(--card-spacing) py-2",
         // A footer is the last child, so CardContent's `last:pb-*` never
         // applies to it — but it is not a first child either, so it needs no
         // top padding beyond its own py-2. Kept here for the case where a card

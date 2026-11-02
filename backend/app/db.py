@@ -132,6 +132,24 @@ def init_db():
                 created_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS telegram_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id INTEGER NOT NULL,
+                message_id INTEGER NOT NULL,
+                user_id INTEGER,
+                username TEXT,
+                full_name TEXT,
+                photo_url TEXT,
+                text TEXT,
+                is_bot INTEGER NOT NULL DEFAULT 0,
+                is_staff INTEGER NOT NULL DEFAULT 0,
+                topic TEXT,
+                reply_text TEXT,
+                replied_at TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(chat_id, message_id)
+            );
+
             CREATE TABLE IF NOT EXISTS tags (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,

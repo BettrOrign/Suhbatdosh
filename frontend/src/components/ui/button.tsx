@@ -13,7 +13,7 @@ const buttonVariants = cva(
   [
     "group/button inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md",
     "text-sm font-medium whitespace-nowrap select-none outline-none",
-    "transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-standard",
+    "transition-[background-color,border-color,color,box-shadow,transform,filter] duration-200 ease-standard",
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
     "active:not-aria-[haspopup]:scale-[0.98] disabled:pointer-events-none disabled:opacity-50",
     "aria-invalid:border-destructive aria-invalid:outline-destructive",
@@ -23,9 +23,10 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: [
-          "bg-primary text-primary-foreground ring-1 ring-primary",
-          "shadow-[inset_0_1px_0_0_color-mix(in_oklch,white_18%,transparent),var(--shadow-e1)]",
-          "hover:bg-primary-hover",
+          "text-white",
+          "bg-[image:var(--accent-gradient)]",
+          "shadow-[inset_0_1px_0_0_rgb(255_255_255/0.25),0_10px_22px_-12px_rgb(9_116_136/0.65)]",
+          "hover:brightness-[1.06] hover:shadow-[inset_0_1px_0_0_rgb(255_255_255/0.3),0_14px_28px_-12px_rgb(9_116_136/0.7)]",
         ],
         outline:
           "bg-surface text-foreground ring-1 ring-border hover:bg-surface-hover hover:ring-border-strong",
@@ -41,15 +42,15 @@ const buttonVariants = cva(
       },
       size: {
         default:
-          "h-9 gap-1.5 px-3.5 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3 text-sm",
+          "h-10 gap-2 px-4 has-data-[icon=inline-end]:pr-3.5 has-data-[icon=inline-start]:pl-3.5 text-sm",
         xs:
           "h-7 gap-1 rounded-sm px-2 text-2xs has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
         sm:
-          "h-8 gap-1.5 rounded-sm px-3 text-2xs has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5 [&_svg:not([class*='size-'])]:size-3.5",
-        lg: "h-10 gap-2 px-5 text-base",
-        icon: "size-9",
+          "h-9 gap-1.5 rounded-md px-3.5 text-xs has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3 [&_svg:not([class*='size-'])]:size-3.5",
+        lg: "h-12 gap-2 px-6 text-base",
+        icon: "size-10",
         "icon-xs": "size-7 rounded-sm [&_svg:not([class*='size-'])]:size-3.5",
-        "icon-sm": "size-8 rounded-sm",
+        "icon-sm": "size-9 rounded-md",
         "icon-lg": "size-11",
       },
     },

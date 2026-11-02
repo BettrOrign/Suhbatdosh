@@ -678,13 +678,17 @@ function UploadDialog({
 
 function LiveStat({ icon: Icon, label, value, tone }: { icon: LucideIcon; label: string; value: number; tone: string }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-lg bg-surface px-3 py-2.5 ring-1 ring-border">
-      <span className={cn('flex size-7 shrink-0 items-center justify-center rounded-md ring-1 ring-inset', tone)}>
-        <Icon aria-hidden="true" className="size-3.5" />
+    <div className="flex items-center gap-4 rounded-xl border border-border bg-surface px-5 py-4 shadow-[var(--shadow-e1)] transition-[box-shadow,border-color] duration-200 hover:border-primary/25 hover:shadow-e2">
+      <span className={cn('flex size-10 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset', tone)}>
+        <Icon aria-hidden="true" className="size-4" />
       </span>
       <div className="min-w-0">
-        <p className="eyebrow truncate">{label}</p>
-        <p className="data-value text-lg leading-tight">{value}</p>
+        <p className="truncate text-[11px] font-semibold tracking-[0.1em] text-muted-foreground uppercase">
+          {label}
+        </p>
+        <p className="mt-1.5 text-[1.75rem] leading-none font-semibold tracking-[-0.03em] tabular-nums">
+          {value}
+        </p>
       </div>
     </div>
   )
@@ -728,8 +732,11 @@ export function Calls() {
   return (
     <div>
       <PageHeader
+        eyebrow={t('nav.calls')}
         title={t('dashboard.title')}
-        description={`${filtered.length} ${t('analytics.calls').toLowerCase()}`}
+        description={t(filtered.length === 1 ? 'calls.count_one' : 'calls.count_many', {
+          n: filtered.length,
+        })}
         actions={
           <>
             <SegmentedControl
@@ -782,7 +789,7 @@ export function Calls() {
       </div>
 
       {!loading && calls.length > 0 && (
-        <div className="mb-6 grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <LiveStat icon={PhoneCall} label={t('analytics.total_calls')} value={calls.length} tone="bg-primary-soft text-primary-soft-foreground ring-primary/20" />
           <LiveStat icon={CircleCheck} label={t('status.done')} value={calls.filter((c) => c.status === 'done').length} tone="bg-success-soft text-success-soft-foreground ring-success/20" />
           <LiveStat icon={Hourglass} label={t('dashboard.stat.in_progress')} value={busyCount} tone="bg-primary-soft text-primary-soft-foreground ring-primary/20" />

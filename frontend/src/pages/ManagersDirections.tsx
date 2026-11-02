@@ -7,6 +7,7 @@ import { PerformanceDirectory, type PerformanceConfig } from '@/components/peopl
  * `/api/stats/manager-rankings` onto the real user rows instead.
  */
 const CONFIG: PerformanceConfig = {
+  eyebrowKey: 'nav.submenu.directions',
   role: 'yonalish',
   titleKey: 'directions.title',
   descriptionKey: 'directions.desc',

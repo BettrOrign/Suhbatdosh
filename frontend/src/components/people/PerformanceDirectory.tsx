@@ -76,6 +76,7 @@ const EMPTY_STATS: PerformanceStats = {
 export type PerformancePerson = ManagedUser & { stats: PerformanceStats }
 
 export interface PerformanceConfig {
+  eyebrowKey?: string
   role: Role
   titleKey: string
   descriptionKey: string
@@ -125,16 +126,18 @@ function StatMini({
   value: string | number
 }) {
   return (
-    <Card size="sm">
-      <CardContent className="flex items-center gap-2.5 p-3">
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-surface-sunken text-muted-foreground ring-1 ring-border-subtle">
-          <Icon className="size-3.5" />
+    <Card className="h-full gap-0">
+      <CardContent className="flex items-center gap-4 p-5">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary">
+          <Icon className="size-4" />
         </div>
         <div className="min-w-0">
-          <p className="truncate text-2xs font-medium uppercase tracking-[0.06em] text-muted-foreground">
+          <p className="truncate text-[11px] font-semibold tracking-[0.1em] text-muted-foreground uppercase">
             {label}
           </p>
-          <p className="data-value text-base leading-tight">{value}</p>
+          <p className="mt-1.5 text-[1.5rem] leading-none font-semibold tracking-[-0.03em] tabular-nums">
+            {value}
+          </p>
         </div>
       </CardContent>
     </Card>
@@ -502,6 +505,7 @@ export function PerformanceDirectory({ config }: { config: PerformanceConfig }) 
   return (
     <div>
       <PageHeader
+        eyebrow={config.eyebrowKey ? t(config.eyebrowKey) : undefined}
         title={t(config.titleKey)}
         description={t(config.descriptionKey)}
         actions={
@@ -528,7 +532,7 @@ export function PerformanceDirectory({ config }: { config: PerformanceConfig }) 
         />
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
           { label: t(config.titleKey), value: directory.length, icon: UserRound },
           {
@@ -543,13 +547,11 @@ export function PerformanceDirectory({ config }: { config: PerformanceConfig }) 
           },
           { label: t('managers.api_access'), value: stats.apiTokens, icon: KeyRound },
         ].map((s) => (
-          <div key={s.label} className="min-w-[140px] flex-1">
-            <StatMini icon={s.icon} label={s.label} value={s.value} />
-          </div>
+          <StatMini key={s.label} icon={s.icon} label={s.label} value={s.value} />
         ))}
       </div>
 
-      <div className="mb-6 grid gap-3 md:grid-cols-3">
+      <div className="mb-6 grid gap-4 md:grid-cols-3">
         <RankingChart
           data={charts.volume}
           label={t(config.chartLabelKeys.volume)}

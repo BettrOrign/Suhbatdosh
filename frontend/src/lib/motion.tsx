@@ -11,22 +11,30 @@ import type { ComponentProps, ReactNode } from 'react'
  */
 /** Spring configs by intent. Snappy = UI feedback, soft = layout, gentle = large. */
 export const SPRING = {
-  snappy: { type: 'spring', stiffness: 520, damping: 34, mass: 0.7 },
-  standard: { type: 'spring', stiffness: 380, damping: 32, mass: 0.8 },
-  soft: { type: 'spring', stiffness: 260, damping: 30, mass: 1 },
-  gentle: { type: 'spring', stiffness: 190, damping: 26, mass: 1 },
+  snappy: { type: 'spring', stiffness: 480, damping: 36, mass: 0.72 },
+  standard: { type: 'spring', stiffness: 340, damping: 34, mass: 0.85 },
+  soft: { type: 'spring', stiffness: 240, damping: 32, mass: 1 },
+  gentle: { type: 'spring', stiffness: 170, damping: 28, mass: 1.05 },
 } as const satisfies Record<string, Transition>
+
+export const hoverLift = { y: -3 } as const
 
 /** Resolve the right spring for the current motion preference. */
 export const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 8 },
+  hidden: { opacity: 0, y: 10 },
   visible: { opacity: 1, y: 0, transition: SPRING.standard },
+}
+
+export const pageFade: Variants = {
+  hidden: { opacity: 0, y: 14 },
+  visible: { opacity: 1, y: 0, transition: SPRING.soft },
+  exit: { opacity: 0, y: -8, transition: { duration: 0.16, ease: [0.4, 0.05, 1, 1] } },
 }
 
 /** List/grid reveal. Children must be motion elements using these variants. */
 export const stagger: Variants = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.035, delayChildren: 0.02 } },
+  visible: { transition: { staggerChildren: 0.042, delayChildren: 0.04 } },
 }
 
 interface RevealProps extends ComponentProps<typeof motion.div> {

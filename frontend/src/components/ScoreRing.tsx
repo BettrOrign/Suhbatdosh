@@ -54,9 +54,10 @@ export function ScoreRing({
             strokeWidth={stroke}
             strokeLinecap="round"
             strokeDasharray={circumference}
+            style={{ filter: `drop-shadow(0 0 5px ${color})` }}
             initial={{ strokeDashoffset: circumference }}
             animate={{ strokeDashoffset: circumference * (1 - clamped / 100) }}
-            transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1], delay }}
+            transition={{ duration: 1.05, ease: [0.16, 1, 0.3, 1], delay }}
           />
         )}
         {reduced && (

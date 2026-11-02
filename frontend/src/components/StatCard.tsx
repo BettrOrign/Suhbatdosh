@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
+import { hoverLift, SPRING } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 
 export interface StatCardProps {
@@ -39,33 +40,35 @@ export function StatCard({
 
   return (
     <motion.div
-      whileHover={reduced ? undefined : { y: -2 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 26, mass: 0.7 }}
+      whileHover={reduced ? undefined : hoverLift}
+      transition={SPRING.snappy}
       className="h-full"
     >
-      <Card size="sm" className="h-full transition-shadow duration-150 hover:shadow-e2">
-        <CardContent className="flex items-start gap-3 p-3.5">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-surface-sunken text-muted-foreground ring-1 ring-border-subtle">
-            <Icon aria-hidden="true" className="size-4" />
+      <Card className="h-full gap-0 border-border transition-[box-shadow,border-color] duration-200 ease-standard hover:border-primary/25 hover:shadow-e2">
+        <CardContent className="flex items-start gap-4 p-5 sm:p-6">
+          <span className="icon-well size-11 rounded-xl">
+            <Icon aria-hidden="true" className="size-5" />
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
-              <p className="eyebrow truncate">{label}</p>
+              <p className="truncate text-[11px] font-semibold tracking-[0.1em] text-muted-foreground uppercase">
+                {label}
+              </p>
               {trailing}
             </div>
             <p
               className={cn(
-                'mt-1 text-2xl leading-none font-semibold tracking-[-0.02em] tabular-nums',
+                'mt-2 text-[2rem] leading-none font-semibold tracking-[-0.035em] tabular-nums',
                 valueClass ?? 'text-foreground'
               )}
             >
               <AnimatedNumber value={value} decimals={decimals} />
             </p>
-            {hint && <p className="mt-1 truncate text-2xs text-muted-foreground">{hint}</p>}
+            {hint && <p className="mt-1.5 truncate text-xs text-muted-foreground">{hint}</p>}
             {progress != null && (
-              <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-surface-sunken">
+              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-sunken">
                 <motion.div
-                  className={cn('h-full rounded-full', progressClass ?? 'bg-primary')}
+                  className={cn('h-full rounded-full', progressClass ?? 'bg-[image:var(--accent-gradient)]')}
                   initial={reduced ? false : { width: 0 }}
                   animate={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
                   transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}

@@ -447,6 +447,7 @@ export function SettingsPage() {
   return (
     <div>
       <PageHeader
+        eyebrow={t('nav.settings')}
         title={t('settings.title')}
         description={t('settings.desc')}
         actions={

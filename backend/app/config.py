@@ -84,21 +84,8 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 ADMIN_NAME = os.getenv("ADMIN_NAME", "Admin")
 
 
-def _env_flag(env_name: str, default: bool) -> bool:
-    """Like :func:`_flag` but lets YAML win over the built-in default."""
-    val = os.getenv(env_name)
-    if val not in (None, ""):
-        return val.strip().lower() in ("true", "1", "yes", "on")
-    return _CFG.get("app", {}).get(env_name.lower(), default)
-
-
-# Demo seeding ships with trivial passwords, so it is ON only when APP_ENV is
-# absent/"dev"/"development" (the default). Production must set APP_ENV=prod,
-# which turns both the demo accounts and the demo calls off.
 APP_ENV = (os.getenv("APP_ENV", "") or "").strip().lower()
-DEV_MODE = APP_ENV in ("", "dev", "development", "local")
-SEED_DEMO_USERS = _env_flag("SEED_DEMO_USERS", DEV_MODE)
-SEED_DEMO_CALLS = _env_flag("SEED_DEMO_CALLS", DEV_MODE)
+
 
 # --- CORS -------------------------------------------------------------------
 # Comma-separated origin allowlist. Empty/unset falls back to "*" so the
@@ -118,6 +105,7 @@ ZADARMA_WEBHOOK_SECRET = os.getenv("ZADARMA_WEBHOOK_SECRET", "")
 # --- Telegram Bot ------------------------------------------------------------
 TELEGRAM_ENABLED = os.getenv("TELEGRAM_ENABLED", "true").lower() in ("true", "1", "yes")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_READER_BOT_TOKEN = os.getenv("TELEGRAM_READER_BOT_TOKEN", "")
 TELEGRAM_ADMIN_IDS: list[int] = [
     int(x) for x in os.getenv("TELEGRAM_ADMIN_IDS", "").split(",") if x.strip().isdigit()
 ]

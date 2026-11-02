@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth'
 
 const CONFIG: PeoplePageConfig = {
   titleKey: 'users.title',
+  eyebrowKey: 'nav.team',
   descriptionKey: 'users.desc',
   /** Every role, including `yonalish`, which the old `ROLES` list omitted —
    *  meaning you literally could not assign it from the UI. */

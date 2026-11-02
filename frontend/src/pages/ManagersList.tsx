@@ -7,6 +7,7 @@ import { PerformanceDirectory, type PerformanceConfig } from '@/components/peopl
 const CONFIG: PerformanceConfig = {
   role: 'manager',
   titleKey: 'managers.title',
+  eyebrowKey: 'nav.submenu.managers',
   descriptionKey: 'managers.manager_desc',
   failureKey: 'managers.load_failed',
   browseLabelKey: 'managers.show_calls',

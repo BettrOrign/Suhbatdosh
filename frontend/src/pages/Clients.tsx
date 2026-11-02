@@ -346,6 +346,7 @@ export function Clients() {
   return (
     <div>
       <PageHeader
+        eyebrow={t('nav.clients')}
         title={t('clients.title')}
         description={description}
         actions={

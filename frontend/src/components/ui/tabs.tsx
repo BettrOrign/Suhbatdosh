@@ -56,12 +56,12 @@ function TabsTrigger({
       data-slot="tabs-trigger"
       className={cn(
         "relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-sm px-2.5 text-xs font-medium whitespace-nowrap",
-        "transition-[background-color,color,box-shadow] duration-150 ease-standard",
+        "transition-[background-color,color,box-shadow] duration-200 ease-standard",
         "group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start",
         "text-muted-foreground hover:text-foreground",
         "focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
         "disabled:pointer-events-none disabled:opacity-50",
-        "group-data-[variant=default]/tabs-list:data-active:bg-surface group-data-[variant=default]/tabs-list:data-active:text-foreground group-data-[variant=default]/tabs-list:data-active:shadow-e1",
+        "group-data-[variant=default]/tabs-list:data-active:bg-surface group-data-[variant=default]/tabs-list:data-active:text-foreground group-data-[variant=default]/tabs-list:data-active:shadow-[var(--shadow-e1),0_0_0_1px_color-mix(in_oklch,var(--primary)_12%,transparent)]",
         "after:absolute after:bg-primary after:opacity-0 after:transition-opacity",
         "group-data-horizontal/tabs:after:inset-x-1 after:bottom-[-4px] after:h-0.5 after:rounded-full",
         "group-data-vertical/tabs:after:inset-y-1 after:left-[-4px] after:w-0.5",

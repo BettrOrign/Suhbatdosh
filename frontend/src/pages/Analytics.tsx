@@ -15,7 +15,7 @@ import { DeltaChip, StatCard } from '@/components/StatCard'
 import { ScoreChip } from '@/components/ScoreRing'
 import { CallTypePieChart } from '@/components/CallTypePieChart'
 import { ScoreDistributionChart } from '@/components/ScoreDistributionChart'
-import { EmptyState } from '@/components/EmptyState'
+import { EmptyState, PageHeader } from '@/components/EmptyState'
 import { Stagger, fadeUp, SPRING } from '@/lib/motion'
 import { useAuth } from '@/lib/auth'
 import { api } from '@/lib/api'
@@ -165,9 +165,7 @@ export function Analytics() {
   if (!canViewOrgStats) {
     return (
       <div>
-        <header className="mb-6">
-          <h1 className="text-xl font-semibold tracking-[-0.02em]">{t('analytics.title')}</h1>
-        </header>
+        <PageHeader eyebrow={t('nav.dashboard')} title={t('analytics.title')} />
         <EmptyState
           icon={ShieldAlert}
           title={t('analytics.no_access')}
@@ -184,14 +182,72 @@ export function Analytics() {
 
   return (
     <div>
-      <header className="mb-6">
-        <h1 className="text-xl font-semibold tracking-[-0.02em]">
-          {user?.name ? t('dashboard.welcome', { name: user.name }) : t('analytics.title')}
-        </h1>
-        <p className="mt-1 text-xs text-muted-foreground">{t('dashboard.welcome_desc')}</p>
-      </header>
+      <PageHeader
+        eyebrow={t('nav.dashboard')}
+        title={user?.name ? t('dashboard.welcome', { name: user.name }) : t('analytics.title')}
+        description={t('dashboard.welcome_desc')}
+      />
 
-      <Stagger className="mb-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <section className="relative mb-5 overflow-hidden rounded-2xl text-white">
+        <div aria-hidden="true" className="absolute inset-0" style={{ background: 'var(--accent-gradient)' }} />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 opacity-50"
+          style={{
+            background:
+              'radial-gradient(560px 320px at 8% 0%, rgb(255 255 255 / 0.25), transparent 60%), radial-gradient(420px 280px at 96% 110%, rgb(52 214 226 / 0.5), transparent 62%)',
+          }}
+        />
+        <div className="relative flex flex-wrap items-end justify-between gap-8 p-6 sm:p-8">
+          <div className="max-w-xl">
+            <p className="font-mono text-2xs font-medium tracking-[0.16em] text-white/75 uppercase">
+              {t('analytics.hero_eyebrow')}
+            </p>
+            <h2 className="mt-3 text-[1.6rem] leading-tight font-semibold tracking-[-0.03em] sm:text-[2rem]">
+              {t('analytics.hero_title')}
+            </h2>
+            <p className="mt-2 max-w-lg text-sm leading-relaxed text-white/80">
+              {t('analytics.hero_sub')}
+            </p>
+            <Link
+              to="/calls"
+              className="focus-ring mt-5 inline-flex h-10 items-center gap-2 rounded-full border border-white/30 bg-white/15 px-4 text-sm font-medium text-white backdrop-blur transition-colors duration-200 hover:bg-white/25"
+            >
+              {t('nav.calls')}
+              <ArrowUp aria-hidden="true" className="size-3.5 rotate-45" />
+            </Link>
+          </div>
+
+          <dl className="flex flex-wrap items-end gap-x-10 gap-y-6">
+            <div>
+              <dt className="text-2xs font-medium tracking-[0.12em] text-white/70 uppercase">
+                {t('analytics.avg_score')}
+              </dt>
+              <dd className="mt-1 text-[2.75rem] leading-none font-semibold tracking-[-0.04em] tabular-nums">
+                {overview?.avg_score != null ? Math.round(overview.avg_score) : '—'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-2xs font-medium tracking-[0.12em] text-white/70 uppercase">
+                {t('analytics.total_calls')}
+              </dt>
+              <dd className="mt-1 text-[2rem] leading-none font-semibold tracking-[-0.04em] tabular-nums">
+                {overview?.total_calls ?? 0}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-2xs font-medium tracking-[0.12em] text-white/70 uppercase">
+                {t('analytics.today_calls')}
+              </dt>
+              <dd className="mt-1 text-[2rem] leading-none font-semibold tracking-[-0.04em] tabular-nums">
+                {overview?.calls_today ?? 0}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <Stagger className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <motion.div variants={fadeUp}>
           <StatCard icon={PhoneCall} label={t('analytics.total_calls')} value={overview?.total_calls ?? 0} />
         </motion.div>
@@ -213,7 +269,7 @@ export function Analytics() {
       </Stagger>
 
       {dod && (
-        <section className="mb-4 grid grid-cols-2 gap-2 lg:grid-cols-4" aria-label={t('analytics.day_comparison')}>
+        <section className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label={t('analytics.day_comparison')}>
           {[
             {
               key: 'calls',
@@ -258,10 +314,10 @@ export function Analytics() {
             const yesterday = typeof m.yesterday === 'number' ? m.yesterday : null
             const max = Math.max(today ?? 0, yesterday ?? 0, 1)
             return (
-              <Card key={m.key} size="sm">
-                <CardContent className="space-y-2 p-3">
+              <Card key={m.key}>
+                <CardContent className="space-y-3 p-5">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="eyebrow truncate">{m.label}</p>
+                    <p className="truncate text-[11px] font-semibold tracking-[0.1em] text-muted-foreground uppercase">{m.label}</p>
                     <DeltaChip
                       delta={today != null && yesterday != null ? m.delta(today, yesterday) : null}
                       invert={m.invert}
@@ -269,7 +325,7 @@ export function Analytics() {
                   </div>
                   <p
                     className={cn(
-                      'text-2xl leading-none font-semibold tracking-[-0.02em] tabular-nums',
+                      'text-[1.75rem] leading-none font-semibold tracking-[-0.03em] tabular-nums',
                       m.score ? scoreColor(today) : 'text-foreground'
                     )}
                   >
@@ -310,7 +366,7 @@ export function Analytics() {
         </section>
       )}
 
-      <div className="mb-4 grid gap-3 lg:grid-cols-3">
+      <div className="mb-4 grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader className="pb-1">
             <CardTitle>{t('analytics.weekly_trend')}</CardTitle>
@@ -321,8 +377,8 @@ export function Analytics() {
                 <AreaChart data={weeklyData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                   <defs>
                     <linearGradient id="callsFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.22} />
-                      <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity={0.01} />
+                      <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.42} />
+                      <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="day" axisLine={false} tickLine={false} dy={4} />
@@ -332,7 +388,7 @@ export function Analytics() {
                     type="monotone"
                     dataKey="calls"
                     stroke="var(--color-chart-1)"
-                    strokeWidth={2}
+                    strokeWidth={2.25}
                     fill="url(#callsFill)"
                     dot={{ r: 2.5, fill: 'var(--color-chart-1)', strokeWidth: 0 }}
                     activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--color-surface)' }}
@@ -630,7 +686,7 @@ function DashboardSkeleton() {
           <Skeleton key={i} className="h-20 rounded-lg" />
         ))}
       </div>
-      <div className="mb-4 grid gap-3 lg:grid-cols-3">
+      <div className="mb-4 grid gap-4 lg:grid-cols-3">
         <Skeleton className="h-56 rounded-lg lg:col-span-2" />
         <Skeleton className="h-56 rounded-lg" />
       </div>

@@ -19,6 +19,7 @@ import {
 export interface PeoplePageConfig {
   /** i18n keys for the masthead. */
   titleKey: string
+  eyebrowKey?: string
   descriptionKey: string
   /** Which roles this page lists. */
   roles: Role[]
@@ -53,6 +54,7 @@ export function PeoplePage({
   return (
     <div>
       <PageHeader
+        eyebrow={config.eyebrowKey ? t(config.eyebrowKey) : undefined}
         title={t(config.titleKey)}
         description={t(config.descriptionKey)}
         actions={

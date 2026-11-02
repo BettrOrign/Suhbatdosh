@@ -58,9 +58,8 @@ ADMIN_EMAIL=you@yourcompany.com
 ADMIN_PASSWORD=<a strong password>
 ```
 
-That admin is created once, on an empty database. Demo accounts and demo
-calls are **off** by default; they only appear if you opt in with
-`SEED_DEMO_USERS=true` / `SEED_DEMO_CALLS=true`.
+That admin is created once, on an empty database. The app never seeds demo
+accounts, demo clients or demo calls — every record is real.
 
 ## Project Structure
 

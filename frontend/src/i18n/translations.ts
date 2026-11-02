@@ -16,11 +16,19 @@ export const translations: Record<Lang, Record<string, string>> = {
     'nav.role.manager': 'Manager',
     'nav.role.receptionist': 'Receptionist',
     'nav.role.yonalish': 'Employee',
+    'nav.account': 'Account',
     'nav.logout': 'Logout',
     'brand.name': 'Suhbatdosh',
     'brand.tagline': 'AI conversation coach',
 
     // login
+    'login.hero_eyebrow': 'AI call intelligence',
+    'login.hero_title': 'Every call, scored and coached.',
+    'login.hero_sub':
+      'Recordings arrive from Zadarma or an upload. Suhbatdosh transcribes the conversation, scores the rubric and tells the team what to fix next.',
+    'login.feature_1': 'Automatic transcription in Uzbek, Russian and English',
+    'login.feature_2': 'A rubric scorecard with coaching points for every call',
+    'login.feature_3': 'Team analytics, problem calls and follow-ups',
     'app.sign_in': 'Sign in',
     'app.sign_in_desc': 'Use your Suhbatdosh account',
     'app.email': 'Email',
@@ -473,6 +481,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     'notifications.assignee': 'Assignee: {assignee}',
 
     // analytics
+    'analytics.hero_eyebrow': 'Call intelligence',
+    'analytics.hero_title': 'Your team, scored on every conversation.',
+    'analytics.hero_sub': 'Average rubric score across analysed calls — updated as recordings arrive.',
     'analytics.title': 'Analytics Overview',
     'analytics.no_access': 'Analytics are not available for your role',
     'analytics.no_access_desc': 'Organisation-wide statistics are visible to administrators and supervisors only.',
@@ -484,6 +495,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     'analytics.today': 'Today',
     'analytics.yesterday': 'Yesterday',
     'analytics.calls': 'Calls',
+    'calls.count_one': '{n} call',
+    'calls.count_many': '{n} calls',
     'analytics.score': 'Score',
     'analytics.duration': 'Duration',
     'analytics.talk_ratio': 'Talk Ratio',
@@ -518,11 +531,19 @@ export const translations: Record<Lang, Record<string, string>> = {
     'nav.role.manager': 'Menejer',
     'nav.role.receptionist': 'Qabulxona xodimi',
     'nav.role.yonalish': 'Xodim',
+    'nav.account': 'Hisob',
     'nav.logout': 'Chiqish',
     'brand.name': 'Suhbatdosh',
     'brand.tagline': 'Sun\'iy intellekt suhbat murabbiyi',
 
     // login
+    'login.hero_eyebrow': 'AI qoʻngʻiroq tahlili',
+    'login.hero_title': 'Har bir qoʻngʻiroq baholanadi va tahlil qilinadi.',
+    'login.hero_sub':
+      'Yozuvlar Zadarma orqali yoki yuklash bilan keladi. Suhbatdosh suhbatni transkripsiya qiladi, baholaydi va jamoaga nimani tuzatish kerakligini aytadi.',
+    'login.feature_1': 'Oʻzbek, rus va ingliz tillarida avtomatik transkripsiya',
+    'login.feature_2': 'Har bir qoʻngʻiroq uchun baho va murabbiylik maslahatlari',
+    'login.feature_3': 'Jamoa analitikasi, muammoli qoʻngʻiroqlar va keyingi qadamlar',
     'app.sign_in': 'Kirish',
     'app.sign_in_desc': 'Suhbatdosh hisobingizdan foydalaning',
     'app.email': 'Elektron pochta',
@@ -975,6 +996,9 @@ export const translations: Record<Lang, Record<string, string>> = {
     'notifications.assignee': 'Masʼul: {assignee}',
 
     // analytics
+    'analytics.hero_eyebrow': 'Qoʻngʻiroq tahlili',
+    'analytics.hero_title': 'Jamoangiz har bir suhbatda baholanadi.',
+    'analytics.hero_sub': 'Tahlil qilingan qoʻngʻiroqlar boʻyicha oʻrtacha baho — yozuvlar kelishi bilan yangilanadi.',
     'analytics.title': 'Statistika',
     'analytics.no_access': 'Statistika sizning rolingiz uchun mavjud emas',
     'analytics.no_access_desc': 'Tashkilot bo‘ylab statistikani faqat administratorlar va masullar ko‘radi.',
@@ -986,6 +1010,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     'analytics.today': 'Bugun',
     'analytics.yesterday': 'Kecha',
     'analytics.calls': 'Qoʻngʻiroqlar soni',
+    'calls.count_one': '{n} ta qoʻngʻiroq',
+    'calls.count_many': '{n} ta qoʻngʻiroq',
     'analytics.score': 'Qong\'iroqlar bahosi',
     'analytics.duration': 'Qong\'iroqlar davomiylik',
     'analytics.talk_ratio': 'Muvofaqiyatli qong\'iroqlar',

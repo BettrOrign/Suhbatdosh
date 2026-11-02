@@ -36,8 +36,8 @@ export function EmptyState({
       )}
     >
       {Icon && (
-        <div className="flex size-10 items-center justify-center rounded-lg bg-surface-sunken ring-1 ring-border">
-          <Icon className="size-5 text-muted-foreground" />
+        <div className="icon-well size-10 rounded-lg">
+          <Icon className="size-5" />
         </div>
       )}
       <div className="space-y-1">
@@ -51,14 +51,16 @@ export function EmptyState({
   )
 }
 
-/** The standard page masthead: h1 + description, with right-aligned actions. */
+/** The standard page masthead: eyebrow + display title + lede, actions right. */
 export function PageHeader({
   title,
+  eyebrow,
   description,
   actions,
   className,
 }: {
   title: string
+  eyebrow?: string
   description?: string
   actions?: ReactNode
   className?: string
@@ -68,16 +70,15 @@ export function PageHeader({
       initial="hidden"
       animate="visible"
       variants={{
-        hidden: { opacity: 0, y: -6 },
+        hidden: { opacity: 0, y: -8 },
         visible: { opacity: 1, y: 0, transition: SPRING.standard },
       }}
-      className={cn('mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-3', className)}
+      className={cn('mb-8 flex flex-wrap items-end justify-between gap-x-8 gap-y-4', className)}
     >
       <div className="min-w-0">
-        <h1 className="text-xl font-semibold tracking-[-0.02em] text-balance">{title}</h1>
-        {description && (
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
-        )}
+        {eyebrow && <p className="eyebrow mb-3">{eyebrow}</p>}
+        <h1 className="page-title text-balance">{title}</h1>
+        {description && <p className="page-lede mt-2.5">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </motion.header>

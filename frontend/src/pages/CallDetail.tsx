@@ -97,6 +97,11 @@ function speakerStyle(label: string): CSSProperties {
   return { color: c.fg, backgroundColor: c.bg, borderColor: c.fg }
 }
 
+/** Text colour only: the transcript reads as prose, not as coloured cards. */
+function speakerTone(label: string): string {
+  return SPEAKER_PALETTE[hash(label) % SPEAKER_PALETTE.length].fg
+}
+
 /**
  * A turn is "current" while the playhead sits inside it. Only private-mode
  * segments carry `start`/`end`, so every check here tolerates their absence.
@@ -183,17 +188,11 @@ function TranscriptView({
                   ? { onClick: seek, onKeyDown: onSeekKey, role: 'button', tabIndex: 0 }
                   : {})}
                 className={cn(
-                  'flex-1 rounded-md px-3 py-2 text-sm leading-relaxed ring-1 ring-inset transition-colors',
-                  start != null && 'cursor-pointer outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                  isActive && 'bg-primary-soft text-primary-soft-foreground ring-primary/40'
+                  'flex-1 rounded-lg border-l-2 border-transparent px-3 py-2 text-[13.5px] leading-relaxed transition-colors',
+                  start != null && 'cursor-pointer outline-none hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                  isActive && 'border-primary bg-primary-soft text-primary-soft-foreground'
                 )}
-                style={
-                  isActive
-                    ? undefined
-                    : s.speaker_label
-                      ? { ...speakerStyle(s.speaker_label), backgroundColor: 'transparent', borderColor: 'var(--color-border)' }
-                      : { backgroundColor: 'var(--color-surface-sunken)' }
-                }
+                style={isActive ? undefined : { color: s.speaker_label ? speakerTone(s.speaker_label) : undefined }}
               >
                 {s.text}
               </p>

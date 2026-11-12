@@ -41,9 +41,10 @@ backend/          FastAPI + SQLite + Gemini + python-telegram-bot
     youtube.py    yt-dlp ingestion
   config.yaml     Non-secret defaults. env (.env) always wins. See config.py:_resolve
 frontend/         Vite 8 + React 19 + TS + Tailwind v4 + shadcn/ui
-  src/lib/        api.ts (single fetch wrapper), auth.tsx, types.ts, format.ts
-  src/pages/      Analytics, Calls, CallDetail, Clients, ManagersList,
-                  ManagersDirections, ManagersAdmin, Users, Login, Settings
+  src/lib/        api.ts (single fetch wrapper, cookie+CSRF auth), auth.tsx, types.ts, format.ts
+  src/pages/      Analytics, EmployeeHome, MyTasks, Profile, Signup, AcceptInvite,
+                  Calls, CallDetail, Clients, ManagersList, ManagersDirections,
+                  ManagersAdmin, Users, Login, Settings, Telegram
   src/i18n/       i18n.tsx + translations.ts (430 flat keys, en/uz, symmetric)
 nginx/            suhbatdosh.conf, suhbatdoshai.conf (prod vhosts)
 run.sh            One-command launcher. ./run.sh | --netLAN | --stop
@@ -182,15 +183,25 @@ Two derived business concepts live in SQL, not code:
   authenticated by the `ZADARMA_WEBHOOK_SECRET` shared secret).
   Both dedupe on `zadarma_call_id` stored in `source_meta`.
 
-## Auth & roles
+## Auth, Multi-Tenancy & Roles
 
-- Sessions: `Authorization: Bearer <token>` or a `token` query param.
-- Passwords: PBKDF2-HMAC-SHA256, 100k iters, `salt$digest` (`auth.py:12`).
-- Backend access control lives in `_check_call_access` (`api.py:238`) and inline
-  role branches in `db.list_calls` / `db.list_clients`. **Frontend guards are cosmetic**
-  — in-page 403 cards, not router guards. Never rely on the frontend for security.
-- Two independent admin models: HTTP uses DB `role='admin'`; Telegram uses env
-  `TELEGRAM_ADMIN_IDS`.
+- **Multi-tenant**: `organizations` table scopes `users`, `clients`, `calls`, `tags`,
+  `org_settings`, `invites`, `telegram_users`, `telegram_messages`, and `youtube_whitelist`
+  via `org_id`. Self-serve company registration (`POST /api/auth/signup`) creates an
+  isolated organization + admin owner. Admins can invite teammates via one-time
+  `/invite/<token>` links (`POST /api/invites`).
+- **Sessions & CSRF**: Browser auth uses `httpOnly` `SameSite=Lax` cookie `sd_session`
+  paired with readable `sd_csrf` cookie and `X-CSRF-Token` header validation on
+  `POST`/`PUT`/`PATCH`/`DELETE`. Raw session tokens are SHA-256 hashed in the DB
+  (`db._hash_token`). `Authorization: Bearer <token>` remains supported for API/CLI/tests.
+- **Passwords**: PBKDF2-HMAC-SHA256, 600,000 iters (`pbkdf2$600000$salt$digest`,
+  `auth.py`), with transparent rehash of legacy 100k hashes on login and brute-force
+  lockout (`login_attempts` table).
+- **Role-based workspaces**:
+  - `admin` sees the Company Console + Setup Checklist (`Analytics.tsx`), Team & Invites (`Users.tsx`), and Settings.
+  - `yonalish` (Supervisor / Mas'ul) sees the Coaching Desk (`Analytics.tsx`) + Managers/Employees leaderboards.
+  - `manager` and `receptionist` land on their Personal Workspace (`EmployeeHome.tsx` via `/` and `/my-day`) powered by `GET /api/me/overview`, plus `MyTasks.tsx` (`/tasks`).
+  - All roles have `Profile.tsx` (`/profile`) for password updates, active device sessions, and personal upload keys.
 
 ## Frontend conventions
 

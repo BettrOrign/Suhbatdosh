@@ -40,6 +40,16 @@ def client() -> TestClient:
         yield c
 
 
+@pytest.fixture(autouse=True)
+def _isolate_test_cookies_and_rate_limits(client):
+    """Ensure session cookies set by one test do not leak into subsequent unauthenticated tests."""
+    client.cookies.clear()
+    with db.get_db() as conn:
+        conn.execute("DELETE FROM login_attempts")
+    yield
+    client.cookies.clear()
+
+
 @pytest.fixture
 def admin_token(data_dir) -> str:
     """Create an admin account directly and return a fresh session token."""

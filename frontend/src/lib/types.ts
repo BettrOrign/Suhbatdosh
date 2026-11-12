@@ -6,6 +6,69 @@ export interface User {
   email: string
   role: Role
   api_token?: string | null
+  sip_extension?: string | null
+  org_id?: number
+  org_name?: string
+  org_slug?: string
+}
+
+export interface Invite {
+  id: number
+  token: string
+  org_id: number
+  email: string
+  role: Role
+  created_by: number | null
+  expires_at: string
+  accepted_at: string | null
+  created_at: string
+}
+
+export interface InviteInfo {
+  email: string
+  role: Role
+  org_name: string
+  expires_at: string
+}
+
+export interface UserSession {
+  id: number
+  user_agent: string
+  ip: string
+  created_at: string
+  last_seen_at: string
+  expires_at: string
+}
+
+export interface EmployeeOverview {
+  total_calls: number
+  done_calls: number
+  processing_calls: number
+  calls_today: number
+  calls_week: number
+  avg_score: number | null
+  best_score: number | null
+  avg_talk_ratio: number | null
+  rank: number | null
+  total_peers: number
+  unread_notifications: number
+  open_tasks_count: number
+  daily_trend: { day: string; calls: number; avg_score: number | null }[]
+  rubric_averages: { dimension: string; avg_score: number }[]
+  recent_coaching_points: { call_id: number; call_name: string; text: string; created_at: string }[]
+  open_tasks: Notification[]
+  recent_calls: {
+    id: number
+    name: string
+    status: CallStatus
+    duration_sec: number | null
+    created_at: string
+    score: number | null
+    outcome: string | null
+    coach_decision: 'NO_ACTION' | 'COACH' | 'ESCALATE' | null
+    resolved: boolean
+    bookmarked: boolean
+  }[]
 }
 
 export interface Client {
@@ -61,6 +124,13 @@ export interface KeyMetric {
   value: string
 }
 
+export interface EvidenceQuote {
+  dimension: string
+  quote: string
+  speaker?: string | null
+  start_sec?: number | null
+}
+
 export interface CallAnalysis {
   topic: string
   language: string
@@ -68,10 +138,42 @@ export interface CallAnalysis {
   scorecard: Scorecard
   rep_share_of_talk: number
   outcome: string
+  coach_decision?: 'NO_ACTION' | 'COACH' | 'ESCALATE'
   key_metrics: KeyMetric[]
   coaching_points: string[]
   next_steps: string[]
   action_items: { description: string; due_date: string | null; assignee: string; priority: string }[]
+  evidence_quotes?: EvidenceQuote[]
+  objections?: string[]
+}
+
+export interface AcousticsInfo {
+  channels: number
+  total_sec: number
+  silence_sec: number
+  silence_ratio: number
+  longest_silence_sec: number
+  dead_air_count: number
+  interruption_count: number
+  talk_over_sec: number
+  rep_talk_sec?: number
+  client_talk_sec?: number
+  rep_share_acoustics?: number | null
+}
+
+export interface CrossCallInsights {
+  analyzed_calls: number
+  bookmarked_calls: number
+  decision_counts: { NO_ACTION: number; COACH: number; ESCALATE: number }
+  weakest_dimensions: { dimension: string; avg_score: number }[]
+  top_flaws: { text: string; count: number }[]
+  top_objections: { text: string; count: number }[]
+}
+
+export interface CrossCallAnswer {
+  answer: string
+  cited_call_ids: number[]
+  recommendations: string[]
 }
 
 export interface Call {
@@ -91,6 +193,9 @@ export interface Call {
   client_id: number | null
   uploader_name: string | null
   client_name: string | null
+  resolved?: boolean
+  bookmarked?: boolean
+  bookmark_note?: string
   created_at: string
   updated_at: string
 }
@@ -206,6 +311,23 @@ export function analysisSolutions(raw: Call['analysis']): string[] {
 export function overallScore(raw: Call['analysis']): number | null {
   const v = asAnalysis(raw).scorecard?.overall
   return typeof v === 'number' ? v : null
+}
+
+export interface TelegramMessage {
+  id: number
+  chat_id: number
+  message_id: number
+  user_id: number | null
+  username: string | null
+  full_name: string | null
+  photo_url: string | null
+  text: string | null
+  is_bot: number
+  is_staff: number
+  topic: string | null
+  reply_text: string | null
+  replied_at: string | null
+  created_at: string
 }
 
 /** Model-written topic, preferred over the raw call name once analysed. */

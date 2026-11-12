@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ArrowRight, Check, Loader2, Mic, Sparkles } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ArrowRight, Building2, Check, Eye, EyeOff, Loader2, Mic, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 import { Button } from '@/components/ui/button'
@@ -13,22 +14,24 @@ import { SPRING } from '@/lib/motion'
 
 /**
  * Split sign-in screen: the brand story on the left, the form on the right.
- * Same tokens as the app — no hardcoded palette, no theme flash.
+ * Follows modern-web-guidance autofill-sign-in-form & forms best practices.
  */
 export function Login() {
   const { login } = useAuth()
   const { t } = useI18n()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (busy) return
     setError('')
     setBusy(true)
     try {
-      await login(email, password)
+      await login(email.trim(), password)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -147,10 +150,13 @@ export function Login() {
                   <Label htmlFor="email">{t('app.email')}</Label>
                   <Input
                     id="email"
+                    name="email"
                     type="email"
                     required
                     autoFocus
-                    autoComplete="email"
+                    spellCheck={false}
+                    autoCapitalize="none"
+                    autoComplete="username"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder={t('app.email_placeholder')}
@@ -159,16 +165,32 @@ export function Login() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password">{t('app.password')}</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    required
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder={t('app.password_placeholder')}
-                    className="h-11"
-                  />
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder={t('app.password_placeholder')}
+                      className="h-11 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      aria-label={showPassword ? t('auth.hide_password') : t('auth.show_password')}
+                      aria-pressed={showPassword}
+                      className="absolute top-1/2 right-2.5 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+                    >
+                      {showPassword ? (
+                        <EyeOff aria-hidden="true" className="size-4" />
+                      ) : (
+                        <Eye aria-hidden="true" className="size-4" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {error && (
@@ -189,7 +211,17 @@ export function Login() {
               </form>
             </div>
 
-            <p className="mt-5 text-center text-xs text-muted-foreground">{t('app.contact_admin')}</p>
+            <div className="mt-5 rounded-xl border border-border bg-surface/80 p-4 text-center">
+              <p className="text-xs text-muted-foreground">{t('auth.no_account')}</p>
+              <Link
+                to="/signup"
+                className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+              >
+                <Building2 aria-hidden="true" className="size-3.5" />
+                {t('auth.create_company')}
+                <ArrowRight aria-hidden="true" className="size-3.5" />
+              </Link>
+            </div>
           </motion.div>
         </div>
       </div>

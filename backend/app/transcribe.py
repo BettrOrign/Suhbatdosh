@@ -24,16 +24,12 @@ TRANSCRIBE_PROMPT = (
 )
 
 
-def _transcribe_prompt() -> str:
-    """TRANSCRIBE_PROMPT adjusted by the Settings feature flags.
-
-    Read fresh per transcription so toggling a setting applies to the next
-    call without a restart. Defaults keep the historical prompt byte-identical.
-    """
+def _transcribe_prompt(org_id: int = 1) -> str:
+    """TRANSCRIBE_PROMPT adjusted by the Settings feature flags."""
     prompt = TRANSCRIBE_PROMPT
-    if not db.get_flag("punctuation"):
+    if not db.get_flag("punctuation", org_id=org_id):
         prompt += " Do not add punctuation - write the words as they were spoken."
-    if db.get_flag("speaker_labels"):
+    if db.get_flag("speaker_labels", org_id=org_id):
         prompt += (
             " Prefix each line with the speaker: 'Sotuvchi:' for the staff member "
             "or 'Mijoz:' for the caller."
@@ -41,14 +37,10 @@ def _transcribe_prompt() -> str:
     return prompt
 
 
-def get_mode() -> str:
-    """Return the configured processing mode, defaulting to ``online``.
-
-    Read fresh on every call so switching modes in the UI takes effect without
-    a restart. An unrecognised stored value is treated as ``online``.
-    """
+def get_mode(org_id: int = 1) -> str:
+    """Return the configured processing mode, defaulting to ``online``."""
     try:
-        mode = (db.get_bot_setting(MODE_SETTING_KEY, "") or "").strip().lower()
+        mode = (db.get_bot_setting(MODE_SETTING_KEY, "", org_id=org_id) or "").strip().lower()
     except Exception as exc:  # DB not initialised yet (e.g. very early boot)
         logger.warning("Could not read processing mode, defaulting to online: %s", exc)
         return MODE_ONLINE
@@ -109,33 +101,22 @@ def _compress_wav(wav_path: Path) -> Path:
 class Transcriber:
     """REST-based verbatim multilingual transcription for finished recordings."""
 
-    def __init__(self, api_key: str | None = None):
+    def __init__(self, api_key: str | None = None, org_id: int = 1):
         self._api_key = api_key or config.GEMINI_API_KEY
+        self._org_id = org_id
         self._client = None
 
     @property
     def client(self):
-        """The Gemini client, built on first use.
-
-        Lazy because private mode never talks to Gemini, and constructing the
-        client eagerly would make transcription fail outright on a deployment
-        with no API key configured.
-        """
+        """The Gemini client, built on first use."""
         if self._client is None:
             self._client = genai.Client(api_key=self._api_key)
         return self._client
 
     async def transcribe_wav(self, wav_path: Path) -> dict:
-        """Transcribe a WAV file, honouring the configured processing mode.
-
-        ``private`` transcribes on this machine with GigaAM and never sends the
-        audio anywhere; if the local model is unusable it logs why and falls
-        back to Gemini rather than failing the call. ``online`` is the original
-        Gemini path, unchanged.
-
-        Returns {"text": str, "language_code": str|None, "segments": [{"text":...}]}.
-        """
-        if get_mode() == MODE_PRIVATE:
+        """Transcribe a WAV file, honouring the configured processing mode."""
+        mode = get_mode() if self._org_id == 1 else get_mode(self._org_id)
+        if mode == MODE_PRIVATE:
             try:
                 return await _local_transcribe(wav_path)
             except LocalSttUnavailable as exc:
@@ -150,11 +131,12 @@ class Transcriber:
         compressed = _compress_wav(wav_path)
         try:
             data = compressed.read_bytes()
+            prompt = _transcribe_prompt() if self._org_id == 1 else _transcribe_prompt(self._org_id)
             resp = await asyncio.wait_for(
                 self.client.aio.models.generate_content(
                     model=config.GEMINI_ANALYSIS_MODEL,
                     contents=[
-                        types.Part(text=_transcribe_prompt()),
+                        types.Part(text=prompt),
                         types.Part(
                             inline_data=types.Blob(
                                 data=data,

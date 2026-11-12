@@ -8,6 +8,7 @@ import json
 import logging
 import re
 import tempfile
+import threading
 from pathlib import Path
 
 from . import audio, config, db
@@ -152,4 +153,8 @@ def process_youtube_video(
         source_meta=source_meta,
     )
     db.update_call(call_id, status="queued")
+    from .api import _analyze_call, _process_call
+
+    threading.Thread(target=_process_call, args=(call_id,), daemon=True).start()
+    threading.Thread(target=_analyze_call, args=(call_id,), daemon=True).start()
     return call_id

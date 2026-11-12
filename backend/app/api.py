@@ -11,43 +11,14 @@ from fastapi.responses import FileResponse
 from . import audio, config, db
 from .analysis import Analyzer
 from .auth import get_current_user, require_role
-from .live import LiveTranscriber
 from .transcribe import Transcriber
 
 logger = logging.getLogger("suhbatdosh.api")
 router = APIRouter(prefix="/api")
 
-# Lazy singletons for the live WebSocket transcription path.
 # The REST background tasks (_process_call / _analyze_call) intentionally create
 # fresh Transcriber()/Analyzer() instances per call to avoid reusing a single
 # async HTTP client across asyncio.run() loops (which raises "Event loop is closed").
-_transcriber: LiveTranscriber | None = None
-_analyzer: Analyzer | None = None
-_rest_transcriber: Transcriber | None = None
-
-
-def _get_transcriber() -> LiveTranscriber:
-    """Lazily create and cache the singleton LiveTranscriber for streaming (WebSocket) use."""
-    global _transcriber
-    if _transcriber is None:
-        _transcriber = LiveTranscriber()
-    return _transcriber
-
-
-def _get_rest_transcriber() -> Transcriber:
-    """Lazily create and cache the singleton REST Transcriber (retained for live use)."""
-    global _rest_transcriber
-    if _rest_transcriber is None:
-        _rest_transcriber = Transcriber()
-    return _rest_transcriber
-
-
-def _get_analyzer() -> Analyzer:
-    """Lazily create and cache the singleton Analyzer (retained for live use)."""
-    global _analyzer
-    if _analyzer is None:
-        _analyzer = Analyzer()
-    return _analyzer
 
 
 def _process_call(call_id: int):
@@ -65,20 +36,32 @@ def _process_call(call_id: int):
                 return
 
             db.update_call(call_id, status="transcribing")
+            org_id = call.get("org_id") or 1
 
             result = asyncio.run(
-                asyncio.wait_for(Transcriber().transcribe_wav(wav), timeout=120)
+                asyncio.wait_for(Transcriber(org_id=org_id).transcribe_wav(wav), timeout=120)
             )
             segments = result.get("segments", [])
             text = result.get("text", "") or ""
 
-            db.update_call(
-                call_id,
-                status="transcribed",
-                transcript=text,
-                segments=json.dumps(segments, ensure_ascii=False),
-                language=result.get("language_code") or None,
-            )
+            acoustics = audio.compute_acoustics(wav)
+            if acoustics:
+                segments = audio.assign_stereo_speakers(segments, acoustics)
+                meta = dict(call.get("source_meta") or {})
+                meta["acoustics"] = {k: v for k, v in acoustics.items() if k != "stereo_turns"}
+                source_meta_str = json.dumps(meta, ensure_ascii=False)
+            else:
+                source_meta_str = None
+
+            update_kwargs = {
+                "status": "transcribed",
+                "transcript": text,
+                "segments": json.dumps(segments, ensure_ascii=False),
+                "language": result.get("language_code") or None,
+            }
+            if source_meta_str is not None:
+                update_kwargs["source_meta"] = source_meta_str
+            db.update_call(call_id, **update_kwargs)
             return  # success
 
         except Exception as e:
@@ -117,7 +100,8 @@ def _analyze_call(call_id: int):
                 db.update_call(call_id, status="error")
                 return
             db.update_call(call_id, status="analyzing")
-            analyzer = Analyzer()
+            org_id = call.get("org_id") or 1
+            analyzer = Analyzer(org_id=org_id)
             result = asyncio.run(
                 asyncio.wait_for(analyzer.analyze(call["transcript"]), timeout=60)
             )
@@ -125,13 +109,12 @@ def _analyze_call(call_id: int):
             if (
                 call.get("user_id")
                 and "error" not in result
-                and db.get_flag("problem_alerts")
+                and db.get_flag("problem_alerts", org_id=org_id)
             ):
-                action_analyzer = Analyzer()
-                action_items = asyncio.run(
-                    asyncio.wait_for(action_analyzer.extract_action_items(call["transcript"]), timeout=30)
-                )
+                action_items = result.get("action_items") or []
                 for item in action_items:
+                    if not isinstance(item, dict):
+                        continue
                     db.create_notification(
                         user_id=call["user_id"],
                         type_="action_item",
@@ -148,9 +131,15 @@ def _analyze_call(call_id: int):
             db.update_call(call_id, status="done", analysis=json.dumps(result, ensure_ascii=False))
 
             topic = (result.get("topic") or "").strip()
+            lang = (result.get("language") or "").strip()
             logger.info("Analysis result for call %d: topic=%r, keys=%s", call_id, topic, list(result.keys()))
+            extra_updates = {}
             if topic:
-                db.update_call(call_id, name=topic)
+                extra_updates["name"] = topic
+            if lang and not call.get("language"):
+                extra_updates["language"] = lang
+            if extra_updates:
+                db.update_call(call_id, **extra_updates)
             return  # success
 
         except Exception as e:
@@ -194,7 +183,16 @@ async def upload_call(
     try:
         wav_path, pcm_path = audio.normalize_audio(tmp_path)
         dur = audio.duration_sec(wav_path)
-        target_user_id = assigned_user_id if (user["role"] == "admin" and assigned_user_id) else user["id"]
+        org_id = user.get("org_id") or 1
+        target_user_id = user["id"]
+        if user["role"] == "admin" and assigned_user_id:
+            target = db.get_user(assigned_user_id)
+            if target and (target.get("org_id") or 1) == org_id:
+                target_user_id = assigned_user_id
+        if client_id:
+            cl = db.get_client(client_id, org_id=org_id)
+            if not cl:
+                client_id = None
         call_id = db.create_call(
             name=name or Path(file.filename or "call").stem,
             audio_path=str(wav_path),
@@ -203,11 +201,12 @@ async def upload_call(
             user_id=target_user_id,
             client_id=client_id,
             source_type=stype,
+            org_id=org_id,
         )
         db.update_call(call_id, status="queued")
         background.add_task(_process_call, call_id)
         background.add_task(_analyze_call, call_id)
-        return db.get_call(call_id)
+        return db.get_call(call_id, org_id=org_id)
     finally:
         tmp_path.unlink(missing_ok=True)
 
@@ -217,35 +216,47 @@ async def get_calls(
     call_type: str | None = None,
     user: dict = Depends(get_current_user),
 ):
-    """List calls scoped to the current user's role.
+    """List calls scoped to the current user's organization and role.
 
-    Admin sees everything; a manager sees their own manager calls; a receptionist
-    sees receptionist calls. `call_type` filters by 'manager'/'receptionist'.
+    Admin and yonalish see everything in their organization; a manager sees
+    their own manager calls; a receptionist sees receptionist calls.
     """
-    if user["role"] == "admin":
-        return db.list_calls(call_type=call_type)
+    org_id = user.get("org_id") or 1
+    if user["role"] in ("admin", "yonalish"):
+        return db.list_calls(call_type=call_type, org_id=org_id)
     if user["role"] == "manager":
-        return db.list_calls(user_id=user["id"], call_type="manager")
-    return db.list_calls(call_type="receptionist")
+        return db.list_calls(user_id=user["id"], call_type="manager", org_id=org_id)
+    return db.list_calls(call_type="receptionist", org_id=org_id)
 
 
 @router.get("/calls/{call_id}")
 async def get_call(call_id: int, user: dict = Depends(get_current_user)):
-    """Fetch a single call by id, enforcing per-role access."""
-    call = db.get_call(call_id)
+    """Fetch a single call by id, enforcing organization isolation and per-role access."""
+    call = db.get_call(call_id, org_id=user.get("org_id") or 1)
     if call is None:
         raise HTTPException(404, "call not found")
     _check_call_access(call, user)
+    meta = dict(call.get("source_meta") or {})
+    if "acoustics" not in meta and call.get("audio_path"):
+        wav = audio.resolve_audio_path(call["audio_path"])
+        if wav is not None:
+            ac = audio.compute_acoustics(wav)
+            if ac:
+                meta["acoustics"] = {k: v for k, v in ac.items() if k != "stereo_turns"}
+                call["source_meta"] = meta
     return call
 
 
 def _check_call_access(call: dict, user: dict):
     """Enforce that the current user may access a given call.
 
-    Admin: always. Receptionist: only receptionist calls. Manager: only calls
-    owned by them (or unassigned). Raises 403 otherwise.
+    Cross-organization access raises 404 so call IDs cannot be enumerated.
+    Admin/yonalish: always within org. Receptionist: only receptionist calls.
+    Manager: only manager calls owned by them (or unassigned).
     """
-    if user["role"] == "admin":
+    if (call.get("org_id") or 1) != (user.get("org_id") or 1):
+        raise HTTPException(404, "call not found")
+    if user["role"] in ("admin", "yonalish"):
         return
     if call.get("call_type") == "receptionist":
         if user["role"] != "receptionist":
@@ -261,7 +272,7 @@ def _check_call_access(call: dict, user: dict):
 @router.get("/calls/{call_id}/audio")
 async def get_audio(call_id: int, user: dict = Depends(get_current_user)):
     """Stream the raw WAV audio for a call to the client (browser WavePlayer)."""
-    call = db.get_call(call_id)
+    call = db.get_call(call_id, org_id=user.get("org_id") or 1)
     if call is None or not call["audio_path"]:
         raise HTTPException(404, "audio not found")
     _check_call_access(call, user)
@@ -271,10 +282,12 @@ async def get_audio(call_id: int, user: dict = Depends(get_current_user)):
     return FileResponse(path, media_type="audio/wav")
 
 
+@router.patch("/calls/{call_id}")
 @router.patch("/calls/{call_id}/transcript")
 async def update_transcript(call_id: int, payload: dict, user: dict = Depends(get_current_user)):
-    """Manual edit of transcript text and/or segments (for Uzbek cleanup)."""
-    call = db.get_call(call_id)
+    """Manual edit of call metadata, resolved state, transcript text and/or segments."""
+    org_id = user.get("org_id") or 1
+    call = db.get_call(call_id, org_id=org_id)
     if call is None:
         raise HTTPException(404, "call not found")
     _check_call_access(call, user)
@@ -287,15 +300,23 @@ async def update_transcript(call_id: int, payload: dict, user: dict = Depends(ge
         fields["call_type"] = payload["call_type"]
     if "client_id" in payload:
         fields["client_id"] = payload["client_id"]
+    if "name" in payload and str(payload["name"]).strip():
+        fields["name"] = str(payload["name"]).strip()
+    if "resolved" in payload:
+        fields["resolved"] = 1 if payload["resolved"] else 0
+    if "bookmarked" in payload:
+        fields["bookmarked"] = 1 if payload["bookmarked"] else 0
+    if "bookmark_note" in payload:
+        fields["bookmark_note"] = str(payload.get("bookmark_note") or "").strip()
     if fields:
         db.update_call(call_id, **fields)
-    return db.get_call(call_id)
+    return db.get_call(call_id, org_id=org_id)
 
 
 @router.post("/calls/{call_id}/reanalyze")
 async def reanalyze(call_id: int, background: BackgroundTasks, user: dict = Depends(get_current_user)):
     """Re-run LLM analysis on a call's transcript (useful after manual transcript edits)."""
-    call = db.get_call(call_id)
+    call = db.get_call(call_id, org_id=user.get("org_id") or 1)
     if call is None:
         raise HTTPException(404, "call not found")
     _check_call_access(call, user)
@@ -305,13 +326,8 @@ async def reanalyze(call_id: int, background: BackgroundTasks, user: dict = Depe
 
 @router.post("/calls/reanalyze-all")
 async def reanalyze_all(background: BackgroundTasks, user: dict = Depends(require_role("admin"))):
-    """Queue re-analysis of every analysed call (cap 200, newest first). Admin only.
-
-    The point of bulk re-analysis: after editing the organization profile or
-    the settings flags, all existing scorecards are re-scored under the new
-    rules instead of describing a mixture of old and new regimes.
-    """
-    ids = db.list_analysable_call_ids(limit=200)
+    """Queue re-analysis of every analysed call in the current organization (cap 200, newest first). Admin only."""
+    ids = db.list_analysable_call_ids(limit=200, org_id=user.get("org_id") or 1)
     for call_id in ids:
         background.add_task(_analyze_call, call_id)
     logger.info("Bulk re-analysis queued for %d call(s) by %s", len(ids), user["email"])
@@ -321,7 +337,7 @@ async def reanalyze_all(background: BackgroundTasks, user: dict = Depends(requir
 @router.delete("/calls/{call_id}")
 async def delete_call(call_id: int, user: dict = Depends(get_current_user)):
     """Delete a call and remove its on-disk audio + pcm files (admin deletes any)."""
-    call = db.get_call(call_id)
+    call = db.get_call(call_id, org_id=user.get("org_id") or 1)
     if call is None:
         raise HTTPException(404, "call not found")
     _check_call_access(call, user)
@@ -412,34 +428,56 @@ ORG_WIDE_STATS = Depends(require_role("admin", "yonalish"))
 
 @router.get("/stats/overview")
 def stats_overview(user: dict = ORG_WIDE_STATS):
-    return db.get_org_stats()
+    return db.get_org_stats(org_id=user.get("org_id") or 1)
 
 
 @router.get("/stats/day-over-day")
 def stats_day_over_day(user: dict = ORG_WIDE_STATS):
-    return db.get_day_over_day_stats()
+    return db.get_day_over_day_stats(org_id=user.get("org_id") or 1)
 
 
 @router.get("/stats/weekly-trend")
 def stats_weekly_trend(user: dict = ORG_WIDE_STATS):
-    return db.get_weekly_trend()
+    return db.get_weekly_trend(org_id=user.get("org_id") or 1)
 
 
 @router.get("/stats/monthly-trend")
 def stats_monthly_trend(user: dict = ORG_WIDE_STATS):
-    return db.get_monthly_trend()
+    return db.get_monthly_trend(org_id=user.get("org_id") or 1)
 
 
 @router.get("/stats/problem-calls")
 def stats_problem_calls(user: dict = ORG_WIDE_STATS):
-    return db.get_problem_calls()
+    return db.get_problem_calls(org_id=user.get("org_id") or 1)
 
 
 @router.get("/stats/manager-rankings")
 def stats_manager_rankings(user: dict = ORG_WIDE_STATS):
-    return db.get_manager_rankings()
+    return db.get_manager_rankings(org_id=user.get("org_id") or 1)
 
 
 @router.get("/stats/source-breakdown")
 def stats_source_breakdown(user: dict = ORG_WIDE_STATS):
-    return db.get_source_breakdown()
+    return db.get_source_breakdown(org_id=user.get("org_id") or 1)
+
+
+@router.get("/stats/insights")
+def stats_insights(user: dict = ORG_WIDE_STATS):
+    """Cross-call intelligence: recurring objections, flaws, rubric weak spots, and coach decisions."""
+    return db.get_cross_call_insights(org_id=user.get("org_id") or 1)
+
+
+@router.post("/stats/ask")
+async def stats_ask_ai(payload: dict, user: dict = ORG_WIDE_STATS):
+    """Ask AI a natural-language question across recent analysed calls."""
+    question = (payload.get("question") or "").strip()
+    if not question:
+        raise HTTPException(400, "question is required")
+    org_id = user.get("org_id") or 1
+    calls_ctx = db.list_recent_calls_for_qa(limit=30, org_id=org_id)
+    try:
+        return await Analyzer(org_id=org_id).ask_across_calls(question, calls_ctx)
+    except Exception as exc:
+        logger.exception("stats_ask_ai failed")
+        raise HTTPException(502, f"AI query failed: {exc}") from exc
+

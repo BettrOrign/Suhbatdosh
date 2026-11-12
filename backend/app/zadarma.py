@@ -53,21 +53,6 @@ class ZadarmaClient:
         resp.raise_for_status()
         return resp.json()
 
-    def _request_post(self, path: str, data: dict | None = None) -> dict:
-        """Make an authenticated POST request and return the parsed JSON body."""
-        data = data or {}
-        data["format"] = "json"
-        params_str = urlencode(OrderedDict(sorted(data.items())))
-        signature = _sign(path, params_str, self.api_secret)
-        headers = {
-            "Authorization": f"{self.api_key}:{signature}",
-            "Content-Type": "application/x-www-form-urlencoded",
-        }
-        url = f"{BASE_URL}{path}"
-        resp = self._http.post(url, data=params_str, headers=headers)
-        resp.raise_for_status()
-        return resp.json()
-
     def get_balance(self) -> dict:
         """Return the user's balance info."""
         return self._request("GET", "/v1/info/balance/")

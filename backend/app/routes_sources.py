@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api")
 
 def _call_for_tagging(call_id: int, user: dict) -> dict:
     """Load a call and enforce per-role access before mutating its tags."""
-    call = db.get_call(call_id)
+    call = db.get_call(call_id, org_id=user.get("org_id") or 1)
     if call is None:
         raise HTTPException(404, "call not found")
     _check_call_access(call, user)
@@ -26,7 +26,7 @@ def _call_for_tagging(call_id: int, user: dict) -> dict:
 
 @router.get("/tags")
 def list_tags(user: dict = Depends(get_current_user)):
-    return db.list_tags()
+    return db.list_tags(org_id=user.get("org_id") or 1)
 
 
 @router.post("/tags")
@@ -35,13 +35,13 @@ def create_tag(payload: dict, user: dict = Depends(require_role("admin"))):
     if not name:
         raise HTTPException(400, "tag name is required")
     color = payload.get("color", "#6366f1")
-    tag_id = db.create_tag(name, color)
+    tag_id = db.create_tag(name, color, org_id=user.get("org_id") or 1)
     return {"id": tag_id, "name": name, "color": color}
 
 
 @router.delete("/tags/{tag_id}")
 def delete_tag(tag_id: int, user: dict = Depends(require_role("admin"))):
-    db.delete_tag(tag_id)
+    db.delete_tag(tag_id, org_id=user.get("org_id") or 1)
     return {"ok": True}
 
 
@@ -75,7 +75,7 @@ def get_call_tags(call_id: int, user: dict = Depends(get_current_user)):
 
 @router.get("/youtube/whitelist")
 def list_youtube_whitelist(user: dict = Depends(require_role("admin"))):
-    return db.list_youtube_whitelist()
+    return db.list_youtube_whitelist(org_id=user.get("org_id") or 1)
 
 
 @router.post("/youtube/whitelist")
@@ -85,13 +85,13 @@ def add_youtube_whitelist(payload: dict, user: dict = Depends(require_role("admi
     pattern = payload.get("pattern")
     if not channel_id and not pattern:
         raise HTTPException(400, "channel_id or pattern is required")
-    entry_id = db.add_youtube_whitelist(channel_id, channel_name, pattern)
+    entry_id = db.add_youtube_whitelist(channel_id, channel_name, pattern, org_id=user.get("org_id") or 1)
     return {"id": entry_id}
 
 
 @router.delete("/youtube/whitelist/{entry_id}")
 def remove_youtube_whitelist(entry_id: int, user: dict = Depends(require_role("admin"))):
-    db.remove_youtube_whitelist(entry_id)
+    db.remove_youtube_whitelist(entry_id, org_id=user.get("org_id") or 1)
     return {"ok": True}
 
 

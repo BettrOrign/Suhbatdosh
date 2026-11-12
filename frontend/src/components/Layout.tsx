@@ -146,7 +146,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   {t('brand.name')}
                 </span>
                 <span className="block truncate text-2xs text-muted-foreground">
-                  {t('brand.tagline')}
+                  {user?.org_name ?? t('brand.tagline')}
                 </span>
               </span>
             </Link>
@@ -228,16 +228,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
           {user && (
             <div className="border-t border-sidebar-border p-2.5">
-              <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary-soft-foreground">
-                  {user.name.charAt(0).toUpperCase()}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-medium">{user.name}</p>
-                  <p className="truncate text-2xs text-muted-foreground">
-                    {t(`nav.role.${user.role}`)}
-                  </p>
-                </div>
+              <div className="flex items-center gap-2 rounded-md px-2 py-1.5">
+                <Link
+                  to="/profile"
+                  className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md outline-none transition-colors hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary-soft-foreground">
+                    {user.name.charAt(0).toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium">{user.name}</p>
+                    <p className="truncate text-2xs text-muted-foreground">
+                      {t(`nav.role.${user.role}`)}
+                    </p>
+                  </div>
+                </Link>
                 <Button
                   variant="destructive-ghost"
                   size="icon-sm"

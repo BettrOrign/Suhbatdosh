@@ -1,9 +1,14 @@
 import {
   BarChart3,
   LayoutDashboard,
+  ListTodo,
+  MessageSquare,
   Mic,
   Settings,
+  ShieldCheck,
   SlidersHorizontal,
+  Sparkles,
+  Sun,
   UserCog,
   Users,
   type LucideIcon,
@@ -24,23 +29,47 @@ export interface NavItem {
 
 /**
  * One nav definition drives the sidebar, the breadcrumb and the ⌘K palette,
- * so they cannot drift apart the way the old hardcoded arrays did.
+ * tailored cleanly per role so employees, supervisors and company admins each
+ * see a focused workspace.
  */
 export const NAV: NavItem[] = [
   {
     to: '/',
     labelKey: 'nav.dashboard',
     icon: LayoutDashboard,
-    roles: ['admin', 'manager', 'receptionist', 'yonalish'],
+    roles: ['admin'],
     exact: true,
-    keywords: 'analytics overview stats dashboard',
+    keywords: 'analytics overview stats dashboard company',
+  },
+  {
+    to: '/',
+    labelKey: 'nav.coaching_desk',
+    icon: Sparkles,
+    roles: ['yonalish'],
+    exact: true,
+    keywords: 'coaching desk supervisor escalate review quality',
+  },
+  {
+    to: '/',
+    labelKey: 'nav.my_day',
+    icon: Sun,
+    roles: ['manager', 'receptionist'],
+    exact: true,
+    keywords: 'my day overview personal score rank coaching',
   },
   {
     to: '/calls',
     labelKey: 'nav.calls',
     icon: Mic,
     roles: ['admin', 'manager', 'receptionist', 'yonalish'],
-    keywords: 'recordings transcript score',
+    keywords: 'recordings transcript score upload',
+  },
+  {
+    to: '/tasks',
+    labelKey: 'nav.tasks',
+    icon: ListTodo,
+    roles: ['admin', 'manager', 'receptionist', 'yonalish'],
+    keywords: 'tasks action items follow ups alerts todo',
   },
   {
     to: '/clients',
@@ -61,7 +90,6 @@ export const NAV: NavItem[] = [
     labelKey: 'nav.submenu.managers',
     icon: BarChart3,
     roles: ['admin', 'yonalish'],
-    // `exact` so the two sibling routes do not light this up as well.
     exact: true,
     keywords: 'performance rankings coaching',
   },
@@ -77,14 +105,28 @@ export const NAV: NavItem[] = [
     labelKey: 'nav.team',
     icon: Users,
     roles: ['admin'],
-    keywords: 'accounts roles invites',
+    keywords: 'accounts roles invites team',
+  },
+  {
+    to: '/telegram',
+    labelKey: 'nav.telegram',
+    icon: MessageSquare,
+    roles: ['admin', 'receptionist', 'yonalish'],
+    keywords: 'telegram messages clients questions',
   },
   {
     to: '/settings',
     labelKey: 'nav.settings',
     icon: Settings,
     roles: ['admin'],
-    keywords: 'mode privacy stt gemini configuration',
+    keywords: 'mode privacy stt gemini configuration zadarma',
+  },
+  {
+    to: '/profile',
+    labelKey: 'nav.profile',
+    icon: ShieldCheck,
+    roles: ['admin', 'manager', 'receptionist', 'yonalish'],
+    keywords: 'profile password security sessions token account',
   },
 ]
 

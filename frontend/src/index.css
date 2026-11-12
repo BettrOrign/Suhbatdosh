@@ -54,11 +54,13 @@
   --accent-900: #05323a;
 
   /* gradient companions */
+  --in-oklab: ;
+  --in-oklch: ;
   --brand-2: #17adc6;
   --brand-3: #34d6e2;
-  --accent-gradient: linear-gradient(135deg, #097488 0%, #17adc6 52%, #34d6e2 100%);
-  --accent-gradient-soft: linear-gradient(135deg, #e6f6f9 0%, #d9f4f7 50%, #e9fbfd 100%);
-  --glow-primary: color-mix(in srgb, #097488 26%, transparent);
+  --accent-gradient: linear-gradient(135deg var(--in-oklch), #097488 0%, #17adc6 52%, #34d6e2 100%);
+  --accent-gradient-soft: linear-gradient(135deg var(--in-oklab), #e6f6f9 0%, #d9f4f7 50%, #e9fbfd 100%);
+  --glow-primary: color-mix(in oklab, #097488 26%, transparent);
 
   /* --- semantics --------------------------------------------------------- */
   --success-100: #e6f7ee;
@@ -185,6 +187,13 @@
   --duration-base: 240ms;
   --duration-slow: 380ms;
   --duration-slower: 560ms;
+}
+
+@supports (background: linear-gradient(in oklab, white, black)) {
+  :root {
+    --in-oklab: in oklab;
+    --in-oklch: in oklch;
+  }
 }
 
 .dark {
@@ -439,15 +448,31 @@
 
   body {
     background-color: var(--background);
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -15%, color-mix(in oklab, var(--primary) 10%, transparent), transparent),
+      radial-gradient(ellipse 60% 40% at 90% 10%, color-mix(in oklab, var(--brand-2) 6%, transparent), transparent);
+    background-attachment: fixed;
     color: var(--foreground);
     font-size: 0.9375rem;
     line-height: 1.55;
     overscroll-behavior-y: none;
   }
 
-  :focus-visible {
+  :where(button) {
+    transition:
+      box-shadow var(--duration-fast) ease-out,
+      scale var(--duration-fast) ease-out,
+      background-color var(--duration-fast) ease-out,
+      color var(--duration-fast) ease-out;
+  }
+
+  :where(button):not(:disabled):active {
+    scale: 0.97;
+  }
+
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
     outline: 2px solid var(--ring);
-    outline-offset: 2px;
+    outline-offset: 3px;
     border-radius: var(--radius-sm);
   }
 

@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowDown, ArrowUp, Clock, Gauge, Minus, PhoneCall, ShieldAlert, UsersRound, Users } from 'lucide-react'
+import { toast } from 'sonner'
+import { ArrowDown, ArrowUp, CheckCircle2, Clock, Gauge, Lightbulb, Loader2, MessageSquareWarning, Minus, PhoneCall, Send, Sparkles, UsersRound, Users } from 'lucide-react'
 import { motion as m } from 'framer-motion'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -15,13 +17,14 @@ import { DeltaChip, StatCard } from '@/components/StatCard'
 import { ScoreChip } from '@/components/ScoreRing'
 import { CallTypePieChart } from '@/components/CallTypePieChart'
 import { ScoreDistributionChart } from '@/components/ScoreDistributionChart'
-import { EmptyState, PageHeader } from '@/components/EmptyState'
+import { PageHeader } from '@/components/EmptyState'
+import { EmployeeHome } from '@/pages/EmployeeHome'
 import { Stagger, fadeUp, SPRING } from '@/lib/motion'
 import { useAuth } from '@/lib/auth'
 import { api } from '@/lib/api'
 import { useI18n } from '@/i18n/i18n'
 import { formatDate, formatDuration, scoreColor } from '@/lib/format'
-import { callTitle, overallScore, type Call } from '@/lib/types'
+import { callTitle, overallScore, type Call, type CrossCallAnswer, type CrossCallInsights } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 type OverviewStats = Awaited<ReturnType<typeof api.getOverviewStats>>
@@ -68,6 +71,10 @@ export function Analytics() {
   const [calls, setCalls] = useState<Call[]>([])
   const [sources, setSources] = useState<Record<string, number>>({})
   const [problems, setProblems] = useState<ProblemCall[]>([])
+  const [insights, setInsights] = useState<CrossCallInsights | null>(null)
+  const [qaQuestion, setQaQuestion] = useState('')
+  const [qaAsking, setQaAsking] = useState(false)
+  const [qaAnswer, setQaAnswer] = useState<CrossCallAnswer | null>(null)
   const [selected, setSelected] = useState<{ id: number; name: string } | null>(null)
   const [selectedCalls, setSelectedCalls] = useState<Call[]>([])
   const [selectedLoading, setSelectedLoading] = useState(false)
@@ -75,25 +82,8 @@ export function Analytics() {
 
   useEffect(() => {
     if (!canViewOrgStats) {
-      // `api.py:391` gates every /api/stats/* endpoint behind admin+yonalish.
-      // Calling them as a manager produced six 403s, and because Promise.all
-      // is fail-fast that discarded the one call that *did* succeed and
-      // rendered a silently empty dashboard. Don't ask for what we can't have.
-      let cancelled = false
-      api
-        .listCalls()
-        .then((cl) => {
-          if (!cancelled) setCalls(cl)
-        })
-        .catch(() => {
-          /* the denied state below is the whole story for this role */
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false)
-        })
-      return () => {
-        cancelled = true
-      }
+      setLoading(false)
+      return
     }
 
     let cancelled = false
@@ -107,7 +97,8 @@ export function Analytics() {
       api.listCalls().catch(() => [] as Call[]),
       api.getSourceBreakdown().catch(() => ({}) as Record<string, number>),
       api.getProblemCalls().catch(() => [] as ProblemCall[]),
-    ]).then(([ov, day, wt, mr, cl, src, pb]) => {
+      api.getCrossCallInsights().catch(() => null),
+    ]).then(([ov, day, wt, mr, cl, src, pb, ins]) => {
       if (cancelled) return
       setOverview(ov)
       setDod(day)
@@ -116,6 +107,7 @@ export function Analytics() {
       setCalls(cl)
       setSources(src)
       setProblems(pb)
+      setInsights(ins)
     }).finally(() => {
       if (!cancelled) setLoading(false)
     })
@@ -160,33 +152,104 @@ export function Analytics() {
      Only `yonalish` rows participate; anything else is a different view. */
   const leaders = useMemo(() => rankings.filter((r) => r.role === 'yonalish'), [rankings])
 
+  if (!canViewOrgStats) {
+    return <EmployeeHome />
+  }
+
   if (loading) return <DashboardSkeleton />
 
-  if (!canViewOrgStats) {
-    return (
-      <div>
-        <PageHeader eyebrow={t('nav.dashboard')} title={t('analytics.title')} />
-        <EmptyState
-          icon={ShieldAlert}
-          title={t('analytics.no_access')}
-          description={t('analytics.no_access_desc')}
-          action={
-            <Button size="sm" variant="outline" asChild>
-              <Link to="/calls">{t('nav.calls')}</Link>
-            </Button>
-          }
-        />
-      </div>
-    )
-  }
+  const hasTeam = (overview?.total_managers ?? 0) > 0 || rankings.length > 0
+  const hasCalls = (overview?.total_calls ?? 0) > 0
+  const hasPbx = Boolean(sources.zadarma || sources.telegram_voice || sources.telegram_audio)
 
   return (
     <div>
       <PageHeader
-        eyebrow={t('nav.dashboard')}
+        eyebrow={user?.role === 'yonalish' ? t('nav.coaching_desk') : t('nav.dashboard')}
         title={user?.name ? t('dashboard.welcome', { name: user.name }) : t('analytics.title')}
-        description={t('dashboard.welcome_desc')}
+        description={user?.role === 'yonalish' ? t('coach.banner_desc') : t('dashboard.welcome_desc')}
       />
+
+      {user?.role === 'admin' && (!hasTeam || !hasCalls) && (
+        <section className="mb-5 rounded-xl border border-primary/25 bg-surface p-4 shadow-e1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold">{t('setup.title')}</h2>
+              <p className="text-xs text-muted-foreground">{t('setup.desc')}</p>
+            </div>
+            <Badge variant="outline" className="font-mono text-2xs">
+              {user.org_name ?? 'MBSI'}
+            </Badge>
+          </div>
+          <div className="mt-3 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { label: t('setup.step_org'), to: '/settings', done: hasCalls },
+              { label: t('setup.step_team'), to: '/users', done: hasTeam },
+              { label: t('setup.step_pbx'), to: '/settings', done: hasPbx },
+              { label: t('setup.step_call'), to: '/calls', done: hasCalls },
+            ].map((step) => (
+              <Link
+                key={step.label}
+                to={step.to}
+                className={cn(
+                  'flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-xs transition-colors',
+                  step.done
+                    ? 'border-success/30 bg-success/5 text-foreground'
+                    : 'border-border bg-surface-sunken/70 hover:bg-surface-hover',
+                )}
+              >
+                <span className="font-medium">{step.label}</span>
+                <CheckCircle2
+                  className={cn(
+                    'size-4 shrink-0',
+                    step.done ? 'text-success' : 'text-muted-foreground/40',
+                  )}
+                />
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {user?.role === 'yonalish' && (
+        <section className="mb-5 rounded-xl border border-primary/25 bg-surface p-4 shadow-e1">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-sm font-semibold">{t('coach.banner_title')}</h2>
+              <p className="text-xs text-muted-foreground">{t('coach.banner_desc')}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                to="/calls"
+                className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-xs"
+              >
+                <span className="text-muted-foreground">{t('coach.escalated_label')}: </span>
+                <strong data-numeric className="text-destructive">
+                  {insights?.decision_counts.ESCALATE ?? 0}
+                </strong>
+              </Link>
+              <Link
+                to="/calls"
+                className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-1.5 text-xs"
+              >
+                <span className="text-muted-foreground">{t('coach.needs_coaching_label')}: </span>
+                <strong data-numeric className="text-amber-600 dark:text-amber-400">
+                  {insights?.decision_counts.COACH ?? 0}
+                </strong>
+              </Link>
+              <Link
+                to="/calls"
+                className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs"
+              >
+                <span className="text-muted-foreground">{t('coach.exemplars_label')}: </span>
+                <strong data-numeric className="text-primary">
+                  {insights?.bookmarked_calls ?? 0}
+                </strong>
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="relative mb-5 overflow-hidden rounded-2xl text-white">
         <div aria-hidden="true" className="absolute inset-0" style={{ background: 'var(--accent-gradient)' }} />
@@ -409,6 +472,178 @@ export function Analytics() {
         <CallTypePieChart calls={calls} />
         <SourceBreakdown sources={sources} />
       </div>
+
+      {/* Cross-Call AI Intelligence & Trends */}
+      <Card>
+        <CardHeader className="border-b border-border-subtle pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles aria-hidden="true" className="size-4 text-primary" />
+                {t('analytics.insights.title')}
+              </CardTitle>
+              <CardDescription className="mt-0.5">
+                {t('analytics.insights.desc')}
+              </CardDescription>
+            </div>
+            {insights && insights.analyzed_calls > 0 && (
+              <Badge variant="outline" className="tabular-nums">
+                {insights.analyzed_calls} {t('nav.calls')}
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-4">
+          {insights && insights.analyzed_calls > 0 && (
+            <div className="grid gap-3 md:grid-cols-3">
+              {/* Weakest Rubric Dimensions */}
+              <div className="rounded-lg border border-border-subtle bg-surface-sunken/50 p-3">
+                <p className="mb-2 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t('analytics.insights.weak_dims')}
+                </p>
+                <ul className="space-y-1.5">
+                  {insights.weakest_dimensions.map((d) => (
+                    <li key={d.dimension} className="flex items-center justify-between text-xs">
+                      <span className="truncate font-medium">{t(`rubric.${d.dimension}`)}</span>
+                      <span className={cn('font-semibold tabular-nums', scoreColor(d.avg_score))}>
+                        {d.avg_score}/100
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Top Client Objections */}
+              <div className="rounded-lg border border-border-subtle bg-surface-sunken/50 p-3">
+                <p className="mb-2 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <MessageSquareWarning aria-hidden="true" className="size-3.5 text-warning" />
+                  {t('analytics.insights.top_objections')}
+                </p>
+                {insights.top_objections.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">{t('analytics.insights.no_objections')}</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {insights.top_objections.slice(0, 4).map((obj, idx) => (
+                      <li key={idx} className="flex items-start justify-between gap-2 text-xs">
+                        <span className="line-clamp-1">{obj.text}</span>
+                        <Badge variant="secondary" className="shrink-0 tabular-nums">
+                          {obj.count}x
+                        </Badge>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Top Coaching Flaws */}
+              <div className="rounded-lg border border-border-subtle bg-surface-sunken/50 p-3">
+                <p className="mb-2 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <Lightbulb aria-hidden="true" className="size-3.5 text-primary" />
+                  {t('analytics.insights.top_flaws')}
+                </p>
+                {insights.top_flaws.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">—</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {insights.top_flaws.slice(0, 4).map((flaw, idx) => (
+                      <li key={idx} className="flex items-start justify-between gap-2 text-xs">
+                        <span className="line-clamp-1">{flaw.text}</span>
+                        <Badge variant="outline" className="shrink-0 tabular-nums">
+                          {flaw.count}x
+                        </Badge>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Interactive Cross-Call Ask AI */}
+          <div className="rounded-lg border border-border bg-surface p-3.5">
+            <form
+              className="flex flex-col gap-2 sm:flex-row"
+              onSubmit={async (e) => {
+                e.preventDefault()
+                const q = qaQuestion.trim()
+                if (!q || qaAsking) return
+                setQaAsking(true)
+                try {
+                  const res = await api.askAcrossCalls(q)
+                  setQaAnswer(res)
+                } catch (err) {
+                  toast.error((err as Error).message)
+                } finally {
+                  setQaAsking(false)
+                }
+              }}
+            >
+              <Input
+                value={qaQuestion}
+                onChange={(e) => setQaQuestion(e.target.value)}
+                placeholder={t('analytics.insights.ask_placeholder')}
+                aria-label={t('analytics.insights.ask_placeholder')}
+                className="flex-1"
+              />
+              <Button type="submit" disabled={qaAsking || !qaQuestion.trim()}>
+                {qaAsking ? (
+                  <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                ) : (
+                  <Send aria-hidden="true" className="size-4" />
+                )}
+                {qaAsking ? t('analytics.insights.asking') : t('analytics.insights.ask_btn')}
+              </Button>
+            </form>
+
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {[t('analytics.insights.q1'), t('analytics.insights.q2'), t('analytics.insights.q3')].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setQaQuestion(preset)}
+                  className="rounded-full border border-border-subtle bg-surface-sunken px-2.5 py-1 text-2xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+
+            {qaAnswer && (
+              <div className="mt-3.5 space-y-2.5 rounded-md border border-primary/20 bg-primary-soft/20 p-3 text-xs">
+                <p className="leading-relaxed whitespace-pre-line text-foreground">{qaAnswer.answer}</p>
+                {qaAnswer.recommendations.length > 0 && (
+                  <div>
+                    <p className="mb-1 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      {t('analytics.insights.recommendations')}
+                    </p>
+                    <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
+                      {qaAnswer.recommendations.map((rec, i) => (
+                        <li key={i}>{rec}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {qaAnswer.cited_call_ids.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="text-2xs font-semibold text-muted-foreground">
+                      {t('analytics.insights.cited_calls')}:
+                    </span>
+                    {qaAnswer.cited_call_ids.map((cid) => (
+                      <Link
+                        key={cid}
+                        to={`/calls/${cid}`}
+                        className="rounded bg-surface px-1.5 py-0.5 font-mono text-2xs font-medium text-primary ring-1 ring-border transition-colors hover:bg-primary-soft"
+                      >
+                        #{cid}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <Tabs defaultValue="employees">

@@ -9,7 +9,12 @@ from typing import Literal
 from pydantic import BaseModel
 
 from . import config, db
-from .prompts import ORG_SUMMARY_PROMPT, ORG_WEB_FACTS_PROMPT, scoring_system_prompt
+from .prompts import (
+    CROSS_CALL_QA_PROMPT,
+    ORG_SUMMARY_PROMPT,
+    ORG_WEB_FACTS_PROMPT,
+    scoring_system_prompt,
+)
 
 logger = logging.getLogger("suhbatdosh.analysis")
 
@@ -43,6 +48,15 @@ class ActionItem(BaseModel):
     priority: str
 
 
+class EvidenceQuote(BaseModel):
+    """A transcript quote cited as evidence for a rubric dimension."""
+
+    dimension: str
+    quote: str
+    speaker: str | None = None
+    start_sec: float | None = None
+
+
 class CallAnalysis(BaseModel):
     """Structured coaching report returned by the analysis model."""
 
@@ -52,22 +66,35 @@ class CallAnalysis(BaseModel):
     scorecard: Scorecard
     rep_share_of_talk: float
     outcome: Literal["win", "likely", "uncertain", "unknown"]
+    coach_decision: Literal["NO_ACTION", "COACH", "ESCALATE"] = "COACH"
     key_metrics: list[KeyMetric]
     coaching_points: list[str]
     next_steps: list[str]
     action_items: list[ActionItem]
+    evidence_quotes: list[EvidenceQuote] = []
+    objections: list[str] = []
+
+
+class CrossCallAnswer(BaseModel):
+    """Structured answer returned by the cross-call Q&A endpoint."""
+
+    answer: str
+    cited_call_ids: list[int] = []
+    recommendations: list[str] = []
 
 
 class Analyzer:
     """Wraps a Gemini client used to score a call transcript into a CallAnalysis."""
 
-    def __init__(self, api_key: str | None = None):
+    def __init__(self, api_key: str | None = None, org_id: int = 1):
         self._client = genai.Client(api_key=api_key or config.GEMINI_API_KEY)
+        self._org_id = org_id
 
     async def analyze(self, transcript: str) -> dict:
         """Asynchronously generate a CallAnalysis from a transcript string."""
         if not transcript or not transcript.strip():
             return {"error": "empty transcript"}
+        profile = db.get_org_profile() if self._org_id == 1 else db.get_org_profile(org_id=self._org_id)
         resp = await asyncio.wait_for(
             self._client.aio.models.generate_content(
                 model=config.GEMINI_ANALYSIS_MODEL,
@@ -75,7 +102,7 @@ class Analyzer:
                 config=types.GenerateContentConfig(
                     # Read fresh per analysis so a profile edit applies to the
                     # very next call without a restart.
-                    system_instruction=scoring_system_prompt(db.get_org_profile()),
+                    system_instruction=scoring_system_prompt(profile),
                     response_mime_type="application/json",
                     response_schema=CallAnalysis,
                 ),
@@ -119,6 +146,39 @@ class Analyzer:
         except json.JSONDecodeError:
             logger.error("Action items extraction returned non-JSON: %.300s", text)
             return []
+
+    async def ask_across_calls(self, question: str, calls_context: list[dict]) -> dict:
+        """Answer a supervisor's natural-language question across recent analysed calls."""
+        if not calls_context:
+            return {
+                "answer": "Tahlil qilingan qoʻngʻiroqlar hali mavjud emas.",
+                "cited_call_ids": [],
+                "recommendations": [],
+            }
+        payload = json.dumps(
+            {"question": question, "calls": calls_context},
+            ensure_ascii=False,
+        )
+        resp = await asyncio.wait_for(
+            self._client.aio.models.generate_content(
+                model=config.GEMINI_ANALYSIS_MODEL,
+                contents=payload,
+                config=types.GenerateContentConfig(
+                    system_instruction=CROSS_CALL_QA_PROMPT,
+                    response_mime_type="application/json",
+                    response_schema=CrossCallAnswer,
+                ),
+            ),
+            timeout=45,
+        )
+        try:
+            return json.loads(resp.text)
+        except json.JSONDecodeError:
+            return {
+                "answer": (resp.text or "").strip(),
+                "cited_call_ids": [],
+                "recommendations": [],
+            }
 
 
 class OrgProfileDraft(BaseModel):

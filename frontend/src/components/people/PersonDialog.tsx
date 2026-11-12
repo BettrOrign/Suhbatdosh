@@ -70,6 +70,7 @@ export function PersonDialog({
   const [email, setEmail] = useState(person?.email ?? '')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<Role>(lockRoleTo ?? person?.role ?? 'manager')
+  const [sipExtension, setSipExtension] = useState(person?.sip_extension ?? '')
   const [active, setActive] = useState(person?.active ?? true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -83,7 +84,13 @@ export function PersonDialog({
     setError(null)
     try {
       if (mode === 'create') {
-        await api.createUser({ name: name.trim(), email: email.trim(), password, role })
+        await api.createUser({
+          name: name.trim(),
+          email: email.trim(),
+          password,
+          role,
+          sip_extension: sipExtension.trim(),
+        })
         toast.success(t('users.created'))
       } else if (person) {
         await api.updateUser(person.id, {
@@ -91,6 +98,7 @@ export function PersonDialog({
           email: email.trim(),
           role,
           active,
+          sip_extension: sipExtension.trim(),
           ...(password.trim() ? { password: password.trim() } : {}),
         })
         toast.success(t('users.updated'))
@@ -192,6 +200,16 @@ export function PersonDialog({
             </div>
           </div>
 
+          <div className="space-y-1.5">
+            <Label htmlFor="person-sip">{t('users.sip_extension')}</Label>
+            <Input
+              id="person-sip"
+              value={sipExtension}
+              onChange={(e) => setSipExtension(e.target.value)}
+              placeholder={t('users.sip_placeholder')}
+            />
+          </div>
+
           {mode === 'edit' && (
             <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface-sunken px-3 py-2">
               <div className="min-w-0">
@@ -282,6 +300,11 @@ export function PersonRow({
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
+        {person.sip_extension && (
+          <Badge variant="outline" className="font-mono text-2xs">
+            SIP {person.sip_extension}
+          </Badge>
+        )}
         <Badge variant={roleBadgeVariant(person.role)}>{t(`nav.role.${person.role}`)}</Badge>
         <span className="inline-flex items-center gap-1.5 text-xs" title={t('users.active_desc')}>
           <span

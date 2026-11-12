@@ -10,32 +10,23 @@ router = APIRouter(prefix="/api")
 def list_managers(user: dict = Depends(get_current_user)):
     if user["role"] not in ("admin", "yonalish"):
         raise HTTPException(403, "Forbidden")
-    return db.list_managers_with_stats()
+    return db.list_managers_with_stats(org_id=user.get("org_id") or 1)
 
 
 @router.get("/managers/options")
 def manager_options(user: dict = Depends(get_current_user)):
-    """Id + name of active managers, for pickers.
-
-    The client form offers a manager dropdown to receptionists, but the only
-    source it had was GET /api/users, which is admin/yonalish-only — so that
-    select was permanently empty with the 403 swallowed. This is the narrow
-    projection the picker actually needs; it exposes no email and no token.
-    """
+    """Id + name of active managers in the user's organization, for pickers."""
     if user["role"] not in ("admin", "yonalish", "receptionist"):
         raise HTTPException(403, "Forbidden")
-    return db.list_active_managers()
+    return db.list_active_managers(org_id=user.get("org_id") or 1)
 
 
 @router.get("/managers/{manager_id}/calls")
 def manager_calls(manager_id: int, user: dict = Depends(get_current_user)):
     if user["role"] not in ("admin", "yonalish"):
         raise HTTPException(403, "Forbidden")
+    org_id = user.get("org_id") or 1
     owner = db.get_user(manager_id)
-    # `yonalish` counts here for the same reason it does in
-    # `db.get_manager_rankings`: both roles own `call_type = 'manager'`
-    # calls, and the leaderboard and the Employees directory drill down from
-    # exactly those rows. Rejecting a supervisor made every drill-down 404.
-    if not owner or owner["role"] not in ("manager", "yonalish"):
+    if not owner or (owner.get("org_id") or 1) != org_id or owner["role"] not in ("manager", "yonalish"):
         raise HTTPException(404, "Manager not found")
-    return db.list_manager_calls(manager_id)
+    return db.list_manager_calls(manager_id, org_id=org_id)

@@ -17,6 +17,7 @@ import {
   Loader2,
   PhoneCall,
   Search,
+  Star,
   Upload,
   UploadCloud,
   X,
@@ -72,7 +73,7 @@ const TYPE_OPTIONS: { value: CallType; labelKey: string }[] = [
   { value: 'receptionist', labelKey: 'upload.call_type.receptionist' },
 ]
 
-type StatusFilter = 'all' | 'done' | 'processing' | 'error'
+type StatusFilter = 'all' | 'done' | 'processing' | 'error' | 'bookmarked'
 type ViewMode = 'grid' | 'table'
 
 const MAX_FILE_SIZE = 200 * 1024 * 1024 // 200 MB
@@ -181,8 +182,11 @@ function CallCard({ call }: { call: Call }) {
 
           <CardHeader className="gap-0 px-3.5 pt-3 pb-2">
             <div className="flex items-start justify-between gap-2">
-              <CardTitle className="line-clamp-1 transition-colors group-hover/card:text-primary">
-                {callTitle(call)}
+              <CardTitle className="flex min-w-0 items-center gap-1.5 line-clamp-1 transition-colors group-hover/card:text-primary">
+                {call.bookmarked && (
+                  <Star aria-label={t('call.bookmarked')} className="size-3.5 shrink-0 fill-amber-400 text-amber-500" />
+                )}
+                <span className="truncate">{callTitle(call)}</span>
               </CardTitle>
               <Badge
                 variant={
@@ -317,9 +321,12 @@ function CallTable({ calls }: { calls: Call[] }) {
                   <td className="max-w-[280px] px-3 py-2">
                     <Link
                       to={`/calls/${call.id}`}
-                      className="block truncate font-medium transition-colors hover:text-primary hover:underline"
+                      className="inline-flex max-w-full items-center gap-1.5 truncate font-medium transition-colors hover:text-primary hover:underline"
                     >
-                      {callTitle(call)}
+                      {call.bookmarked && (
+                        <Star aria-label={t('call.bookmarked')} className="size-3.5 shrink-0 fill-amber-400 text-amber-500" />
+                      )}
+                      <span className="truncate">{callTitle(call)}</span>
                     </Link>
                     {call.client_name && (
                       <span className="mt-0.5 block truncate text-2xs text-muted-foreground">
@@ -724,6 +731,7 @@ export function Calls() {
       if (statusFilter === 'done' && c.status !== 'done') return false
       if (statusFilter === 'processing' && !isInFlight(c.status)) return false
       if (statusFilter === 'error' && c.status !== 'error') return false
+      if (statusFilter === 'bookmarked' && !c.bookmarked) return false
       if (!q) return true
       return matches(c.name, q) || matches(c.client_name, q)
     })
@@ -777,6 +785,7 @@ export function Calls() {
             { value: 'done', label: t('status.done') },
             { value: 'processing', label: t('dashboard.stat.in_progress') },
             { value: 'error', label: t('status.error') },
+            { value: 'bookmarked', label: t('calls.filter.bookmarked'), icon: Star },
           ]}
         />
 

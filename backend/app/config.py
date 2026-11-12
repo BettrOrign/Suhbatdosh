@@ -82,6 +82,10 @@ DB_PATH = DATA_DIR / "suhbatdosh.db"
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 ADMIN_NAME = os.getenv("ADMIN_NAME", "Admin")
+DEFAULT_ORG_NAME = os.getenv("DEFAULT_ORG_NAME", "MBSI")
+DEFAULT_ORG_SLUG = os.getenv("DEFAULT_ORG_SLUG", "mbsi")
+SIGNUP_ENABLED = os.getenv("SIGNUP_ENABLED", "true").lower() in ("true", "1", "yes")
+TELEGRAM_READER_ORG_ID = int(os.getenv("TELEGRAM_READER_ORG_ID", "1") or "1")
 
 
 APP_ENV = (os.getenv("APP_ENV", "") or "").strip().lower()

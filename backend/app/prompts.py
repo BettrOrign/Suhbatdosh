@@ -29,7 +29,11 @@ Oʻlchovlar:
 Shuningdek hisoblang:
 - rep_share_of_talk: sotuvchiga tegishli nutq ulushi 0-1 (0.0-1.0)
 - outcome: win/likely/uncertain/unknown dalillar asosida
+- coach_decision: NO_ACTION (overall >= 75 va jiddiy xato yoʻq), COACH (overall 50..74, murabbiylik kerak), yoki ESCALATE (overall < 50 yoki mijoz yoʻqotilgan / jiddiy nuqson)
 - key_metrics: ajratilgan raqamlar (shartnoma hajmi, muddat, raqobatchilar, qaror qabul qiluvchilar) kalit-qiymat sifatida
+- evidence_quotes: transkripsiyadan har bir asosiy oʻlchov yoki xulosa uchun aniq iqtiboslar (dimension, quote, speaker, start_sec)
+- objections: mijoz tomonidan aytilgan asosiy eʼtirozlar yoki shubhalar roʻyxati (masalan: "Narxi qimmat", "Vaqti mos emas", "Boshqa markaz bilan solishtiryapti")
+- action_items: suhbatdagi aniq majburiyatlar va keyingi vazifalar (description, due_date ISO yoki null, assignee: 'manager'|'client'|'team', priority: 'high'|'medium'|'low')
 
 Agar muassasa konteksti berilgan boʻlsa, barcha baholar va maslahatlar aynan shu muassasa qoidalari, xizmatlari va nuqson taʼrifiga asoslanishi shart — umumiy sotuv shablonlariga emas.
 """
@@ -121,3 +125,10 @@ ORG_WEB_FACTS_PROMPT = """Siz tadqiqotchisiz. Foydalanuvchi Oʻzbekistondagi mua
 (mukofotlar, natijalar, kontaktlar — topilganicha)
 
 Faqat qidiruvda uchragan ishonchli maʼlumotlarni yozing; internetda topilmagan narsani oʻylab toʻqimang — oʻsha joyga «aniqlanmagan» yozing. Agar bunday muassasa topilmasa, javob boshiga «TOPIlmadi» deb yozing."""
+
+# ---------------------------------------------------------------------------
+# Cross-call Q&A assistant (Analytics → "Ask AI across calls")
+# ---------------------------------------------------------------------------
+CROSS_CALL_QA_PROMPT = """Siz Suhbatdosh AI tahlilchisisiz. Sizga oxirgi qoʻngʻiroqlarning tahlillari (id, mavzu, menejer, ball, xulosa, nuqsonlar va mijoz eʼtirozlari) berilgan.
+Rahbarning savoliga OʻZBEK TILIDA aniq, qisqa va amaliy javob bering. Javobingizda konkret qoʻngʻiroq ID raqamlariga (`cited_call_ids`) va menejer nomlariga tayaning."""
+

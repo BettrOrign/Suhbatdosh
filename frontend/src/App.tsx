@@ -1,15 +1,21 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ThemeProvider } from 'next-themes'
 
+import { AcceptInvite } from '@/pages/AcceptInvite'
 import { Analytics } from '@/pages/Analytics'
 import { CallDetail } from '@/pages/CallDetail'
 import { Calls } from '@/pages/Calls'
 import { Clients } from '@/pages/Clients'
+import { EmployeeHome } from '@/pages/EmployeeHome'
 import { Login } from '@/pages/Login'
 import { ManagersAdminPage } from '@/pages/ManagersAdmin'
 import { ManagersDirectionsPage } from '@/pages/ManagersDirections'
 import { ManagersPage } from '@/pages/ManagersList'
+import { MyTasks } from '@/pages/MyTasks'
+import { Profile } from '@/pages/Profile'
 import { SettingsPage } from '@/pages/Settings'
+import { Signup } from '@/pages/Signup'
+import TelegramPage from '@/pages/Telegram'
 import { UsersPage } from '@/pages/Users'
 
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -41,7 +47,15 @@ function AuthedShell() {
   const { lang } = useI18n()
 
   if (loading) return <BootSkeleton />
-  if (!user) return <Login />
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/invite/:token" element={<AcceptInvite />} />
+        <Route path="*" element={<Login />} />
+      </Routes>
+    )
+  }
 
   return (
     <ModeProvider>
@@ -49,6 +63,9 @@ function AuthedShell() {
         <ErrorBoundary lang={lang}>
           <Routes>
             <Route path="/" element={<Analytics />} />
+            <Route path="/my-day" element={<EmployeeHome />} />
+            <Route path="/tasks" element={<MyTasks />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="/calls" element={<Calls />} />
             <Route path="/calls/:id" element={<CallDetail />} />
             <Route path="/clients" element={<Clients />} />
@@ -57,6 +74,8 @@ function AuthedShell() {
             <Route path="/managers/directions" element={<ManagersDirectionsPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/telegram" element={<TelegramPage />} />
+            <Route path="/invite/:token" element={<AcceptInvite />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </ErrorBoundary>

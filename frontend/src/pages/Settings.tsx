@@ -7,6 +7,7 @@ import {
   FileCode2,
   HardDrive,
   Loader2,
+  PhoneCall,
   RefreshCw,
   Search,
   ShieldAlert,
@@ -645,8 +646,137 @@ export function SettingsPage() {
             </Row>
           </CardContent>
         </Card>
+
+        {/* --- Zadarma PBX -------------------------- */}
+        <ZadarmaCard />
       </div>
     </div>
+  )
+}
+
+function ZadarmaCard() {
+  const { t } = useI18n()
+  const [configured, setConfigured] = useState(false)
+  const [balance, setBalance] = useState<string | null>(null)
+  const [apiKey, setApiKey] = useState('')
+  const [apiSecret, setApiSecret] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+
+  const loadStatus = () => {
+    api
+      .getZadarmaConfig()
+      .then((r) => {
+        setConfigured(r.configured)
+        if (r.balance !== undefined && r.balance !== null) {
+          setBalance(`${r.balance} ${r.currency ?? ''}`.trim())
+        } else {
+          setBalance(null)
+        }
+      })
+      .catch(() => setConfigured(false))
+  }
+
+  useEffect(() => {
+    loadStatus()
+  }, [])
+
+  const save = async () => {
+    if (!apiKey.trim() || !apiSecret.trim()) return
+    setSaving(true)
+    try {
+      await api.saveZadarmaConfig({ api_key: apiKey.trim(), api_secret: apiSecret.trim() })
+      setApiKey('')
+      setApiSecret('')
+      loadStatus()
+      toast.success(t('settings.saved'))
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const sync = async () => {
+    setSyncing(true)
+    try {
+      await api.syncZadarma()
+      toast.success(t('settings.zadarma.sync_started'))
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <CardTitle className="flex items-center gap-1.5">
+              <PhoneCall aria-hidden="true" className="size-3.5 text-primary" />
+              {t('settings.zadarma.title')}
+            </CardTitle>
+            <CardDescription>{t('settings.zadarma.desc')}</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            {balance && (
+              <Badge variant="outline" className="font-mono text-2xs">
+                {balance}
+              </Badge>
+            )}
+            <Badge variant={configured ? 'default' : 'secondary'}>
+              {configured ? t('settings.zadarma.configured') : t('settings.zadarma.not_configured')}
+            </Badge>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="zd-key">{t('settings.zadarma.api_key')}</Label>
+            <Input
+              id="zd-key"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="••••••••••••••••"
+              autoComplete="off"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="zd-secret">{t('settings.zadarma.api_secret')}</Label>
+            <Input
+              id="zd-secret"
+              type="password"
+              value={apiSecret}
+              onChange={(e) => setApiSecret(e.target.value)}
+              placeholder="••••••••••••••••"
+              autoComplete="off"
+            />
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!configured || syncing}
+            onClick={() => void sync()}
+          >
+            {syncing && <Loader2 className="mr-1.5 size-3.5 animate-spin" />}
+            {t('settings.zadarma.sync')}
+          </Button>
+          <Button
+            size="sm"
+            disabled={saving || !apiKey.trim() || !apiSecret.trim()}
+            onClick={() => void save()}
+          >
+            {saving && <Loader2 className="mr-1.5 size-3.5 animate-spin" />}
+            {t('settings.zadarma.save')}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

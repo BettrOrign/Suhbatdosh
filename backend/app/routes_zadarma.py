@@ -39,20 +39,21 @@ _ZADARMA_SECRET_ENV = "ZADARMA_API_SECRET"
 import os
 
 
-def _get_zadarma_credentials() -> tuple[str, str]:
-    """Return (api_key, api_secret) from environment or DB bot_settings."""
-    key = os.getenv(_ZADARMA_KEY_ENV, "")
-    secret = os.getenv(_ZADARMA_SECRET_ENV, "")
-    if not key:
-        key = db.get_bot_setting("zadarma_api_key", "")
-    if not secret:
-        secret = db.get_bot_setting("zadarma_api_secret", "")
+def _get_zadarma_credentials(org_id: int = 1) -> tuple[str, str]:
+    """Return (api_key, api_secret) from org_settings (or environment for org #1)."""
+    key = db.get_bot_setting("zadarma_api_key", "", org_id=org_id)
+    secret = db.get_bot_setting("zadarma_api_secret", "", org_id=org_id)
+    if org_id == 1:
+        if not key:
+            key = os.getenv(_ZADARMA_KEY_ENV, "")
+        if not secret:
+            secret = os.getenv(_ZADARMA_SECRET_ENV, "")
     return key, secret
 
 
-def _get_client() -> ZadarmaClient | None:
+def _get_client(org_id: int = 1) -> ZadarmaClient | None:
     """Create a ZadarmaClient if credentials are available."""
-    key, secret = _get_zadarma_credentials()
+    key, secret = _get_zadarma_credentials(org_id=org_id)
     if not key or not secret:
         return None
     return ZadarmaClient(key, secret)
@@ -68,12 +69,16 @@ async def get_config(user: dict = Depends(get_current_user)):
     """Return whether Zadarma is configured (no secrets exposed)."""
     if user["role"] != "admin":
         raise HTTPException(403, "Admin only")
-    key, secret = _get_zadarma_credentials()
+    org_id = user.get("org_id") or 1
+    key, secret = _get_zadarma_credentials(org_id=org_id)
     configured = bool(key and secret)
-    result = {"configured": configured}
+    result = {
+        "configured": configured,
+        "webhook_path": f"/api/zadarma/webhook/{user.get('org_slug') or 'mbsi'}",
+    }
     if configured:
         try:
-            client = _get_client()
+            client = _get_client(org_id=org_id)
             balance = client.get_balance()
             result["balance"] = balance.get("balance")
             result["currency"] = balance.get("currency")
@@ -89,12 +94,15 @@ async def save_config(payload: dict, user: dict = Depends(get_current_user)):
     """Save Zadarma API credentials (admin only)."""
     if user["role"] != "admin":
         raise HTTPException(403, "Admin only")
+    org_id = user.get("org_id") or 1
     api_key = (payload.get("api_key") or "").strip()
     api_secret = (payload.get("api_secret") or "").strip()
     if not api_key or not api_secret:
         raise HTTPException(400, "api_key and api_secret are required")
-    db.set_bot_setting("zadarma_api_key", api_key)
-    db.set_bot_setting("zadarma_api_secret", api_secret)
+    db.set_bot_setting("zadarma_api_key", api_key, org_id=org_id)
+    db.set_bot_setting("zadarma_api_secret", api_secret, org_id=org_id)
+    if "webhook_secret" in payload and str(payload.get("webhook_secret") or "").strip():
+        db.set_bot_setting("zadarma_webhook_secret", str(payload["webhook_secret"]).strip(), org_id=org_id)
     return {"ok": True, "configured": True}
 
 
@@ -109,16 +117,12 @@ async def sync_recordings(
     payload: dict | None = None,
     user: dict = Depends(get_current_user),
 ):
-    """Fetch recent Zadarma PBX recordings and import them.
-
-    Body (optional):
-      - start: "YYYY-MM-DD HH:MM:SS" (default: 7 days ago)
-      - end: "YYYY-MM-DD HH:MM:SS" (default: now)
-    """
+    """Fetch recent Zadarma PBX recordings and import them."""
     if user["role"] != "admin":
         raise HTTPException(403, "Admin only")
 
-    client = _get_client()
+    org_id = user.get("org_id") or 1
+    client = _get_client(org_id=org_id)
     if client is None:
         raise HTTPException(400, "Zadarma is not configured. Set API key and secret first.")
 
@@ -134,15 +138,15 @@ async def sync_recordings(
         end_str = now.strftime("%Y-%m-%d %H:%M:%S")
 
     # Launch sync in background so the HTTP response isn't slow
-    background.add_task(_run_sync, start_str, end_str, user["id"])
+    background.add_task(_run_sync, start_str, end_str, user["id"], org_id)
     return {"ok": True, "status": "sync_started", "start": start_str, "end": end_str}
 
 
-def _run_sync(start: str, end: str, user_id: int):
+def _run_sync(start: str, end: str, user_id: int, org_id: int = 1):
     """Background: fetch Zadarma stats, download recordings, import into DB."""
     log = logging.getLogger("suhbatdosh.zadarma_sync")
 
-    client = _get_client()
+    client = _get_client(org_id=org_id)
     if client is None:
         log.error("Zadarma credentials disappeared during sync")
         return
@@ -246,12 +250,9 @@ def _run_sync(start: str, end: str, user_id: int):
             "zadarma_pbx_call_id": stat.get("pbx_call_id", ""),
         }
 
-        # Determine call_type: if destination looks like an internal ext, it's
-        # likely a manager-to-manager call; otherwise default to manager.
-        call_type = "manager"
-
-        # Try to match SIP to a user
-        user_id_for_call = _match_sip_to_user(sip)
+        # Try to match SIP to a user and phone to a client
+        user_id_for_call, call_type = _match_sip_to_user(sip, org_id=org_id)
+        client_id_for_call = _match_phone_to_client(clid, destination, org_id=org_id)
 
         call_id = db.create_call(
             name=name,
@@ -259,9 +260,10 @@ def _run_sync(start: str, end: str, user_id: int):
             duration_sec=dur,
             call_type=call_type,
             user_id=user_id_for_call,
-            client_id=None,
+            client_id=client_id_for_call,
             source_type="zadarma",
             source_meta=source_meta,
+            org_id=org_id,
         )
         db.update_call(call_id, status="queued")
 
@@ -276,21 +278,41 @@ def _run_sync(start: str, end: str, user_id: int):
     log.info("Zadarma sync complete: %d new calls imported", imported)
 
 
-def _match_sip_to_user(sip: str) -> int | None:
-    """Try to match a Zadarma SIP number to a local user by name or email pattern.
-
-    Returns the user_id or None if no match found.
-    """
-    if not sip:
-        return None
-    # Try matching by email containing the SIP number
+def _match_sip_to_user(sip: str, org_id: int = 1) -> tuple[int | None, str]:
+    """Match a Zadarma SIP extension to an active user in ``org_id``."""
+    sip_clean = (sip or "").strip()
+    if not sip_clean:
+        return None, "manager"
     with db.get_db() as conn:
         row = conn.execute(
-            "SELECT id FROM users WHERE email LIKE ? AND active = 1 LIMIT 1",
-            (f"%{sip}%",),
+            "SELECT id, role FROM users WHERE org_id = ? AND sip_extension = ? AND active = 1 LIMIT 1",
+            (org_id, sip_clean),
         ).fetchone()
+        if not row:
+            row = conn.execute(
+                "SELECT id, role FROM users WHERE org_id = ? AND email LIKE ? AND active = 1 LIMIT 1",
+                (org_id, f"%{sip_clean}%"),
+            ).fetchone()
         if row:
-            return row[0]
+            call_type = "receptionist" if row["role"] == "receptionist" else "manager"
+            return row["id"], call_type
+    return None, "manager"
+
+
+def _match_phone_to_client(*phones: str, org_id: int = 1) -> int | None:
+    """Try to match any external caller/destination phone number to a client row in ``org_id``."""
+    with db.get_db() as conn:
+        for raw in phones:
+            digits = "".join(ch for ch in (raw or "") if ch.isdigit())
+            if len(digits) < 7:
+                continue
+            tail = digits[-9:]
+            row = conn.execute(
+                "SELECT id FROM clients WHERE org_id = ? AND replace(replace(replace(phone, '+', ''), ' ', ''), '-', '') LIKE ? LIMIT 1",
+                (org_id, f"%{tail}%"),
+            ).fetchone()
+            if row:
+                return row["id"]
     return None
 
 
@@ -368,11 +390,11 @@ async def webhook_notify(request: Request, background: BackgroundTasks):
     if not call_id_with_rec:
         return {"ok": True, "error": "missing call_id_with_rec"}
 
-    # Check for duplicate
+    # Check for duplicate via exact JSON field match
     with db.get_db() as conn:
         existing = conn.execute(
-            "SELECT id FROM calls WHERE source_type = 'zadarma' AND source_meta LIKE ?",
-            (f'%{call_id_with_rec}%',),
+            "SELECT id FROM calls WHERE source_type = 'zadarma' AND json_extract(source_meta, '$.zadarma_call_id') = ?",
+            (str(call_id_with_rec),),
         ).fetchone()
         if existing:
             return {"ok": True, "duplicate": True, "call_id": existing[0]}
@@ -391,15 +413,18 @@ def _import_webhook_recording(call_id_with_rec: str, pbx_call_id: str):
         log.error("Zadarma not configured, cannot import webhook recording")
         return
 
-    # Wait a bit for Zadarma to finish writing the file
-    time.sleep(45)
-
-    # Get download link using call_id_with_rec as the call_id
-    try:
-        link_resp = client.get_record_link(call_id=call_id_with_rec, lifetime=3600)
-    except Exception as e:
-        log.error("Failed to get record link for webhook call: %s", e)
-        return
+    # Poll with short backoff in case Zadarma is still flushing the recording file
+    link_resp: dict = {}
+    for attempt, delay in enumerate((0, 2, 5, 10), start=1):
+        if delay:
+            time.sleep(delay)
+        try:
+            link_resp = client.get_record_link(call_id=call_id_with_rec, lifetime=3600)
+        except Exception as e:
+            log.warning("Attempt %d to get record link failed: %s", attempt, e)
+            continue
+        if link_resp.get("status") == "success" and link_resp.get("link"):
+            break
 
     if link_resp.get("status") != "success":
         log.error("Record link not success: %s", link_resp)

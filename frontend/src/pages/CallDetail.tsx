@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
+  Activity,
   ArrowLeft,
   Check,
   CheckSquare,
@@ -15,6 +16,7 @@ import {
   PhoneCall,
   Play,
   RefreshCw,
+  Star,
   Target,
   Trash2,
   TriangleAlert,
@@ -65,6 +67,7 @@ import {
   analysisSolutions,
   asAnalysis,
   callTitle,
+  type AcousticsInfo,
   type Call,
   type CallType,
   type Client,
@@ -401,6 +404,38 @@ export function CallDetail() {
     }
   }
 
+  const toggleResolved = async () => {
+    if (!call) return
+    try {
+      const updated = await api.updateCall(callId, { resolved: !call.resolved })
+      setCall(updated)
+      callRef.current = updated
+    } catch (e) {
+      toast.error(t('call.save_failed', { error: (e as Error).message }))
+    }
+  }
+
+  const toggleBookmark = async () => {
+    if (!call) return
+    const nextBookmarked = !call.bookmarked
+    let note = call.bookmark_note ?? ''
+    if (nextBookmarked && !note) {
+      const prompted = window.prompt(t('call.bookmark_note_placeholder'), '')
+      if (prompted === null) return
+      note = prompted.trim()
+    }
+    try {
+      const updated = await api.updateCall(callId, {
+        bookmarked: nextBookmarked,
+        bookmark_note: nextBookmarked ? note : '',
+      })
+      setCall(updated)
+      callRef.current = updated
+    } catch (e) {
+      toast.error(t('call.save_failed', { error: (e as Error).message }))
+    }
+  }
+
   if (loading) return <DetailSkeleton />
 
   if (!call || missing) {
@@ -427,6 +462,7 @@ export function CallDetail() {
   const hasAnalysis = call.status === 'done' && analysis.scorecard != null
   const processing = isInFlight(call.status)
   const title = callTitle(call)
+  const acoustics = (call.source_meta?.acoustics as AcousticsInfo | undefined) ?? null
 
   return (
     <div className="space-y-4">
@@ -500,6 +536,28 @@ export function CallDetail() {
                 <RefreshCw aria-hidden="true" className="size-3.5" />
                 {t('call.reanalyze')}
               </Button>
+              {(overall != null && overall < 50) || call.resolved ? (
+                <Button
+                  variant={call.resolved ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => void toggleResolved()}
+                >
+                  <Check aria-hidden="true" className="size-3.5" />
+                  {call.resolved ? t('call.resolved') : t('call.mark_resolved')}
+                </Button>
+              ) : null}
+              <Button
+                variant={call.bookmarked ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => void toggleBookmark()}
+                title={call.bookmark_note || undefined}
+              >
+                <Star
+                  aria-hidden="true"
+                  className={cn('size-3.5', call.bookmarked && 'fill-current')}
+                />
+                {call.bookmarked ? t('call.bookmarked') : t('call.bookmark')}
+              </Button>
               <Button
                 variant="destructive-ghost"
                 size="sm"
@@ -568,6 +626,20 @@ export function CallDetail() {
                   <p className={cn('text-sm font-semibold', scoreColor(overall))}>
                     {scoreLabel(overall, lang)}
                   </p>
+                  {analysis.coach_decision && (
+                    <Badge
+                      variant={
+                        analysis.coach_decision === 'ESCALATE'
+                          ? 'destructive'
+                          : analysis.coach_decision === 'COACH'
+                            ? 'warning'
+                            : 'success'
+                      }
+                      className="font-mono text-2xs"
+                    >
+                      {t('call.coach_decision')}: {analysis.coach_decision}
+                    </Badge>
+                  )}
                 </CardContent>
               </Card>
             </Reveal>
@@ -619,6 +691,55 @@ export function CallDetail() {
                 </CardContent>
               </Card>
             </Reveal>
+
+            {acoustics && (
+              <Reveal>
+                <Card>
+                  <CardHeader className="border-b border-border-subtle pb-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <CardTitle className="flex items-center gap-1.5">
+                        <Activity aria-hidden="true" className="size-3.5 text-primary" />
+                        {t('call.acoustics.title')}
+                      </CardTitle>
+                      <Badge variant="outline" className="font-mono text-[10px]">
+                        {acoustics.channels >= 2
+                          ? t('call.acoustics.stereo')
+                          : t('call.acoustics.mono')}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-3 gap-2 pt-3">
+                    <div className="rounded-md bg-surface-sunken px-2.5 py-2 ring-1 ring-border-subtle ring-inset">
+                      <p className="eyebrow">{t('call.acoustics.dead_air')}</p>
+                      <p className="mt-0.5 text-sm font-semibold tabular-nums">
+                        {Math.round((acoustics.silence_ratio ?? 0) * 100)}%
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {formatDuration(acoustics.silence_sec)}
+                      </p>
+                    </div>
+                    <div className="rounded-md bg-surface-sunken px-2.5 py-2 ring-1 ring-border-subtle ring-inset">
+                      <p className="eyebrow">{t('call.acoustics.longest_silence')}</p>
+                      <p className="mt-0.5 text-sm font-semibold tabular-nums">
+                        {formatDuration(acoustics.longest_silence_sec)}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {acoustics.dead_air_count} gaps ≥3s
+                      </p>
+                    </div>
+                    <div className="rounded-md bg-surface-sunken px-2.5 py-2 ring-1 ring-border-subtle ring-inset">
+                      <p className="eyebrow">{t('call.acoustics.interruptions')}</p>
+                      <p className="mt-0.5 text-sm font-semibold tabular-nums">
+                        {acoustics.interruption_count ?? 0}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {formatDuration(acoustics.talk_over_sec ?? 0)}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Reveal>
+            )}
 
           {problem && (
             <Reveal>
@@ -759,6 +880,36 @@ export function CallDetail() {
                         </motion.li>
                       ))}
                     </ol>
+                    {analysis.evidence_quotes?.length ? (
+                      <div className="mt-4 space-y-2 border-t border-border-subtle pt-3">
+                        <p className="eyebrow">{t('call.evidence_quotes')}</p>
+                        {analysis.evidence_quotes.map((eq, idx) => (
+                          <div
+                            key={idx}
+                            onClick={() => {
+                              if (eq.start_sec != null) playerRef.current?.seek(eq.start_sec)
+                            }}
+                            className={cn(
+                              'rounded-md border border-border-subtle bg-surface-sunken/70 p-2.5 text-xs transition-colors',
+                              eq.start_sec != null && 'cursor-pointer hover:border-primary/40 hover:bg-surface-hover',
+                            )}
+                          >
+                            <div className="mb-1 flex items-center justify-between gap-2">
+                              <Badge variant="outline" className="text-[10px] capitalize">
+                                {eq.dimension.replace(/_/g, ' ')}
+                              </Badge>
+                              {eq.start_sec != null && (
+                                <span className="inline-flex items-center gap-1 font-mono text-[10px] text-primary">
+                                  <Play className="size-2.5 fill-current" />
+                                  {formatDuration(eq.start_sec)}
+                                </span>
+                              )}
+                            </div>
+                            <p className="italic text-foreground">“{eq.quote}”</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </TabsContent>
 
                   <TabsContent value="next-steps">

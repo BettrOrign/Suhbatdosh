@@ -1,36 +1,63 @@
 import type {
   Call,
   Client,
+  CrossCallAnswer,
+  CrossCallInsights,
+  EmployeeOverview,
+  Invite,
+  InviteInfo,
   Notification,
   OrgProfile,
   OrgProfileResponse,
   OrgSearchResult,
   ProcessingMode,
+  Role,
   Settings,
   SettingsFlags,
+  TelegramMessage,
   User,
+  UserSession,
 } from './types'
 
-const TOKEN_KEY = 'suhbatdosh_token'
-
-export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null
+  const prefix = `${encodeURIComponent(name)}=`
+  for (const part of document.cookie.split(';')) {
+    const trimmed = part.trim()
+    if (trimmed.startsWith(prefix)) {
+      return decodeURIComponent(trimmed.slice(prefix.length))
+    }
+  }
+  return null
 }
 
-export function setToken(token: string | null) {
-  if (token) localStorage.setItem(TOKEN_KEY, token)
-  else localStorage.removeItem(TOKEN_KEY)
+/** Kept as no-ops for backwards compatibility; auth uses httpOnly cookies + CSRF. */
+export function getToken(): string | null {
+  return readCookie('sd_csrf')
+}
+
+export function setToken(_token: string | null) {
+  localStorage.removeItem('suhbatdosh_token')
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method ?? 'GET').toUpperCase()
   const headers = new Headers(init?.headers)
   const isForm = init?.body instanceof FormData
-  if (!isForm) headers.set('Content-Type', 'application/json')
-  const token = getToken()
-  if (token) headers.set('Authorization', `Bearer ${token}`)
-  const res = await fetch(path, { ...init, headers })
-  if (res.status === 401 && !path.startsWith('/api/auth/login')) {
-    setToken(null)
+  if (!isForm && init?.body !== undefined) {
+    headers.set('Content-Type', 'application/json')
+  }
+  if (method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE') {
+    const csrf = readCookie('sd_csrf')
+    if (csrf) headers.set('X-CSRF-Token', csrf)
+  }
+  const res = await fetch(path, { ...init, headers, credentials: 'include' })
+  const isAuthBootstrap =
+    path.startsWith('/api/auth/login') ||
+    path.startsWith('/api/auth/signup') ||
+    path.startsWith('/api/auth/me') ||
+    path.startsWith('/api/invites/')
+  if (res.status === 401 && !isAuthBootstrap) {
     window.dispatchEvent(new Event('auth:logout'))
     throw new Error('Session expired')
   }
@@ -52,23 +79,50 @@ function jsonBody(method: string, body: unknown): RequestInit {
 }
 
 export const api = {
-  // auth
+  // auth & self-service account
   login: (email: string, password: string) =>
     request<{ token: string; user: User }>('/api/auth/login', jsonBody('POST', { email, password })),
+  signup: (data: { org_name: string; name: string; email: string; password: string }) =>
+    request<{ token: string; user: User }>('/api/auth/signup', jsonBody('POST', data)),
   logout: () => request<{ ok: boolean }>('/api/auth/logout', jsonBody('POST', {})),
+  logoutAllSessions: () => request<{ ok: boolean }>('/api/auth/logout-all', jsonBody('POST', {})),
   me: () => request<User>('/api/auth/me'),
+  updateProfile: (data: { name: string }) =>
+    request<User>('/api/auth/me', jsonBody('PATCH', data)),
+  changePassword: (data: { current_password: string; new_password: string }) =>
+    request<{ ok: boolean }>('/api/auth/password', jsonBody('POST', data)),
+  listSessions: () => request<UserSession[]>('/api/auth/sessions'),
+  revokeSession: (sessionId: number) =>
+    request<{ ok: boolean }>(`/api/auth/sessions/${sessionId}`, { method: 'DELETE' }),
+  getMyOverview: () => request<EmployeeOverview>('/api/me/overview'),
   regenerateToken: (userId?: number) =>
     request<{ api_token: string }>(
       userId ? `/api/users/${userId}/token` : '/api/auth/token',
       { method: 'POST' },
     ),
 
-   // users (admin)
+  // invites
+  listInvites: () => request<Invite[]>('/api/invites'),
+  createInvite: (data: { email: string; role: Role }) =>
+    request<Invite>('/api/invites', jsonBody('POST', data)),
+  deleteInvite: (id: number) =>
+    request<{ ok: boolean }>(`/api/invites/${id}`, { method: 'DELETE' }),
+  getInviteInfo: (token: string) =>
+    request<InviteInfo>(`/api/invites/${encodeURIComponent(token)}`),
+  acceptInvite: (token: string, data: { name: string; password: string }) =>
+    request<{ token: string; user: User }>(
+      `/api/invites/${encodeURIComponent(token)}/accept`,
+      jsonBody('POST', data),
+    ),
+
+  // users (admin)
   listUsers: () => request<(User & { active: boolean })[]>('/api/users'),
-  createUser: (data: { name: string; email: string; password: string; role: string }) =>
+  createUser: (data: { name: string; email: string; password: string; role: string; sip_extension?: string }) =>
     request<User>('/api/users', jsonBody('POST', data)),
-  updateUser: (id: number, data: Partial<{ name: string; email: string; password: string; role: string; active: boolean }>) =>
-    request<{ ok: boolean }>(`/api/users/${id}`, jsonBody('PATCH', data)),
+  updateUser: (
+    id: number,
+    data: Partial<{ name: string; email: string; password: string; role: string; active: boolean; sip_extension: string }>,
+  ) => request<{ ok: boolean }>(`/api/users/${id}`, jsonBody('PATCH', data)),
   deleteUser: (id: number) =>
     request<{ ok: boolean }>(`/api/users/${id}`, { method: 'DELETE' }),
 
@@ -97,18 +151,22 @@ export const api = {
     if (opts?.client_id) fd.append('client_id', String(opts.client_id))
     return request<Call>('/api/calls', { method: 'POST', body: fd })
   },
-  audioUrl: (id: number) => {
-    const token = getToken()
-    const base = `${window.location.origin}/api/calls/${id}/audio`
-    return token ? `${base}?token=${token}` : base
-  },
+  audioUrl: (id: number) => `${window.location.origin}/api/calls/${id}/audio`,
   updateTranscript: (id: number, transcript: string, segments?: unknown[]) =>
     request<Call>(`/api/calls/${id}/transcript`, {
       method: 'PATCH',
       body: JSON.stringify({ transcript, ...(segments ? { segments } : {}) }),
     }),
-  updateCall: (id: number, data: Partial<{ call_type: string; client_id: number | null }>) =>
-    request<Call>(`/api/calls/${id}`, jsonBody('PATCH', data)),
+  updateCall: (
+    id: number,
+    data: Partial<{
+      call_type: string
+      client_id: number | null
+      resolved: boolean
+      bookmarked: boolean
+      bookmark_note: string
+    }>,
+  ) => request<Call>(`/api/calls/${id}`, jsonBody('PATCH', data)),
   reanalyze: (id: number) =>
     request<{ ok: boolean }>(`/api/calls/${id}/reanalyze`, { method: 'POST' }),
   reanalyzeAll: () =>
@@ -156,4 +214,27 @@ export const api = {
   getProblemCalls: () => request<{ id: number; name: string; duration_sec: number; source_type: string; created_at: string; score: number | null; outcome: string; summary: string; uploader_name: string | null }[]>('/api/stats/problem-calls'),
   getManagerRankings: () => request<{ id: number; name: string; email: string; role?: string; total_calls: number; avg_score: number | null; avg_talk_ratio: number | null; calls_today: number; calls_yesterday: number; trend: string; best_score: number | null; solved_problems?: number; unsolved_problems?: number }[]>('/api/stats/manager-rankings'),
   getSourceBreakdown: () => request<Record<string, number>>('/api/stats/source-breakdown'),
+  getCrossCallInsights: () => request<CrossCallInsights>('/api/stats/insights'),
+  askAcrossCalls: (question: string) =>
+    request<CrossCallAnswer>('/api/stats/ask', jsonBody('POST', { question })),
+  // telegram
+  listTelegramMessages: () => request<TelegramMessage[]>('/api/telegram/messages'),
+  replyTelegramMessage: (id: number, text: string) =>
+    request<TelegramMessage>(`/api/telegram/messages/${id}/reply`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    }),
+
+  // zadarma
+  getZadarmaConfig: () =>
+    request<{ configured: boolean; balance?: number | string | null; currency?: string; error?: string }>(
+      '/api/zadarma/config',
+    ),
+  saveZadarmaConfig: (data: { api_key: string; api_secret: string }) =>
+    request<{ ok: boolean; configured: boolean }>('/api/zadarma/config', jsonBody('POST', data)),
+  syncZadarma: (data?: { start?: string; end?: string }) =>
+    request<{ ok: boolean; status: string; start: string; end: string }>(
+      '/api/zadarma/sync',
+      jsonBody('POST', data ?? {}),
+    ),
 }

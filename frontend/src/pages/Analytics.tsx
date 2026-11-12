@@ -3,8 +3,24 @@ import { Link } from 'react-router-dom'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { AnimatePresence, motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { ArrowDown, ArrowUp, CheckCircle2, Clock, Gauge, Lightbulb, Loader2, MessageSquareWarning, Minus, PhoneCall, Send, Sparkles, UsersRound, Users } from 'lucide-react'
-import { motion as m } from 'framer-motion'
+import {
+  ArrowDown,
+  ArrowRight,
+  ArrowUp,
+  CheckCircle2,
+  Clock,
+  Gauge,
+  Lightbulb,
+  Loader2,
+  MessageSquareWarning,
+  Mic,
+  Minus,
+  PhoneCall,
+  Send,
+  Sparkles,
+  TriangleAlert,
+  Users,
+} from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,18 +29,22 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 
-import { DeltaChip, StatCard } from '@/components/StatCard'
+import { DeltaChip } from '@/components/StatCard'
 import { ScoreChip } from '@/components/ScoreRing'
-import { CallTypePieChart } from '@/components/CallTypePieChart'
-import { ScoreDistributionChart } from '@/components/ScoreDistributionChart'
 import { PageHeader } from '@/components/EmptyState'
 import { EmployeeHome } from '@/pages/EmployeeHome'
-import { Stagger, fadeUp, SPRING } from '@/lib/motion'
+import { SPRING } from '@/lib/motion'
 import { useAuth } from '@/lib/auth'
 import { api } from '@/lib/api'
 import { useI18n } from '@/i18n/i18n'
 import { formatDate, formatDuration, scoreColor } from '@/lib/format'
-import { callTitle, overallScore, type Call, type CrossCallAnswer, type CrossCallInsights } from '@/lib/types'
+import {
+  callTitle,
+  overallScore,
+  type Call,
+  type CrossCallAnswer,
+  type CrossCallInsights,
+} from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 type OverviewStats = Awaited<ReturnType<typeof api.getOverviewStats>>
@@ -46,11 +66,6 @@ function TrendIcon({ trend }: { trend: string }) {
   return <Minus aria-hidden="true" className="size-3 text-muted-foreground" />
 }
 
-/**
- * Signed duration delta, e.g. `+45s`, `-2m`, `0s`. The absolute difference used
- * to be shown, so a longer average call and a shorter one both rendered as a
- * green improvement.
- */
 function signedDuration(diffSeconds: number): string {
   const rounded = Math.round(diffSeconds)
   const sign = rounded > 0 ? '+' : rounded < 0 ? '-' : ''
@@ -87,8 +102,6 @@ export function Analytics() {
     }
 
     let cancelled = false
-    // Every request settles on its own: one failing endpoint must not blank
-    // the six that worked.
     Promise.all([
       api.getOverviewStats().catch(() => null),
       api.getDayOverDay().catch(() => null),
@@ -98,19 +111,21 @@ export function Analytics() {
       api.getSourceBreakdown().catch(() => ({}) as Record<string, number>),
       api.getProblemCalls().catch(() => [] as ProblemCall[]),
       api.getCrossCallInsights().catch(() => null),
-    ]).then(([ov, day, wt, mr, cl, src, pb, ins]) => {
-      if (cancelled) return
-      setOverview(ov)
-      setDod(day)
-      setWeekly(wt)
-      setRankings(mr)
-      setCalls(cl)
-      setSources(src)
-      setProblems(pb)
-      setInsights(ins)
-    }).finally(() => {
-      if (!cancelled) setLoading(false)
-    })
+    ])
+      .then(([ov, day, wt, mr, cl, src, pb, ins]) => {
+        if (cancelled) return
+        setOverview(ov)
+        setDod(day)
+        setWeekly(wt)
+        setRankings(mr)
+        setCalls(cl)
+        setSources(src)
+        setProblems(pb)
+        setInsights(ins)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
     return () => {
       cancelled = true
     }
@@ -144,13 +159,36 @@ export function Analytics() {
       weekly.map((d) => ({
         day: new Date(d.day).toLocaleDateString(undefined, { weekday: 'short' }),
         calls: d.total_calls,
+        score: d.avg_score != null ? Math.round(d.avg_score) : null,
       })),
-    [weekly]
+    [weekly],
   )
 
-  /* The leaderboard is the "xodimlar" concept: solved vs unsolved problems.
-     Only `yonalish` rows participate; anything else is a different view. */
-  const leaders = useMemo(() => rankings.filter((r) => r.role === 'yonalish'), [rankings])
+  const scoreBuckets = useMemo(() => {
+    const b = [
+      { label: '70–100 (Strong)', count: 0, tone: 'bg-success' },
+      { label: '40–69 (Needs work)', count: 0, tone: 'bg-warning' },
+      { label: '0–39 (Critical)', count: 0, tone: 'bg-destructive' },
+    ]
+    for (const c of calls) {
+      if (c.status !== 'done') continue
+      const s = overallScore(c.analysis)
+      if (s == null) continue
+      if (s >= 70) b[0].count += 1
+      else if (s >= 40) b[1].count += 1
+      else b[2].count += 1
+    }
+    return b
+  }, [calls])
+
+  const sourceRows = useMemo(
+    () =>
+      Object.entries(sources)
+        .filter(([, n]) => n > 0)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6),
+    [sources],
+  )
 
   if (!canViewOrgStats) {
     return <EmployeeHome />
@@ -162,16 +200,111 @@ export function Analytics() {
   const hasCalls = (overview?.total_calls ?? 0) > 0
   const hasPbx = Boolean(sources.zadarma || sources.telegram_voice || sources.telegram_audio)
 
+  const kpiCards = [
+    {
+      key: 'calls',
+      icon: PhoneCall,
+      label: t('analytics.total_calls'),
+      headline: String(overview?.total_calls ?? 0),
+      subLabel: `${t('analytics.today')}: ${dod?.today.calls ?? overview?.calls_today ?? 0} · ${t('analytics.yesterday')}: ${dod?.yesterday.calls ?? 0}`,
+      delta:
+        dod?.today.calls != null && dod?.yesterday.calls != null
+          ? Math.round(dod.today.calls - dod.yesterday.calls)
+          : null,
+      invert: false,
+      scoreTone: null as number | null,
+    },
+    {
+      key: 'score',
+      icon: Gauge,
+      label: t('analytics.avg_score'),
+      headline: overview?.avg_score != null ? `${Math.round(overview.avg_score)}/100` : '—',
+      subLabel: `${t('analytics.today')}: ${dod?.today.avg_score != null ? Math.round(dod.today.avg_score) : '—'} · ${t('analytics.yesterday')}: ${dod?.yesterday.avg_score != null ? Math.round(dod.yesterday.avg_score) : '—'}`,
+      delta:
+        dod?.today.avg_score != null && dod?.yesterday.avg_score != null
+          ? Math.round(dod.today.avg_score - dod.yesterday.avg_score)
+          : null,
+      invert: false,
+      scoreTone: overview?.avg_score ?? null,
+    },
+    {
+      key: 'duration',
+      icon: Clock,
+      label: t('analytics.duration'),
+      headline:
+        dod?.today.avg_duration != null
+          ? formatDuration(dod.today.avg_duration)
+          : dod?.yesterday.avg_duration != null
+            ? formatDuration(dod.yesterday.avg_duration)
+            : '—',
+      subLabel: `${t('analytics.yesterday')}: ${dod?.yesterday.avg_duration != null ? formatDuration(dod.yesterday.avg_duration) : '—'}`,
+      delta:
+        dod?.today.avg_duration != null && dod?.yesterday.avg_duration != null
+          ? signedDuration(dod.today.avg_duration - dod.yesterday.avg_duration)
+          : null,
+      invert: true,
+      scoreTone: null as number | null,
+    },
+    {
+      key: 'team',
+      icon: Users,
+      label: t('analytics.active_managers'),
+      headline: String(overview?.total_managers ?? rankings.length),
+      subLabel:
+        dod?.today.avg_talk_ratio != null
+          ? `${t('call.talk_ratio')}: ${Math.round(dod.today.avg_talk_ratio * 100)}%`
+          : `${problems.length} ${t('analytics.problem_calls').toLowerCase()}`,
+      delta:
+        dod?.today.avg_talk_ratio != null && dod?.yesterday.avg_talk_ratio != null
+          ? `${Math.round((dod.today.avg_talk_ratio - dod.yesterday.avg_talk_ratio) * 100)}pp`
+          : null,
+      invert: false,
+      scoreTone: null as number | null,
+    },
+  ]
+
   return (
-    <div>
+    <div className="space-y-6 pb-10">
       <PageHeader
         eyebrow={user?.role === 'yonalish' ? t('nav.coaching_desk') : t('nav.dashboard')}
         title={user?.name ? t('dashboard.welcome', { name: user.name }) : t('analytics.title')}
-        description={user?.role === 'yonalish' ? t('coach.banner_desc') : t('dashboard.welcome_desc')}
+        description={
+          user?.role === 'yonalish' ? t('coach.banner_desc') : t('dashboard.welcome_desc')
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {insights && (
+              <>
+                <Link
+                  to="/calls"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive-soft/60 px-2.5 py-1.5 text-xs font-medium text-destructive-soft-foreground transition-colors hover:bg-destructive-soft"
+                >
+                  <span>{t('coach.escalated_label')}:</span>
+                  <strong data-numeric>{insights.decision_counts.ESCALATE}</strong>
+                </Link>
+                <Link
+                  to="/calls"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-warning/30 bg-warning-soft/60 px-2.5 py-1.5 text-xs font-medium text-warning-soft-foreground transition-colors hover:bg-warning-soft"
+                >
+                  <span>{t('coach.needs_coaching_label')}:</span>
+                  <strong data-numeric>{insights.decision_counts.COACH}</strong>
+                </Link>
+              </>
+            )}
+            <Button asChild size="sm">
+              <Link to="/calls">
+                <Mic aria-hidden="true" className="size-3.5" />
+                {t('nav.calls')}
+                <ArrowRight aria-hidden="true" className="size-3.5" />
+              </Link>
+            </Button>
+          </div>
+        }
       />
 
+      {/* Setup Checklist (Admin only, when workspace is still being configured) */}
       {user?.role === 'admin' && (!hasTeam || !hasCalls) && (
-        <section className="mb-5 rounded-xl border border-primary/25 bg-surface p-4 shadow-e1">
+        <section className="rounded-xl border border-primary/25 bg-surface p-4 shadow-e1">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-semibold">{t('setup.title')}</h2>
@@ -211,269 +344,395 @@ export function Analytics() {
         </section>
       )}
 
-      {user?.role === 'yonalish' && (
-        <section className="mb-5 rounded-xl border border-primary/25 bg-surface p-4 shadow-e1">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 className="text-sm font-semibold">{t('coach.banner_title')}</h2>
-              <p className="text-xs text-muted-foreground">{t('coach.banner_desc')}</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <Link
-                to="/calls"
-                className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-xs"
-              >
-                <span className="text-muted-foreground">{t('coach.escalated_label')}: </span>
-                <strong data-numeric className="text-destructive">
-                  {insights?.decision_counts.ESCALATE ?? 0}
-                </strong>
-              </Link>
-              <Link
-                to="/calls"
-                className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-1.5 text-xs"
-              >
-                <span className="text-muted-foreground">{t('coach.needs_coaching_label')}: </span>
-                <strong data-numeric className="text-amber-600 dark:text-amber-400">
-                  {insights?.decision_counts.COACH ?? 0}
-                </strong>
-              </Link>
-              <Link
-                to="/calls"
-                className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs"
-              >
-                <span className="text-muted-foreground">{t('coach.exemplars_label')}: </span>
-                <strong data-numeric className="text-primary">
-                  {insights?.bookmarked_calls ?? 0}
-                </strong>
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
+      {/* Row 1: Unified Metasell KPI Strip (4 aligned cards with built-in day-over-day delta) */}
+      <section
+        aria-label={t('analytics.title')}
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      >
+        {kpiCards.map((k) => {
+          const Icon = k.icon
+          return (
+            <Card key={k.key} className="h-full">
+              <CardContent className="flex h-full flex-col justify-between gap-3 p-5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                    <span className="flex size-7 items-center justify-center rounded-md bg-primary-soft text-primary-soft-foreground">
+                      <Icon aria-hidden="true" className="size-3.5" />
+                    </span>
+                    {k.label}
+                  </span>
+                  <DeltaChip delta={k.delta} invert={k.invert} />
+                </div>
 
-      <section className="relative mb-5 overflow-hidden rounded-2xl text-white">
-        <div aria-hidden="true" className="absolute inset-0" style={{ background: 'var(--accent-gradient)' }} />
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 opacity-50"
-          style={{
-            background:
-              'radial-gradient(560px 320px at 8% 0%, rgb(255 255 255 / 0.25), transparent 60%), radial-gradient(420px 280px at 96% 110%, rgb(52 214 226 / 0.5), transparent 62%)',
-          }}
-        />
-        <div className="relative flex flex-wrap items-end justify-between gap-8 p-6 sm:p-8">
-          <div className="max-w-xl">
-            <p className="font-mono text-2xs font-medium tracking-[0.16em] text-white/75 uppercase">
-              {t('analytics.hero_eyebrow')}
-            </p>
-            <h2 className="mt-3 text-[1.6rem] leading-tight font-semibold tracking-[-0.03em] sm:text-[2rem]">
-              {t('analytics.hero_title')}
-            </h2>
-            <p className="mt-2 max-w-lg text-sm leading-relaxed text-white/80">
-              {t('analytics.hero_sub')}
-            </p>
-            <Link
-              to="/calls"
-              className="focus-ring mt-5 inline-flex h-10 items-center gap-2 rounded-full border border-white/30 bg-white/15 px-4 text-sm font-medium text-white backdrop-blur transition-colors duration-200 hover:bg-white/25"
-            >
-              {t('nav.calls')}
-              <ArrowUp aria-hidden="true" className="size-3.5 rotate-45" />
-            </Link>
-          </div>
-
-          <dl className="flex flex-wrap items-end gap-x-10 gap-y-6">
-            <div>
-              <dt className="text-2xs font-medium tracking-[0.12em] text-white/70 uppercase">
-                {t('analytics.avg_score')}
-              </dt>
-              <dd className="mt-1 text-[2.75rem] leading-none font-semibold tracking-[-0.04em] tabular-nums">
-                {overview?.avg_score != null ? Math.round(overview.avg_score) : '—'}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-2xs font-medium tracking-[0.12em] text-white/70 uppercase">
-                {t('analytics.total_calls')}
-              </dt>
-              <dd className="mt-1 text-[2rem] leading-none font-semibold tracking-[-0.04em] tabular-nums">
-                {overview?.total_calls ?? 0}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-2xs font-medium tracking-[0.12em] text-white/70 uppercase">
-                {t('analytics.today_calls')}
-              </dt>
-              <dd className="mt-1 text-[2rem] leading-none font-semibold tracking-[-0.04em] tabular-nums">
-                {overview?.calls_today ?? 0}
-              </dd>
-            </div>
-          </dl>
-        </div>
-      </section>
-
-      <Stagger className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <motion.div variants={fadeUp}>
-          <StatCard icon={PhoneCall} label={t('analytics.total_calls')} value={overview?.total_calls ?? 0} />
-        </motion.div>
-        <motion.div variants={fadeUp}>
-          <StatCard
-            icon={Gauge}
-            label={t('analytics.avg_score')}
-            value={overview?.avg_score ?? 0}
-            valueClass={scoreColor(overview?.avg_score)}
-            progress={overview?.avg_score ?? null}
-          />
-        </motion.div>
-        <motion.div variants={fadeUp}>
-          <StatCard icon={Clock} label={t('analytics.today_calls')} value={overview?.calls_today ?? 0} />
-        </motion.div>
-        <motion.div variants={fadeUp}>
-          <StatCard icon={Users} label={t('analytics.active_managers')} value={overview?.total_managers ?? 0} />
-        </motion.div>
-      </Stagger>
-
-      {dod && (
-        <section className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label={t('analytics.day_comparison')}>
-          {[
-            {
-              key: 'calls',
-              label: t('analytics.calls'),
-              today: dod.today.calls,
-              yesterday: dod.yesterday.calls,
-              format: (v: number | null) => (v != null ? String(v) : '—'),
-              delta: (a: number, b: number) => Math.round(a - b),
-              invert: false,
-            },
-            {
-              key: 'score',
-              label: t('analytics.score'),
-              today: dod.today.avg_score,
-              yesterday: dod.yesterday.avg_score,
-              format: (v: number | null) => (v != null ? String(v) : '—'),
-              score: true,
-              delta: (a: number, b: number) => Math.round(a - b),
-              invert: false,
-            },
-            {
-              key: 'duration',
-              label: t('analytics.duration'),
-              today: dod.today.avg_duration,
-              yesterday: dod.yesterday.avg_duration,
-              format: (v: number | null) => (v != null ? formatDuration(v) : '—'),
-              delta: (a: number, b: number) => signedDuration(a - b),
-              // Longer calls are not an achievement.
-              invert: true,
-            },
-            {
-              key: 'talk',
-              label: t('analytics.talk_ratio'),
-              today: dod.today.avg_talk_ratio,
-              yesterday: dod.yesterday.avg_talk_ratio,
-              format: (v: number | null) => (v != null ? `${Math.round(v * 100)}%` : '—'),
-              delta: (a: number, b: number) => `${Math.round((a - b) * 100)}pp`,
-              invert: false,
-            },
-          ].map((m) => {
-            const today = typeof m.today === 'number' ? m.today : null
-            const yesterday = typeof m.yesterday === 'number' ? m.yesterday : null
-            const max = Math.max(today ?? 0, yesterday ?? 0, 1)
-            return (
-              <Card key={m.key}>
-                <CardContent className="space-y-3 p-5">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="truncate text-[11px] font-semibold tracking-[0.1em] text-muted-foreground uppercase">{m.label}</p>
-                    <DeltaChip
-                      delta={today != null && yesterday != null ? m.delta(today, yesterday) : null}
-                      invert={m.invert}
-                    />
-                  </div>
+                <div>
                   <p
+                    data-numeric
                     className={cn(
-                      'text-[1.75rem] leading-none font-semibold tracking-[-0.03em] tabular-nums',
-                      m.score ? scoreColor(today) : 'text-foreground'
+                      'text-[1.85rem] leading-none font-bold tracking-[-0.03em] tabular-nums',
+                      k.scoreTone != null ? scoreColor(k.scoreTone) : 'text-foreground',
                     )}
                   >
-                    {m.format(today)}
+                    {k.headline}
                   </p>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-surface-sunken">
-                        <motion.div
-                          className="h-full rounded-full bg-border-strong"
-                          initial={{ width: 0 }}
-                          animate={{ width: `${((yesterday ?? 0) / max) * 100}%` }}
-                          transition={SPRING.gentle}
-                        />
-                      </div>
-                      <span className="w-20 shrink-0 text-right text-2xs tabular-nums text-muted-foreground">
-                        {t('analytics.yesterday')} {m.format(yesterday)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-surface-sunken">
-                        <motion.div
-                          className="h-full rounded-full bg-primary"
-                          initial={{ width: 0 }}
-                          animate={{ width: `${((today ?? 0) / max) * 100}%` }}
-                          transition={SPRING.gentle}
-                        />
-                      </div>
-                      <span className="w-20 shrink-0 text-right text-2xs font-medium tabular-nums">
-                        {t('analytics.today')} {m.format(today)}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </section>
-      )}
+                  <p className="mt-1.5 truncate text-2xs text-muted-foreground">{k.subLabel}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </section>
 
-      <div className="mb-4 grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-1">
-            <CardTitle>{t('analytics.weekly_trend')}</CardTitle>
+      {/* Row 2: Symmetrical 12-Column Analytics Bento Grid (Weekly Trend + Breakdown Card) */}
+      <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-12">
+        <Card className="flex flex-col lg:col-span-7">
+          <CardHeader className="border-b border-border-subtle pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <CardTitle>{t('analytics.weekly_trend')}</CardTitle>
+                <CardDescription className="mt-0.5">{t('analytics.hero_sub')}</CardDescription>
+              </div>
+              <Badge variant="secondary" className="tabular-nums">
+                {overview?.done_calls ?? 0} {t('status.done').toLowerCase()}
+              </Badge>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1 pt-4">
             {weeklyData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={190}>
+              <ResponsiveContainer width="100%" height={220}>
                 <AreaChart data={weeklyData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                   <defs>
                     <linearGradient id="callsFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.42} />
+                      <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.38} />
                       <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="day" axisLine={false} tickLine={false} dy={4} />
                   <YAxis allowDecimals={false} axisLine={false} tickLine={false} width={32} />
-                  <Tooltip cursor={{ stroke: 'var(--color-border-strong)', strokeDasharray: '3 3' }} contentStyle={CHART_TOOLTIP} />
+                  <Tooltip
+                    cursor={{ stroke: 'var(--color-border-strong)', strokeDasharray: '3 3' }}
+                    contentStyle={CHART_TOOLTIP}
+                  />
                   <Area
                     type="monotone"
                     dataKey="calls"
                     stroke="var(--color-chart-1)"
                     strokeWidth={2.25}
                     fill="url(#callsFill)"
-                    dot={{ r: 2.5, fill: 'var(--color-chart-1)', strokeWidth: 0 }}
-                    activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--color-surface)' }}
+                    dot={{ r: 3, fill: 'var(--color-chart-1)', strokeWidth: 0 }}
+                    activeDot={{ r: 4.5, strokeWidth: 2, stroke: 'var(--color-surface)' }}
                   />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex h-[190px] items-center justify-center text-xs text-muted-foreground">
+              <div className="flex h-[220px] items-center justify-center text-xs text-muted-foreground">
                 {t('dashboard.chart.no_data')}
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* These two components existed as dead files while Analytics
-            re-implemented them inline. They are now the single source. */}
-        <ScoreDistributionChart calls={calls} />
-        <CallTypePieChart calls={calls} />
-        <SourceBreakdown sources={sources} />
+        <Card className="flex flex-col lg:col-span-5">
+          <Tabs defaultValue="scores" className="flex h-full flex-col">
+            <CardHeader className="border-b border-border-subtle pb-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle>{t('analytics.score_distribution')}</CardTitle>
+                <TabsList>
+                  <TabsTrigger value="scores">{t('analytics.score')}</TabsTrigger>
+                  <TabsTrigger value="sources">{t('analytics.source_breakdown')}</TabsTrigger>
+                </TabsList>
+              </div>
+            </CardHeader>
+            <CardContent className="flex flex-1 flex-col justify-center pt-4">
+              <TabsContent value="scores" className="mt-0 space-y-4">
+                {(() => {
+                  const totalScored = scoreBuckets.reduce((s, b) => s + b.count, 0) || 1
+                  return scoreBuckets.map((b) => {
+                    const pct = Math.round((b.count / totalScored) * 100)
+                    return (
+                      <div key={b.label} className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-medium">{b.label}</span>
+                          <span className="font-semibold tabular-nums">
+                            {b.count}{' '}
+                            <span className="text-2xs font-normal text-muted-foreground">
+                              ({pct}%)
+                            </span>
+                          </span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-surface-sunken">
+                          <div
+                            className={cn('h-full rounded-full transition-all', b.tone)}
+                            style={{ width: `${Math.max(b.count > 0 ? 6 : 0, pct)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
+
+                <div className="grid grid-cols-2 gap-2.5 border-t border-border-subtle pt-3">
+                  <div className="rounded-lg bg-surface-sunken px-3 py-2">
+                    <p className="text-2xs text-muted-foreground">{t('call.manager_call')}</p>
+                    <p data-numeric className="mt-0.5 text-base font-semibold">
+                      {calls.filter((c) => c.call_type === 'manager').length}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-surface-sunken px-3 py-2">
+                    <p className="text-2xs text-muted-foreground">{t('call.receptionist_call')}</p>
+                    <p data-numeric className="mt-0.5 text-base font-semibold">
+                      {calls.filter((c) => c.call_type === 'receptionist').length}
+                    </p>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="sources" className="mt-0">
+                {sourceRows.length === 0 ? (
+                  <div className="flex h-[180px] items-center justify-center text-xs text-muted-foreground">
+                    {t('dashboard.chart.no_data')}
+                  </div>
+                ) : (
+                  <ul className="space-y-3">
+                    {(() => {
+                      const total = sourceRows.reduce((s, [, n]) => s + n, 0) || 1
+                      return sourceRows.map(([source, count], i) => (
+                        <li key={source} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="capitalize font-medium">
+                              {source.replace(/_/g, ' ')}
+                            </span>
+                            <span className="font-semibold tabular-nums">
+                              {count}{' '}
+                              <span className="text-2xs font-normal text-muted-foreground">
+                                ({Math.round((count / total) * 100)}%)
+                              </span>
+                            </span>
+                          </div>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-surface-sunken">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${Math.round((count / total) * 100)}%`,
+                                backgroundColor: `var(--color-chart-${(i % 6) + 1})`,
+                              }}
+                            />
+                          </div>
+                        </li>
+                      ))
+                    })()}
+                  </ul>
+                )}
+              </TabsContent>
+            </CardContent>
+          </Tabs>
+        </Card>
       </div>
 
-      {/* Cross-Call AI Intelligence & Trends */}
+      {/* Row 3: Metasell Split View — Team Leaderboard (Left 7 cols) + Problem Calls Queue (Right 5 cols) */}
+      <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-12">
+        {/* Left: Team Performance Leaderboard */}
+        <Card className="flex flex-col lg:col-span-7">
+          <CardHeader className="border-b border-border-subtle pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <CardTitle>{t('analytics.manager_rankings')}</CardTitle>
+                <CardDescription className="mt-0.5">{t(' analytics.click_employee' in t ? 'analytics.click_employee' : 'analytics.click_employee')}</CardDescription>
+              </div>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/managers">{t('nav.submenu.managers')}</Link>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="flex-1 pt-3">
+            {rankings.length === 0 ? (
+              <div className="flex h-60 items-center justify-center text-xs text-muted-foreground">
+                {t('managers.no_managers')}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div
+                  role="region"
+                  aria-label={t('analytics.manager_rankings')}
+                  tabIndex={0}
+                  className="max-h-80 overflow-y-auto rounded-lg border border-border-subtle [overscroll-behavior:contain] [scrollbar-gutter:stable]"
+                >
+                  <table className="w-full text-left text-xs">
+                    <thead className="sticky top-0 z-10 border-b border-border-subtle bg-surface-sunken text-2xs font-semibold uppercase text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2">#</th>
+                        <th className="px-3 py-2">{t('users.name')}</th>
+                        <th className="px-3 py-2 text-right">{t('analytics.calls')}</th>
+                        <th className="px-3 py-2 text-right">{t('analytics.score')}</th>
+                        <th className="px-3 py-2 text-right">{t('analytics.best')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-subtle">
+                      {rankings.map((r, i) => {
+                        const isSelected = selected?.id === r.id
+                        return (
+                          <tr
+                            key={r.id}
+                            onClick={() =>
+                              setSelected(isSelected ? null : { id: r.id, name: r.name })
+                            }
+                            className={cn(
+                              'cursor-pointer transition-colors',
+                              isSelected ? 'bg-primary-soft/60' : 'hover:bg-surface-hover',
+                            )}
+                          >
+                            <td className="px-3 py-2.5 font-mono text-2xs font-semibold tabular-nums text-muted-foreground">
+                              {i + 1}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <div className="flex items-center gap-1.5 font-medium text-foreground">
+                                <span className="truncate">{r.name}</span>
+                                <TrendIcon trend={r.trend} />
+                              </div>
+                              <div className="mt-0.5 flex items-center gap-2 text-2xs text-muted-foreground">
+                                {r.role && <span>{t(`nav.role.${r.role}`)}</span>}
+                                {(r.unsolved_problems ?? 0) > 0 && (
+                                  <span className="text-destructive">
+                                    · {r.unsolved_problems} {t('analytics.unsolved')}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2.5 text-right font-medium tabular-nums">
+                              {r.total_calls}
+                            </td>
+                            <td className="px-3 py-2.5 text-right tabular-nums">
+                              {r.avg_score != null ? (
+                                <span className={cn('font-semibold', scoreColor(r.avg_score))}>
+                                  {Math.round(r.avg_score)}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5 text-right tabular-nums">
+                              {r.best_score != null ? (
+                                <span className={cn('font-semibold', scoreColor(r.best_score))}>
+                                  {Math.round(r.best_score)}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Selected Rep's Recent Calls Drawer */}
+                <AnimatePresence mode="wait">
+                  {selected && (
+                    <motion.div
+                      key={selected.id}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={SPRING.standard}
+                      className="rounded-lg border border-border bg-surface-sunken/50 p-3"
+                    >
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-xs font-semibold">
+                          {t('managers.recent_for', { name: selected.name })}
+                        </p>
+                        <Badge variant="secondary" className="tabular-nums">
+                          {selectedCalls.length}
+                        </Badge>
+                      </div>
+                      {selectedLoading ? (
+                        <Skeleton className="h-16 rounded-md" />
+                      ) : selectedCalls.length === 0 ? (
+                        <p className="py-4 text-center text-xs text-muted-foreground">
+                          {t('analytics.no_calls_for', { name: selected.name })}
+                        </p>
+                      ) : (
+                        <ul className="max-h-44 space-y-1 overflow-y-auto pr-1 [overscroll-behavior:contain]">
+                          {selectedCalls.slice(0, 6).map((c) => (
+                            <li key={c.id}>
+                              <Link
+                                to={`/calls/${c.id}`}
+                                className="flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors hover:bg-surface-hover"
+                              >
+                                <span className="truncate font-medium">{callTitle(c)}</span>
+                                <ScoreChip score={overallScore(c.analysis)} />
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Right: Problem Calls Queue (Always visible beside Leaderboard) */}
+        <Card className="flex flex-col lg:col-span-5">
+          <CardHeader className="border-b border-border-subtle pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <CardTitle className="flex items-center gap-1.5">
+                  <TriangleAlert aria-hidden="true" className="size-4 text-destructive" />
+                  {t('analytics.problem_calls')}
+                </CardTitle>
+                <CardDescription className="mt-0.5">
+                  {t('analytics.problem_calls_desc')}
+                </CardDescription>
+              </div>
+              {problems.length > 0 && (
+                <Badge variant="destructive" className="tabular-nums">
+                  {problems.length}
+                </Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="flex-1 pt-3">
+            {problems.length === 0 ? (
+              <div className="flex h-60 flex-col items-center justify-center gap-2 text-center">
+                <CheckCircle2 aria-hidden="true" className="size-6 text-success" />
+                <p className="text-xs text-muted-foreground">{t('analytics.no_problems')}</p>
+              </div>
+            ) : (
+              <ul className="max-h-80 space-y-2 overflow-y-auto pr-1 [overscroll-behavior:contain] [scrollbar-gutter:stable]">
+                {problems.map((p) => (
+                  <li key={p.id}>
+                    <Link
+                      to={`/calls/${p.id}`}
+                      className="block rounded-lg border border-border-subtle bg-surface-sunken/50 p-3 transition-colors hover:border-destructive/30 hover:bg-surface-hover"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="truncate text-xs font-semibold text-foreground">
+                          {p.name}
+                        </span>
+                        <ScoreChip score={p.score} />
+                      </div>
+                      {p.summary && (
+                        <p className="mt-1 line-clamp-2 text-2xs leading-relaxed text-muted-foreground">
+                          {p.summary}
+                        </p>
+                      )}
+                      <div className="mt-2 flex flex-wrap items-center gap-x-2 text-2xs text-muted-foreground">
+                        {p.uploader_name && <span className="font-medium">{p.uploader_name}</span>}
+                        <span className="tabular-nums">· {formatDuration(p.duration_sec)}</span>
+                        <span className="tabular-nums">· {formatDate(p.created_at)}</span>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Row 4: Cross-Call AI Intelligence & Conversational Assistant */}
       <Card>
         <CardHeader className="border-b border-border-subtle pb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -482,9 +741,7 @@ export function Analytics() {
                 <Sparkles aria-hidden="true" className="size-4 text-primary" />
                 {t('analytics.insights.title')}
               </CardTitle>
-              <CardDescription className="mt-0.5">
-                {t('analytics.insights.desc')}
-              </CardDescription>
+              <CardDescription className="mt-0.5">{t('analytics.insights.desc')}</CardDescription>
             </div>
             {insights && insights.analyzed_calls > 0 && (
               <Badge variant="outline" className="tabular-nums">
@@ -497,11 +754,11 @@ export function Analytics() {
           {insights && insights.analyzed_calls > 0 && (
             <div className="grid gap-3 md:grid-cols-3">
               {/* Weakest Rubric Dimensions */}
-              <div className="rounded-lg border border-border-subtle bg-surface-sunken/50 p-3">
-                <p className="mb-2 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {t('analytics.insights.weak_dims')}
+              <div className="rounded-lg border border-border-subtle bg-surface-sunken/50 p-3.5">
+                <p className="mb-2.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t('analytics.insights.weakest_dims')}
                 </p>
-                <ul className="space-y-1.5">
+                <ul className="space-y-2">
                   {insights.weakest_dimensions.map((d) => (
                     <li key={d.dimension} className="flex items-center justify-between text-xs">
                       <span className="truncate font-medium">{t(`rubric.${d.dimension}`)}</span>
@@ -514,15 +771,17 @@ export function Analytics() {
               </div>
 
               {/* Top Client Objections */}
-              <div className="rounded-lg border border-border-subtle bg-surface-sunken/50 p-3">
-                <p className="mb-2 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="rounded-lg border border-border-subtle bg-surface-sunken/50 p-3.5">
+                <p className="mb-2.5 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
                   <MessageSquareWarning aria-hidden="true" className="size-3.5 text-warning" />
                   {t('analytics.insights.top_objections')}
                 </p>
                 {insights.top_objections.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">{t('analytics.insights.no_objections')}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t('analytics.insights.no_objections')}
+                  </p>
                 ) : (
-                  <ul className="space-y-1.5">
+                  <ul className="space-y-2">
                     {insights.top_objections.slice(0, 4).map((obj, idx) => (
                       <li key={idx} className="flex items-start justify-between gap-2 text-xs">
                         <span className="line-clamp-1">{obj.text}</span>
@@ -536,15 +795,15 @@ export function Analytics() {
               </div>
 
               {/* Top Coaching Flaws */}
-              <div className="rounded-lg border border-border-subtle bg-surface-sunken/50 p-3">
-                <p className="mb-2 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="rounded-lg border border-border-subtle bg-surface-sunken/50 p-3.5">
+                <p className="mb-2.5 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
                   <Lightbulb aria-hidden="true" className="size-3.5 text-primary" />
                   {t('analytics.insights.top_flaws')}
                 </p>
                 {insights.top_flaws.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">—</p>
+                  <p className="text-xs text-muted-foreground">{t('analytics.insights.no_items')}</p>
                 ) : (
-                  <ul className="space-y-1.5">
+                  <ul className="space-y-2">
                     {insights.top_flaws.slice(0, 4).map((flaw, idx) => (
                       <li key={idx} className="flex items-start justify-between gap-2 text-xs">
                         <span className="line-clamp-1">{flaw.text}</span>
@@ -596,7 +855,11 @@ export function Analytics() {
             </form>
 
             <div className="mt-2.5 flex flex-wrap gap-1.5">
-              {[t('analytics.insights.q1'), t('analytics.insights.q2'), t('analytics.insights.q3')].map((preset) => (
+              {[
+                t('analytics.insights.q1'),
+                t('analytics.insights.q2'),
+                t('analytics.insights.q3'),
+              ].map((preset) => (
                 <button
                   key={preset}
                   type="button"
@@ -610,7 +873,9 @@ export function Analytics() {
 
             {qaAnswer && (
               <div className="mt-3.5 space-y-2.5 rounded-md border border-primary/20 bg-primary-soft/20 p-3 text-xs">
-                <p className="leading-relaxed whitespace-pre-line text-foreground">{qaAnswer.answer}</p>
+                <p className="leading-relaxed whitespace-pre-line text-foreground">
+                  {qaAnswer.answer}
+                </p>
                 {qaAnswer.recommendations.length > 0 && (
                   <div>
                     <p className="mb-1 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -644,288 +909,30 @@ export function Analytics() {
           </div>
         </CardContent>
       </Card>
-
-      <Card>
-        <Tabs defaultValue="employees">
-          <CardHeader className="border-b border-border-subtle pb-2.5">
-            <div className="flex items-center justify-between gap-3">
-              <CardTitle>{t('analytics.manager_rankings')}</CardTitle>
-              <TabsList>
-                <TabsTrigger value="employees">{t('analytics.tab_employees')}</TabsTrigger>
-                <TabsTrigger value="problems">
-                  {t('analytics.tab_problems')}
-                  {problems.length > 0 && (
-                    <span className="ml-1 rounded-full bg-destructive-soft px-1.5 text-2xs font-semibold tabular-nums text-destructive-soft-foreground">
-                      {problems.length}
-                    </span>
-                  )}
-                </TabsTrigger>
-              </TabsList>
-            </div>
-          </CardHeader>
-
-          <CardContent className="pt-3">
-            <TabsContent value="employees">
-            <div className="grid gap-4 lg:grid-cols-12">
-            <ol className="min-w-0 max-h-[26rem] space-y-1 overflow-y-auto pr-1 lg:col-span-7">
-              {leaders.length === 0 ? (
-                <li className="py-10 text-center text-xs text-muted-foreground">
-                  {t('analytics.no_problems')}
-                </li>
-              ) : (
-                leaders.map((r, i) => {
-                  const isSelected = selected?.id === r.id
-                  return (
-                    <li key={r.id}>
-                      <button
-                        type="button"
-                        onClick={() => setSelected({ id: r.id, name: r.name })}
-                        aria-pressed={isSelected}
-                        className={cn(
-                          'flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left transition-colors duration-150',
-                          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                          isSelected ? 'bg-primary-soft ring-1 ring-primary/25' : 'hover:bg-surface-hover'
-                        )}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={cn(
-                            'flex size-6 shrink-0 items-center justify-center rounded-sm text-2xs font-semibold tabular-nums ring-1 ring-inset',
-                            i === 0
-                              ? 'bg-warning-soft text-warning-soft-foreground ring-warning/25'
-                              : 'bg-surface-sunken text-muted-foreground ring-border-subtle'
-                          )}
-                        >
-                          {i + 1}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-1.5">
-                            <span className="truncate text-sm font-medium">{r.name}</span>
-                            <TrendIcon trend={r.trend} />
-                          </span>
-                          <span className="mt-0.5 block text-2xs text-muted-foreground">
-                            {r.total_calls} {t('analytics.calls').toLowerCase()}
-                            {r.avg_score != null && (
-                              <> · <span className={cn('font-semibold', scoreColor(r.avg_score))}>{r.avg_score}</span></>
-                            )}
-                            {(r.solved_problems ?? 0) > 0 && (
-                              <span className="text-success"> · {r.solved_problems} {t('analytics.solved')}</span>
-                            )}
-                            {(r.unsolved_problems ?? 0) > 0 && (
-                              <span className="text-destructive"> · {r.unsolved_problems} {t('analytics.unsolved')}</span>
-                            )}
-                          </span>
-                        </span>
-                        {r.best_score != null && (
-                          <span className="shrink-0 text-right">
-                            <span className="eyebrow block">{t('analytics.best')}</span>
-                            <span className={cn('text-xs font-semibold tabular-nums', scoreColor(r.best_score))}>
-                              {r.best_score}
-                            </span>
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  )
-                })
-              )}
-            </ol>
-
-            <div className="lg:col-span-5 lg:min-h-[26rem]">
-              <AnimatePresence mode="wait">
-                {selected ? (
-                  <motion.div
-                    key={selected.id}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={SPRING.standard}
-                  >
-                    <div className="flex items-center justify-between gap-2 border-b border-border-subtle pb-2">
-                      <p className="truncate text-xs font-semibold">{selected.name}</p>
-                      <Badge variant="secondary">
-                        {selectedCalls.length} {t('analytics.calls').toLowerCase()}
-                      </Badge>
-                    </div>
-                    {selectedLoading ? (
-                      <div className="mt-2 space-y-1.5">
-                        {Array.from({ length: 4 }).map((_, i) => (
-                          <Skeleton key={i} className="h-14 rounded-md" />
-                        ))}
-                      </div>
-                    ) : selectedCalls.length === 0 ? (
-                      <p className="py-10 text-center text-xs text-muted-foreground">
-                        {t('analytics.no_calls_for', { name: selected.name })}
-                      </p>
-                    ) : (
-                      <ul className="mt-2 max-h-72 space-y-1 overflow-y-auto">
-                        {selectedCalls.map((c) => {
-                          const overall = overallScore(c.analysis)
-                          const actionItem = Array.isArray(asActionItems(c))
-                            ? asActionItems(c)[0]
-                            : undefined
-                          return (
-                            <li key={c.id}>
-                              <Link
-                                to={`/calls/${c.id}`}
-                                className="block rounded-md px-2.5 py-2 transition-colors duration-150 hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                              >
-                                <span className="flex items-baseline justify-between gap-2">
-                                  <span className="truncate text-xs font-medium">{callTitle(c)}</span>
-                                  <ScoreChip score={overall} />
-                                </span>
-                                <span className="mt-0.5 block text-2xs text-muted-foreground">
-                                  {[c.client_name, c.duration_sec != null ? formatDuration(c.duration_sec) : null]
-                                    .filter(Boolean)
-                                    .join(' · ')}
-                                </span>
-                                {actionItem && (
-                                  <span className="mt-1 block truncate rounded-sm bg-surface-sunken px-1.5 py-0.5 text-2xs text-muted-foreground">
-                                    {actionItem}
-                                  </span>
-                                )}
-                              </Link>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    )}
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="empty"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex flex-col items-center justify-center gap-2 py-16 text-center"
-                  >
-                    <UsersRound aria-hidden="true" className="size-7 text-muted-foreground/40" />
-                    <p className="max-w-[24ch] text-xs text-muted-foreground">{t('analytics.click_employee')}</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-            </div>
-            </TabsContent>
-
-            <TabsContent value="problems">
-              {problems.length === 0 ? (
-                <p className="py-12 text-center text-xs text-muted-foreground">
-                  {t('analytics.no_problems')}
-                </p>
-              ) : (
-                <ul className="max-h-[26rem] space-y-1 overflow-y-auto pr-1">
-                  {problems.map((p) => (
-                    <li key={p.id}>
-                      <Link
-                        to={`/calls/${p.id}`}
-                        className="block rounded-md px-2.5 py-2 transition-colors duration-150 hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                      >
-                        <span className="flex items-baseline justify-between gap-2">
-                          <span className="min-w-0 truncate text-xs font-medium">{p.name}</span>
-                          <ScoreChip score={p.score} />
-                        </span>
-                        {p.summary && (
-                          <span className="mt-1 block line-clamp-2 text-2xs leading-relaxed text-muted-foreground">
-                            {p.summary}
-                          </span>
-                        )}
-                        <span className="mt-1 flex flex-wrap items-center gap-x-2 text-2xs text-muted-foreground">
-                          <span className="tabular-nums">{formatDuration(p.duration_sec)}</span>
-                          <span className="capitalize">{p.source_type.replace(/_/g, ' ')}</span>
-                          {p.outcome && <span className="capitalize">{p.outcome}</span>}
-                          {p.uploader_name && <span>· {p.uploader_name}</span>}
-                          <span className="tabular-nums">· {formatDate(p.created_at)}</span>
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </TabsContent>
-          </CardContent>
-        </Tabs>
-      </Card>
     </div>
   )
 }
 
-/** Where calls come from. Uses the previously-unused `/api/stats/source-breakdown`. */
-function SourceBreakdown({ sources }: { sources: Record<string, number> }) {
-  const { t } = useI18n()
-  const rows = useMemo(
-    () =>
-      Object.entries(sources)
-        .filter(([, n]) => n > 0)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 6),
-    [sources]
-  )
-  const total = rows.reduce((s, [, n]) => s + n, 0) || 1
-
-  return (
-    <Card size="sm" className="lg:col-span-2">
-      <CardHeader className="pb-1">
-        <CardTitle>{t('analytics.source_breakdown')}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {rows.length === 0 ? (
-          <div className="flex h-[190px] items-center justify-center text-xs text-muted-foreground">
-            {t('dashboard.chart.no_data')}
-          </div>
-        ) : (
-          <ul className="space-y-2.5 pt-1">
-            {rows.map(([source, count], i) => (
-              <li key={source} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
-                <span className="truncate text-xs capitalize">{source.replace(/_/g, ' ')}</span>
-                <span className="text-xs font-semibold tabular-nums">
-                  {count}
-                  <span className="ml-1.5 text-2xs font-normal text-muted-foreground">
-                    {Math.round((count / total) * 100)}%
-                  </span>
-                </span>
-                <div className="col-span-2 h-1 overflow-hidden rounded-full bg-surface-sunken">
-                  <m.div
-                    className="h-full rounded-full"
-                    style={{ backgroundColor: `var(--color-chart-${(i % 6) + 1})` }}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(count / total) * 100}%` }}
-                    transition={{ ...SPRING.gentle, delay: i * 0.04 }}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-function asActionItems(call: Call): string[] {
-  const raw = call.analysis as { action_items?: unknown }
-  if (!Array.isArray(raw.action_items)) return []
-  return raw.action_items
-    .map((a) => (a as { description?: unknown })?.description)
-    .filter((d): d is string => typeof d === 'string' && d.trim() !== '')
-}
-
 function DashboardSkeleton() {
   return (
-    <div aria-busy="true" aria-label="loading">
-      <div className="mb-6 space-y-2">
+    <div aria-busy="true" aria-label="loading" className="space-y-6">
+      <div className="space-y-2">
         <Skeleton className="h-6 w-56 rounded-md" />
         <Skeleton className="h-3 w-72 rounded" />
       </div>
-      <div className="mb-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-20 rounded-lg" />
+          <Skeleton key={i} className="h-28 rounded-xl" />
         ))}
       </div>
-      <div className="mb-4 grid gap-4 lg:grid-cols-3">
-        <Skeleton className="h-56 rounded-lg lg:col-span-2" />
-        <Skeleton className="h-56 rounded-lg" />
+      <div className="grid gap-4 lg:grid-cols-12">
+        <Skeleton className="h-72 rounded-xl lg:col-span-7" />
+        <Skeleton className="h-72 rounded-xl lg:col-span-5" />
       </div>
-      <Skeleton className="h-80 rounded-lg" />
+      <div className="grid gap-4 lg:grid-cols-12">
+        <Skeleton className="h-80 rounded-xl lg:col-span-7" />
+        <Skeleton className="h-80 rounded-xl lg:col-span-5" />
+      </div>
     </div>
   )
 }

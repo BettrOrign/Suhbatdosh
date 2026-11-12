@@ -329,64 +329,68 @@ function PersonCard({
   const primaryStatKey = config.primaryStatKey ?? 'total_calls'
 
   return (
-    <Card interactive size="sm" className="h-full">
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-surface-sunken text-muted-foreground ring-1 ring-border-subtle">
-              <UserRound className="size-3.5" />
+    <Card interactive size="sm" className="flex h-full flex-col justify-between">
+      <div>
+        <CardHeader className="pb-2">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-surface-sunken text-muted-foreground ring-1 ring-border-subtle">
+                <UserRound className="size-3.5" />
+              </div>
+              <div className="min-w-0">
+                <CardTitle className="truncate text-sm">{person.name}</CardTitle>
+                <p className="truncate text-xs text-muted-foreground">{person.email}</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <CardTitle className="truncate text-sm">{person.name}</CardTitle>
-              <p className="truncate text-xs text-muted-foreground">{person.email}</p>
+            <Badge variant={person.active ? 'success' : 'secondary'}>
+              {person.active ? t('users.active') : t('users.inactive')}
+            </Badge>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-2.5 pb-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-md bg-surface-sunken px-2.5 py-1.5 ring-1 ring-border-subtle ring-inset">
+              <p className="eyebrow truncate">{t(config.primaryStatLabelKey)}</p>
+              <p className="data-value mt-0.5 text-lg leading-none">
+                {stats[primaryStatKey]}
+              </p>
+            </div>
+            <div className="rounded-md bg-surface-sunken px-2.5 py-1.5 ring-1 ring-border-subtle ring-inset">
+              <p className="eyebrow truncate">{t('managers.avg_talk')}</p>
+              <p className="data-value mt-0.5 text-lg leading-none">
+                {stats.avg_talk_ratio == null ? '—' : `${Math.round(stats.avg_talk_ratio * 100)}%`}
+              </p>
             </div>
           </div>
-          <Badge variant={person.active ? 'success' : 'secondary'}>
-            {person.active ? t('users.active') : t('users.inactive')}
-          </Badge>
-        </div>
-      </CardHeader>
 
-      <CardContent className="space-y-2.5">
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-md bg-surface-sunken px-2.5 py-1.5 ring-1 ring-border-subtle ring-inset">
-            <p className="eyebrow truncate">{t(config.primaryStatLabelKey)}</p>
-            <p className="data-value mt-0.5 text-lg leading-none">
-              {stats[primaryStatKey]}
-            </p>
+          <div className="flex items-baseline justify-between gap-2">
+            {stats.avg_score != null ? (
+              <p className="flex items-baseline gap-1.5">
+                <span className={`text-sm font-semibold tabular-nums ${scoreColor(stats.avg_score)}`}>
+                  {stats.avg_score}/100
+                </span>
+                <span className="text-xs text-muted-foreground">{scoreLabel(stats.avg_score, lang)}</span>
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">{t('managers.no_scores')}</p>
+            )}
+            {stats.best_score != null && (
+              <p className="text-2xs text-muted-foreground">
+                {t('managers.best')} <span className={scoreColor(stats.best_score)}>{stats.best_score}</span>
+              </p>
+            )}
           </div>
-          <div className="rounded-md bg-surface-sunken px-2.5 py-1.5 ring-1 ring-border-subtle ring-inset">
-            <p className="eyebrow truncate">{t('managers.avg_talk')}</p>
-            <p className="data-value mt-0.5 text-lg leading-none">
-              {stats.avg_talk_ratio == null ? '—' : `${Math.round(stats.avg_talk_ratio * 100)}%`}
-            </p>
-          </div>
-        </div>
 
-        <div className="flex items-baseline justify-between gap-2">
-          {stats.avg_score != null ? (
-            <p className="flex items-baseline gap-1.5">
-              <span className={`text-sm font-semibold tabular-nums ${scoreColor(stats.avg_score)}`}>
-                {stats.avg_score}/100
-              </span>
-              <span className="text-xs text-muted-foreground">{scoreLabel(stats.avg_score, lang)}</span>
-            </p>
-          ) : (
-            <p className="text-xs text-muted-foreground">{t('managers.no_scores')}</p>
-          )}
-          {stats.best_score != null && (
-            <p className="text-2xs text-muted-foreground">
-              {t('managers.best')} <span className={scoreColor(stats.best_score)}>{stats.best_score}</span>
+          {stats.last_call_at && (
+            <p className="text-xs text-muted-foreground">
+              {t('managers.last_call', { date: formatDate(stats.last_call_at) })}
             </p>
           )}
-        </div>
+        </CardContent>
+      </div>
 
-        {stats.last_call_at && (
-          <p className="text-xs text-muted-foreground">
-            {t('managers.last_call', { date: formatDate(stats.last_call_at) })}
-          </p>
-        )}
-
+      <CardContent className="space-y-2 pt-0">
         {/* `group/row` is what TokenControl's `group-hover/row:opacity-100`
             keys off. Without it on an ancestor the copy/regenerate buttons
             stayed at opacity 0 on this page and /managers — hover-revealed

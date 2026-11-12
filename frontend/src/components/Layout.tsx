@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
-  BarChart3,
-  ChevronDown,
   Cloud,
   Lock,
   LogOut,
@@ -24,7 +22,7 @@ import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/i18n/i18n'
 import { useMode } from '@/lib/mode'
 import { SPRING, fadeUp } from '@/lib/motion'
-import { NAV, isManagersPath, isNavActive, visibleNav, type NavItem } from '@/components/nav-items'
+import { NAV, isNavActive, visibleNav, type NavGroupKey, type NavItem } from '@/components/nav-items'
 import { cn } from '@/lib/utils'
 
 /** Platform-correct modifier label for the command palette hint. */
@@ -57,22 +55,26 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
   const { t } = useI18n()
   const location = useLocation()
-  const reduced = useReducedMotion()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [managersOpen, setManagersOpen] = useState(false)
   const isDesktop = useIsDesktop()
   const isMac = useIsMac()
   const { loading: modeLoading, sttUnavailable } = useMode()
 
   const items = visibleNav(user?.role)
-  const managersGroup = items.filter((i) => isManagersPath(i.to))
-  const topLevel = items.filter((i) => !isManagersPath(i.to))
-  const managersActive = isManagersPath(location.pathname)
+  const groupedSections = useMemo(() => {
+    const order: NavGroupKey[] = ['workspace', 'coaching', 'company']
+    return order
+      .map((group) => ({
+        group,
+        label: t(`nav.group.${group}`),
+        items: items.filter((i) => i.group === group),
+      }))
+      .filter((sec) => sec.items.length > 0)
+  }, [items, t])
 
   useEffect(() => {
     setSidebarOpen(false)
-    if (managersActive) setManagersOpen(true)
-  }, [location.pathname, managersActive])
+  }, [location.pathname])
 
   // Escape closes the mobile drawer. There was no key handler at all: the only
   // ways out were the X button and clicking the scrim.
@@ -161,58 +163,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Button>
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-2.5 py-3" aria-label={t('nav.primary')}>
-            <NavGroup items={topLevel} pathname={location.pathname} />
-
-            {managersGroup.length > 0 && (
-              <>
-                <div className="my-3 h-px bg-sidebar-border" />
-                <button
-                  type="button"
-                  onClick={() => setManagersOpen((o) => !o)}
-                  aria-expanded={managersOpen}
-                  aria-controls="managers-submenu"
-                  className={cn(
-                    'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm font-medium outline-none',
-                    'transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                    managersActive
-                      ? 'text-sidebar-accent-foreground'
-                      : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
-                  )}
-                >
-                  <BarChart3 aria-hidden="true" className="size-4 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate text-left">{t('nav.managers')}</span>
-                  <motion.span
-                    animate={{ rotate: managersOpen ? 180 : 0 }}
-                    transition={SPRING.snappy}
-                    className="shrink-0"
-                  >
-                    <ChevronDown aria-hidden="true" className="size-3.5" />
-                  </motion.span>
-                </button>
-                <AnimatePresence initial={false}>
-                  {managersOpen && (
-                    <motion.ul
-                      id="managers-submenu"
-                      initial={reduced ? false : { height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={reduced ? { opacity: 0 } : { height: 0, opacity: 0 }}
-                      transition={SPRING.standard}
-                      className="overflow-hidden"
-                    >
-                      {/* A <ul> may only contain <li>: the wrapper used to be a
-                          plain <div> holding bare links, so assistive tech saw
-                          an empty list. */}
-                      <li className="mt-0.5 space-y-0.5 border-l border-sidebar-border pl-2.5">
-                        {managersGroup.map((item) => (
-                          <NavLink key={item.to} item={item} pathname={location.pathname} nested />
-                        ))}
-                      </li>
-                    </motion.ul>
-                  )}
-                </AnimatePresence>
-              </>
-            )}
+          <nav
+            className="flex-1 space-y-5 overflow-y-auto px-3 py-4 [overscroll-behavior:contain] [scrollbar-gutter:stable]"
+            aria-label={t('nav.primary')}
+          >
+            {groupedSections.map((sec) => (
+              <div key={sec.group}>
+                <p className="mb-1.5 px-2.5 text-[10px] font-bold tracking-[0.12em] uppercase text-muted-foreground/75">
+                  {sec.label}
+                </p>
+                <NavGroup items={sec.items} pathname={location.pathname} />
+              </div>
+            ))}
           </nav>
 
           {/* Private-mode warning lives in the sidebar so it is impossible to

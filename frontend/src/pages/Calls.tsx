@@ -6,16 +6,11 @@ import {
   ArrowRight,
   AudioWaveform,
   CircleAlert,
-  CircleCheck,
-  CircleX,
   Clock,
   FileAudio2,
-  Hourglass,
-  KeyRound,
   LayoutGrid,
   List,
   Loader2,
-  PhoneCall,
   Search,
   Star,
   Upload,
@@ -49,7 +44,6 @@ import {
 
 import { EmptyState, PageHeader } from '@/components/EmptyState'
 import { ScoreRing } from '@/components/ScoreRing'
-import { TokenControl } from '@/components/TokenControl'
 import { Stagger, fadeUp, SPRING } from '@/lib/motion'
 import { useAuth } from '@/lib/auth'
 import { api } from '@/lib/api'
@@ -73,8 +67,8 @@ const TYPE_OPTIONS: { value: CallType; labelKey: string }[] = [
   { value: 'receptionist', labelKey: 'upload.call_type.receptionist' },
 ]
 
-type StatusFilter = 'all' | 'done' | 'processing' | 'error' | 'bookmarked'
-type ViewMode = 'grid' | 'table'
+type StatusFilter = 'all' | 'done' | 'problems' | 'processing' | 'error' | 'bookmarked'
+type ViewMode = 'table' | 'grid'
 
 const MAX_FILE_SIZE = 200 * 1024 * 1024 // 200 MB
 
@@ -299,77 +293,147 @@ function CallCard({ call }: { call: Call }) {
 function CallTable({ calls }: { calls: Call[] }) {
   const { t } = useI18n()
   return (
-    <div className="overflow-hidden rounded-lg bg-surface ring-1 ring-border">
-      <div className="overflow-x-auto">
+    <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-e1">
+      <div
+        role="region"
+        aria-label={t('dashboard.title')}
+        tabIndex={0}
+        className="overflow-x-auto [scrollbar-gutter:stable]"
+      >
         <table className="w-full text-left text-xs">
           <caption className="sr-only">{t('dashboard.title')}</caption>
-          <thead className="border-b border-border-subtle bg-surface-sunken">
+          <thead className="sticky top-0 z-10 border-b border-border-subtle bg-surface-sunken">
             <tr>
-              {[t('calls.table.name'), t('calls.table.status'), t('calls.table.score'), t('calls.table.duration'), t('calls.table.type'), t('calls.table.date')].map((h, i) => (
-                <th key={h} scope="col" className={cn('px-3 py-2 text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground', i > 1 && 'w-px whitespace-nowrap')}>
+              {[
+                t('calls.table.name'),
+                t('calls.table.manager'),
+                t('calls.table.client'),
+                t('calls.table.score'),
+                t('calls.table.verdict'),
+                t('calls.table.duration'),
+                t('calls.table.date'),
+              ].map((h, i) => (
+                <th
+                  key={h}
+                  scope="col"
+                  className={cn(
+                    'px-3.5 py-2.5 text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground',
+                    i > 2 && 'w-px whitespace-nowrap',
+                  )}
+                >
                   {h}
                 </th>
               ))}
-              <th scope="col" className="px-3 py-2" />
+              <th scope="col" className="w-px px-3.5 py-2.5" />
             </tr>
           </thead>
           <tbody className="divide-y divide-border-subtle">
             {calls.map((call) => {
+              const analysis = asAnalysis(call.analysis)
               const overall = call.status === 'done' ? overallScore(call.analysis) : null
+              const verdict = call.status === 'done' ? analysis.coach_decision : null
               return (
                 <tr key={call.id} className="group/row transition-colors hover:bg-surface-hover">
-                  <td className="max-w-[280px] px-3 py-2">
+                  <td className="max-w-[300px] px-3.5 py-3">
                     <Link
                       to={`/calls/${call.id}`}
-                      className="inline-flex max-w-full items-center gap-1.5 truncate font-medium transition-colors hover:text-primary hover:underline"
+                      className="inline-flex max-w-full items-center gap-1.5 truncate font-semibold text-foreground transition-colors hover:text-primary"
                     >
                       {call.bookmarked && (
-                        <Star aria-label={t('call.bookmarked')} className="size-3.5 shrink-0 fill-amber-400 text-amber-500" />
+                        <Star
+                          aria-label={t('call.bookmarked')}
+                          className="size-3.5 shrink-0 fill-amber-400 text-amber-500"
+                        />
                       )}
                       <span className="truncate">{callTitle(call)}</span>
                     </Link>
-                    {call.client_name && (
+                    {analysis.summary && (
                       <span className="mt-0.5 block truncate text-2xs text-muted-foreground">
-                        {call.client_name}
+                        {analysis.summary}
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <Badge
-                      variant={
-                        call.status === 'done'
-                          ? 'success'
-                          : call.status === 'error'
-                            ? 'destructive'
-                            : 'secondary'
-                      }
-                    >
-                      {t(`status.${call.status}`)}
-                    </Badge>
+                  <td className="px-3.5 py-3 whitespace-nowrap">
+                    <span className="font-medium text-foreground">
+                      {call.uploader_name ?? '—'}
+                    </span>
+                    <span className="ml-1.5 rounded bg-surface-sunken px-1.5 py-0.5 text-2xs capitalize text-muted-foreground">
+                      {call.call_type}
+                    </span>
                   </td>
-                  <td className={cn('px-3 py-2 tabular-nums', overall == null && 'text-muted-foreground')}>
+                  <td className="max-w-[160px] truncate px-3.5 py-3 text-muted-foreground">
+                    {call.client_name ?? '—'}
+                  </td>
+                  <td
+                    className={cn(
+                      'px-3.5 py-3 whitespace-nowrap tabular-nums',
+                      overall == null && 'text-muted-foreground',
+                    )}
+                  >
                     {overall != null ? (
-                      <span className={cn('font-semibold', scoreColor(overall))}>{overall}/100</span>
+                      <div className="flex items-center gap-2">
+                        <span className={cn('text-sm font-bold', scoreColor(overall))}>
+                          {overall}
+                        </span>
+                        <div className="h-1.5 w-12 overflow-hidden rounded-full bg-surface-sunken">
+                          <div
+                            className={cn(
+                              'h-full rounded-full',
+                              overall >= 70
+                                ? 'bg-success'
+                                : overall >= 40
+                                  ? 'bg-warning'
+                                  : 'bg-destructive',
+                            )}
+                            style={{ width: `${Math.max(8, overall)}%` }}
+                          />
+                        </div>
+                      </div>
                     ) : (
                       '—'
                     )}
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap tabular-nums text-muted-foreground">
+                  <td className="px-3.5 py-3 whitespace-nowrap">
+                    {verdict ? (
+                      <Badge
+                        variant={
+                          verdict === 'ESCALATE'
+                            ? 'destructive'
+                            : verdict === 'COACH'
+                              ? 'warning'
+                              : 'success'
+                        }
+                        className="font-mono text-2xs"
+                      >
+                        {verdict}
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant={
+                          call.status === 'done'
+                            ? 'success'
+                            : call.status === 'error'
+                              ? 'destructive'
+                              : 'secondary'
+                        }
+                      >
+                        {t(`status.${call.status}`)}
+                      </Badge>
+                    )}
+                  </td>
+                  <td className="px-3.5 py-3 whitespace-nowrap tabular-nums text-muted-foreground">
                     {formatDuration(call.duration_sec)}
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-muted-foreground capitalize">
-                    {call.call_type}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                  <td className="px-3.5 py-3 whitespace-nowrap text-muted-foreground">
                     {formatDate(call.created_at)}
                   </td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="px-3.5 py-3 text-right">
                     <Link
                       to={`/calls/${call.id}`}
                       aria-label={`${t('common.view_details')}: ${callTitle(call)}`}
-                      className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                      className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-active hover:text-primary"
                     >
-                      <ArrowRight aria-hidden="true" className="size-3" />
+                      <ArrowRight aria-hidden="true" className="size-3.5" />
                     </Link>
                   </td>
                 </tr>
@@ -683,41 +747,18 @@ function UploadDialog({
   )
 }
 
-function LiveStat({ icon: Icon, label, value, tone }: { icon: LucideIcon; label: string; value: number; tone: string }) {
-  return (
-    <div className="flex items-center gap-4 rounded-xl border border-border bg-surface px-5 py-4 shadow-[var(--shadow-e1)] transition-[box-shadow,border-color] duration-200 hover:border-primary/25 hover:shadow-e2">
-      <span className={cn('flex size-10 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset', tone)}>
-        <Icon aria-hidden="true" className="size-4" />
-      </span>
-      <div className="min-w-0">
-        <p className="truncate text-[11px] font-semibold tracking-[0.1em] text-muted-foreground uppercase">
-          {label}
-        </p>
-        <p className="mt-1.5 text-[1.75rem] leading-none font-semibold tracking-[-0.03em] tabular-nums">
-          {value}
-        </p>
-      </div>
-    </div>
-  )
-}
-
 export function Calls() {
   const { user } = useAuth()
   const { t } = useI18n()
   const role = user?.role
   const defaultCallType: CallType = role === 'receptionist' ? 'receptionist' : 'manager'
 
-  const [ownToken, setOwnToken] = useState<string | null>(user?.api_token ?? null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
 
   const { calls, loading, refresh, setDelay } = usePolledCalls(POLL_ACTIVE_MS, POLL_IDLE_MS)
-
-  useEffect(() => {
-    if (user?.api_token) setOwnToken(user.api_token)
-  }, [user?.api_token])
 
   const busyCount = useMemo(() => calls.filter((c) => isInFlight(c.status)).length, [calls])
 
@@ -729,16 +770,39 @@ export function Calls() {
     const q = search.trim().toLowerCase()
     return calls.filter((c) => {
       if (statusFilter === 'done' && c.status !== 'done') return false
+      if (statusFilter === 'problems') {
+        const s = overallScore(c.analysis)
+        const dec = asAnalysis(c.analysis).coach_decision
+        if (c.status !== 'done' || ((s == null || s >= 50) && dec !== 'ESCALATE' && dec !== 'COACH'))
+          return false
+      }
       if (statusFilter === 'processing' && !isInFlight(c.status)) return false
       if (statusFilter === 'error' && c.status !== 'error') return false
       if (statusFilter === 'bookmarked' && !c.bookmarked) return false
       if (!q) return true
-      return matches(c.name, q) || matches(c.client_name, q)
+      return (
+        matches(c.name, q) ||
+        matches(callTitle(c), q) ||
+        matches(c.client_name, q) ||
+        matches(c.uploader_name, q)
+      )
     })
   }, [calls, search, statusFilter])
 
+  const doneCount = useMemo(() => calls.filter((c) => c.status === 'done').length, [calls])
+  const problemCount = useMemo(
+    () =>
+      calls.filter((c) => {
+        if (c.status !== 'done') return false
+        const s = overallScore(c.analysis)
+        const dec = asAnalysis(c.analysis).coach_decision
+        return (s != null && s < 50) || dec === 'ESCALATE' || dec === 'COACH'
+      }).length,
+    [calls],
+  )
+
   return (
-    <div>
+    <div className="space-y-5 pb-10">
       <PageHeader
         eyebrow={t('nav.calls')}
         title={t('dashboard.title')}
@@ -746,27 +810,37 @@ export function Calls() {
           n: filtered.length,
         })}
         actions={
-          <>
+          <div className="flex items-center gap-2">
+            {busyCount > 0 && (
+              <Badge variant="default" className="gap-1.5">
+                <span aria-hidden="true" className="size-1.5 animate-pulse rounded-full bg-current" />
+                {t('dashboard.in_progress', { n: busyCount })}
+              </Badge>
+            )}
             <SegmentedControl
               label={t('calls.view_mode')}
               value={viewMode}
               onChange={setViewMode}
               options={[
-                { value: 'grid', label: t('calls.view_grid'), icon: LayoutGrid },
                 { value: 'table', label: t('calls.view_table'), icon: List },
+                { value: 'grid', label: t('calls.view_grid'), icon: LayoutGrid },
               ]}
             />
             <Button onClick={() => setDialogOpen(true)}>
               <Upload aria-hidden="true" className="size-4" />
               {t('dashboard.upload')}
             </Button>
-          </>
+          </div>
         }
       />
 
-      <div className="mb-5 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-48 flex-1 sm:max-w-xs">
-          <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+      {/* Unified Metasell Filter & Summary Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-3 shadow-e1">
+        <div className="relative min-w-56 flex-1 sm:max-w-xs">
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+          />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -776,40 +850,30 @@ export function Calls() {
           />
         </div>
 
-        <SegmentedControl
-          label={t('calls.all_statuses')}
-          value={statusFilter}
-          onChange={setStatusFilter}
-          options={[
-            { value: 'all', label: t('calls.all_statuses') },
-            { value: 'done', label: t('status.done') },
-            { value: 'processing', label: t('dashboard.stat.in_progress') },
-            { value: 'error', label: t('status.error') },
-            { value: 'bookmarked', label: t('calls.filter.bookmarked'), icon: Star },
-          ]}
-        />
-
-        {busyCount > 0 && (
-          <Badge variant="default" className="gap-1.5">
-            <span aria-hidden="true" className="size-1.5 animate-pulse rounded-full bg-current" />
-            {t('dashboard.in_progress', { n: busyCount })}
-          </Badge>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <SegmentedControl
+            label={t('calls.all_statuses')}
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[
+              { value: 'all', label: `${t('calls.all_statuses')} (${calls.length})` },
+              { value: 'done', label: `${t('status.done')} (${doneCount})` },
+              { value: 'problems', label: `${t('calls.filter.problems')} (${problemCount})` },
+              { value: 'processing', label: `${t('dashboard.stat.in_progress')} (${busyCount})` },
+              { value: 'bookmarked', label: t('calls.filter.bookmarked'), icon: Star },
+            ]}
+          />
+        </div>
       </div>
 
-      {!loading && calls.length > 0 && (
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <LiveStat icon={PhoneCall} label={t('analytics.total_calls')} value={calls.length} tone="bg-primary-soft text-primary-soft-foreground ring-primary/20" />
-          <LiveStat icon={CircleCheck} label={t('status.done')} value={calls.filter((c) => c.status === 'done').length} tone="bg-success-soft text-success-soft-foreground ring-success/20" />
-          <LiveStat icon={Hourglass} label={t('dashboard.stat.in_progress')} value={busyCount} tone="bg-primary-soft text-primary-soft-foreground ring-primary/20" />
-          <LiveStat icon={CircleX} label={t('status.error')} value={calls.filter((c) => c.status === 'error').length} tone="bg-destructive-soft text-destructive-soft-foreground ring-destructive/20" />
-        </div>
-      )}
-
       {loading ? (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" aria-busy="true" aria-label={t('analytics.loading')}>
+        <div
+          className="space-y-2"
+          aria-busy="true"
+          aria-label={t('analytics.loading')}
+        >
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-56 rounded-lg" />
+            <Skeleton key={i} className="h-14 rounded-xl" />
           ))}
         </div>
       ) : calls.length === 0 ? (
@@ -830,7 +894,14 @@ export function Calls() {
           title={t('dashboard.no_search_results')}
           description={t('dashboard.no_search_results_desc')}
           action={
-            <Button size="sm" variant="outline" onClick={() => { setSearch(''); setStatusFilter('all') }}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setSearch('')
+                setStatusFilter('all')
+              }}
+            >
               {t('common.clear_filters')}
             </Button>
           }
@@ -838,37 +909,11 @@ export function Calls() {
       ) : viewMode === 'table' ? (
         <CallTable calls={filtered} />
       ) : (
-        <Stagger className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <Stagger className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((c) => (
             <CallCard key={c.id} call={c} />
           ))}
         </Stagger>
-      )}
-
-      {role !== 'admin' && (
-        <Card size="sm" className="mt-6">
-          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-3.5">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary-soft-foreground ring-1 ring-primary/20 ring-inset">
-                <KeyRound aria-hidden="true" className="size-3.5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold">{t('token.own_title')}</p>
-                <p className="text-2xs text-muted-foreground">{t('token.own_desc')}</p>
-              </div>
-            </div>
-            <div className="w-full max-w-xs">
-              <TokenControl
-                token={ownToken}
-                onRegenerate={async () => {
-                  const { api_token } = await api.regenerateToken()
-                  setOwnToken(api_token)
-                  return api_token
-                }}
-              />
-            </div>
-          </CardContent>
-        </Card>
       )}
 
       <UploadDialog

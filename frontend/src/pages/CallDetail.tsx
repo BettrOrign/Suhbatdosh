@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -16,6 +16,7 @@ import {
   PhoneCall,
   Play,
   RefreshCw,
+  Search,
   Star,
   Target,
   Trash2,
@@ -34,6 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -117,13 +119,27 @@ function isCurrentTurn(s: Segment, currentTime: number, hasTimings: boolean): bo
 function TranscriptView({
   call,
   currentTime,
+  query,
   onSeek,
 }: {
   call: Call
   currentTime: number
+  query: string
   onSeek: (sec: number) => void
 }) {
   const { t } = useI18n()
+  const q = query.trim().toLowerCase()
+
+  const filteredSegments = useMemo(() => {
+    if (!q) return call.segments.map((s, idx) => ({ s, idx }))
+    return call.segments
+      .map((s, idx) => ({ s, idx }))
+      .filter(
+        ({ s }) =>
+          s.text.toLowerCase().includes(q) ||
+          (s.speaker_label && s.speaker_label.toLowerCase().includes(q))
+      )
+  }, [call.segments, q])
 
   if (call.segments.length > 0) {
     const hasTimings = call.segments.some((s) => s.start != null)
@@ -131,11 +147,19 @@ function TranscriptView({
       ? call.segments.findIndex((s) => isCurrentTurn(s, currentTime, hasTimings))
       : -1
 
+    if (filteredSegments.length === 0) {
+      return (
+        <p className="py-10 text-center text-xs text-muted-foreground">
+          {t('calls.no_match_title')}
+        </p>
+      )
+    }
+
     return (
-      <div className="max-h-[540px] space-y-2.5 overflow-y-auto pr-1">
-        {call.segments.map((s, i) => {
+      <div className="max-h-[calc(100dvh-16rem)] space-y-2.5 overflow-y-auto pr-1 [overscroll-behavior:contain] [scrollbar-gutter:stable]">
+        {filteredSegments.map(({ s, idx }) => {
           const start = s.start
-          const isActive = i === activeIndex
+          const isActive = idx === activeIndex
           const seek = () => onSeek(start as number)
           const onSeekKey = (e: React.KeyboardEvent) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -146,10 +170,10 @@ function TranscriptView({
 
           return (
             <motion.div
-              key={i}
+              key={idx}
               initial={{ opacity: 0, x: -6 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: Math.min(i * 0.015, 0.4), duration: 0.25 }}
+              transition={{ delay: Math.min(idx * 0.012, 0.3), duration: 0.2 }}
               className="flex gap-2.5"
             >
               {(s.speaker_label || s.language_code || start != null) && (
@@ -183,19 +207,21 @@ function TranscriptView({
                   )}
                 </div>
               )}
-              {/* The seek button in the gutter is the keyboard-accessible path;
-                  this is the convenient mouse equivalent. A bare onClick on a
-                  <p> would have made the transcript mouse-only. */}
               <p
                 {...(start != null
                   ? { onClick: seek, onKeyDown: onSeekKey, role: 'button', tabIndex: 0 }
                   : {})}
                 className={cn(
                   'flex-1 rounded-lg border-l-2 border-transparent px-3 py-2 text-[13.5px] leading-relaxed transition-colors',
-                  start != null && 'cursor-pointer outline-none hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                  start != null &&
+                    'cursor-pointer outline-none hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                   isActive && 'border-primary bg-primary-soft text-primary-soft-foreground'
                 )}
-                style={isActive ? undefined : { color: s.speaker_label ? speakerTone(s.speaker_label) : undefined }}
+                style={
+                  isActive
+                    ? undefined
+                    : { color: s.speaker_label ? speakerTone(s.speaker_label) : undefined }
+                }
               >
                 {s.text}
               </p>
@@ -205,27 +231,26 @@ function TranscriptView({
       </div>
     )
   }
-  return <p className="text-sm leading-relaxed whitespace-pre-wrap">{call.transcript}</p>
+  return (
+    <div className="max-h-[calc(100dvh-16rem)] overflow-y-auto pr-1 [overscroll-behavior:contain] [scrollbar-gutter:stable]">
+      <p className="text-sm leading-relaxed whitespace-pre-wrap">{call.transcript}</p>
+    </div>
+  )
 }
 
 function DetailSkeleton() {
   return (
-    <div aria-busy="true" aria-label="loading">
-      <Skeleton className="mb-4 h-36 rounded-lg" />
-      <div className="mb-4 grid gap-3 lg:grid-cols-5 lg:items-start">
-        <div className="order-2 space-y-3 lg:col-span-2 lg:col-start-1 lg:row-start-1">
-          <Skeleton className="h-52 rounded-lg" />
-          <Skeleton className="h-64 rounded-lg" />
+    <div aria-busy="true" aria-label="loading" className="space-y-4">
+      <Skeleton className="h-36 rounded-lg" />
+      <div className="grid gap-4 lg:grid-cols-12 lg:items-start">
+        <div className="space-y-4 lg:col-span-5">
+          <Skeleton className="h-80 rounded-lg" />
           <Skeleton className="h-72 rounded-lg" />
         </div>
-        <div className="order-1 lg:col-span-3 lg:col-start-3 lg:row-start-1">
-          <Skeleton className="h-16 rounded-lg" />
-        </div>
-        <div className="order-3 lg:col-span-3 lg:col-start-3 lg:row-start-2">
-          <Skeleton className="h-96 rounded-lg" />
+        <div className="lg:col-span-7">
+          <Skeleton className="h-[540px] rounded-lg" />
         </div>
       </div>
-      <Skeleton className="h-72 rounded-lg" />
     </div>
   )
 }
@@ -250,12 +275,10 @@ export function CallDetail() {
   const [clients, setClients] = useState<Client[]>([])
   const [clientsLoading, setClientsLoading] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
+  const [transcriptQuery, setTranscriptQuery] = useState('')
 
   const timer = useRef<number | null>(null)
   const playerRef = useRef<WavePlayerHandle>(null)
-  // The poll timer reads cadence through refs, never through `call`: the effect
-  // deliberately does not re-arm on status change, so a captured `call` would
-  // stay `null` forever and POLL_IDLE_MS would be unreachable.
   const statusRef = useRef<Call['status'] | null>(null)
   const callRef = useRef<Call | null>(null)
 
@@ -267,10 +290,6 @@ export function CallDetail() {
       setCall(next)
       setMissing(false)
     } catch (e) {
-      // A transient failure (500, a 502 from the proxy, a dropped connection)
-      // is not "this call does not exist". Only fall back to the not-found
-      // screen when we never managed to load the call at all — otherwise one
-      // blip tore down the whole page mid-view and flashed a toast per poll.
       if (callRef.current === null) setMissing(true)
       toast.error(t('call.load_failed', { error: (e as Error).message }))
     } finally {
@@ -278,21 +297,12 @@ export function CallDetail() {
     }
   }, [callId, t])
 
-  /**
-   * One self-adjusting timer. The previous code had a 10s interval plus a
-   * separate "stop polling on terminal state" effect whose body was empty and
-   * whose dependency list was `call?.status` — it re-ran on the wrong render
-   * and the interval kept firing forever.
-   */
   useEffect(() => {
     if (!Number.isFinite(callId) || callId <= 0) {
       navigate('/calls', { replace: true })
       return
     }
     setCurrentTime(0)
-    // Navigating to another call must not keep the previous one's data on
-    // screen, and the refs below decide whether a fetch failure means
-    // "not found" or "transient" — both are per-call.
     statusRef.current = null
     callRef.current = null
     setCall(null)
@@ -301,9 +311,6 @@ export function CallDetail() {
     void refresh()
     const tick = () => {
       if (!document.hidden) void refresh()
-      // Read through statusRef, not the captured `call`: this effect is not
-      // allowed to re-arm on status change, so a captured value would stay
-      // `null` and every call would be polled every 4s forever.
       const status = statusRef.current
       const delay = status && !isInFlight(status) ? POLL_IDLE_MS : POLL_ACTIVE_MS
       timer.current = window.setTimeout(tick, delay)
@@ -463,122 +470,171 @@ export function CallDetail() {
   const processing = isInFlight(call.status)
   const title = callTitle(call)
   const acoustics = (call.source_meta?.acoustics as AcousticsInfo | undefined) ?? null
+  const coachingCount =
+    (analysis.coaching_points?.length ?? 0) +
+    (analysis.evidence_quotes?.length ?? 0) +
+    (problem ? 1 : 0)
+  const actionCount =
+    (analysis.action_items?.length ?? 0) + (analysis.next_steps?.length ?? 0)
 
   return (
     <div className="space-y-4">
+      {/* 1. Sticky Top Header + Docked Waveform Bar (Metasell Coaching Header) */}
       <Reveal>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex min-w-0 items-start gap-3">
-                <Button variant="outline" size="icon-sm" asChild className="mt-0.5 shrink-0">
-                  <Link to="/calls" aria-label={t('call.back')}>
-                    <ArrowLeft aria-hidden="true" className="size-3.5" />
-                  </Link>
-                </Button>
-                <div className="min-w-0">
-                  <h1 className="text-lg font-semibold tracking-[-0.02em] text-balance">{title}</h1>
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <span className="inline-flex items-center gap-1 rounded-md bg-surface-sunken px-1.5 py-0.5 text-2xs tabular-nums text-muted-foreground ring-1 ring-border-subtle ring-inset">
-                      <Clock aria-hidden="true" className="size-3" />
-                      {formatDuration(call.duration_sec)}
-                    </span>
-                    <span className="rounded-md bg-surface-sunken px-1.5 py-0.5 text-2xs text-muted-foreground ring-1 ring-border-subtle ring-inset">
-                      {formatDate(call.created_at)}
-                    </span>
-                    {call.language && (
-                      <span className="rounded-sm bg-primary-soft px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-primary-soft-foreground">
-                        {call.language}
-                      </span>
-                    )}
-                    <span className="inline-flex items-center gap-1 rounded-md bg-surface-sunken px-1.5 py-0.5 text-2xs capitalize text-muted-foreground ring-1 ring-border-subtle ring-inset">
-                      <PhoneCall aria-hidden="true" className="size-3" />
-                      {call.call_type}
-                    </span>
-                    {call.client_name && (
-                      <Link
-                        to="/clients"
-                        className="rounded-md bg-primary-soft px-1.5 py-0.5 text-2xs font-medium text-primary-soft-foreground transition-colors hover:opacity-80"
+        <div className="sticky top-14 z-20">
+          <Card className="bg-surface/95 backdrop-blur-md">
+            <CardContent className="space-y-3 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                  <Button variant="outline" size="icon-sm" asChild className="mt-0.5 shrink-0">
+                    <Link to="/calls" aria-label={t('call.back')}>
+                      <ArrowLeft aria-hidden="true" className="size-3.5" />
+                    </Link>
+                  </Button>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h1 className="text-lg font-semibold tracking-[-0.02em] text-balance">
+                        {title}
+                      </h1>
+                      <Badge
+                        variant={
+                          call.status === 'done'
+                            ? 'success'
+                            : call.status === 'error'
+                              ? 'destructive'
+                              : 'secondary'
+                        }
                       >
-                        {call.client_name}
-                      </Link>
-                    )}
-                    {call.uploader_name && (
-                      <span className="rounded-md bg-surface-sunken px-1.5 py-0.5 text-2xs text-muted-foreground ring-1 ring-border-subtle ring-inset">
-                        {t('call.uploader')} {call.uploader_name}
+                        {t(`status.${call.status}`)}
+                      </Badge>
+                      {analysis.coach_decision && (
+                        <Badge
+                          variant={
+                            analysis.coach_decision === 'ESCALATE'
+                              ? 'destructive'
+                              : analysis.coach_decision === 'COACH'
+                                ? 'warning'
+                                : 'success'
+                          }
+                          className="font-mono text-2xs"
+                        >
+                          {analysis.coach_decision}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-surface-sunken px-1.5 py-0.5 text-2xs tabular-nums text-muted-foreground ring-1 ring-border-subtle ring-inset">
+                        <Clock aria-hidden="true" className="size-3" />
+                        {formatDuration(call.duration_sec)}
                       </span>
-                    )}
+                      <span className="rounded-md bg-surface-sunken px-1.5 py-0.5 text-2xs text-muted-foreground ring-1 ring-border-subtle ring-inset">
+                        {formatDate(call.created_at)}
+                      </span>
+                      {call.language && (
+                        <span className="rounded-sm bg-primary-soft px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-primary-soft-foreground">
+                          {call.language}
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-1 rounded-md bg-surface-sunken px-1.5 py-0.5 text-2xs capitalize text-muted-foreground ring-1 ring-border-subtle ring-inset">
+                        <PhoneCall aria-hidden="true" className="size-3" />
+                        {call.call_type}
+                      </span>
+                      {acoustics && (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-surface-sunken px-1.5 py-0.5 font-mono text-2xs text-muted-foreground ring-1 ring-border-subtle ring-inset">
+                          <Activity aria-hidden="true" className="size-3 text-primary" />
+                          {acoustics.channels >= 2
+                            ? t('call.acoustics.stereo')
+                            : t('call.acoustics.mono')}
+                        </span>
+                      )}
+                      {call.client_name && (
+                        <Link
+                          to="/clients"
+                          className="rounded-md bg-primary-soft px-1.5 py-0.5 text-2xs font-medium text-primary-soft-foreground transition-colors hover:opacity-80"
+                        >
+                          {call.client_name}
+                        </Link>
+                      )}
+                      {call.uploader_name && (
+                        <span className="rounded-md bg-surface-sunken px-1.5 py-0.5 text-2xs text-muted-foreground ring-1 ring-border-subtle ring-inset">
+                          {t('call.uploader')} {call.uploader_name}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <Badge
-                variant={
-                  call.status === 'done'
-                    ? 'success'
-                    : call.status === 'error'
-                      ? 'destructive'
-                      : 'secondary'
-                }
-                className="shrink-0 self-start"
-              >
-                {t(`status.${call.status}`)}
-              </Badge>
-            </div>
 
-            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-3">
-              {isAdmin && (
-                <Button variant="outline" size="sm" onClick={openEdit}>
-                  <FilePenLine aria-hidden="true" className="size-3.5" />
-                  {t('call.edit_details')}
-                </Button>
+                {/* Action controls right-aligned on the header row */}
+                <div className="flex flex-wrap items-center gap-1.5 lg:shrink-0">
+                  {(overall != null && overall < 50) || call.resolved ? (
+                    <Button
+                      variant={call.resolved ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => void toggleResolved()}
+                    >
+                      <Check aria-hidden="true" className="size-3.5" />
+                      {call.resolved ? t('call.resolved') : t('call.mark_resolved')}
+                    </Button>
+                  ) : null}
+                  <Button
+                    variant={call.bookmarked ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => void toggleBookmark()}
+                    title={call.bookmark_note || undefined}
+                  >
+                    <Star
+                      aria-hidden="true"
+                      className={cn('size-3.5', call.bookmarked && 'fill-current')}
+                    />
+                    {call.bookmarked ? t('call.bookmarked') : t('call.bookmark')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void reanalyze()}
+                    disabled={!call.transcript}
+                  >
+                    <RefreshCw aria-hidden="true" className="size-3.5" />
+                    {t('call.reanalyze')}
+                  </Button>
+                  {isAdmin && (
+                    <Button variant="outline" size="sm" onClick={openEdit}>
+                      <FilePenLine aria-hidden="true" className="size-3.5" />
+                      {t('call.edit_details')}
+                    </Button>
+                  )}
+                  <Button variant="destructive-ghost" size="sm" onClick={() => void remove()}>
+                    <Trash2 aria-hidden="true" className="size-3.5" />
+                    {t('call.delete')}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Docked WavePlayer bar inside sticky header */}
+              {call.audio_path && (
+                <div className="border-t border-border-subtle pt-2.5">
+                  <WavePlayer
+                    ref={playerRef}
+                    url={api.audioUrl(callId)}
+                    onTimeUpdate={setCurrentTime}
+                  />
+                </div>
               )}
-              <Button variant="outline" size="sm" onClick={() => void reanalyze()} disabled={!call.transcript}>
-                <RefreshCw aria-hidden="true" className="size-3.5" />
-                {t('call.reanalyze')}
-              </Button>
-              {(overall != null && overall < 50) || call.resolved ? (
-                <Button
-                  variant={call.resolved ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => void toggleResolved()}
-                >
-                  <Check aria-hidden="true" className="size-3.5" />
-                  {call.resolved ? t('call.resolved') : t('call.mark_resolved')}
-                </Button>
-              ) : null}
-              <Button
-                variant={call.bookmarked ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => void toggleBookmark()}
-                title={call.bookmark_note || undefined}
-              >
-                <Star
-                  aria-hidden="true"
-                  className={cn('size-3.5', call.bookmarked && 'fill-current')}
-                />
-                {call.bookmarked ? t('call.bookmarked') : t('call.bookmark')}
-              </Button>
-              <Button
-                variant="destructive-ghost"
-                size="sm"
-                onClick={() => void remove()}
-                className="ml-auto"
-              >
-                <Trash2 aria-hidden="true" className="size-3.5" />
-                {t('call.delete')}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </Reveal>
 
+      {/* Processing / Error Banner */}
       {(processing || call.status === 'error') && (
         <Reveal>
           <div
             role="status"
             className={cn(
               'flex flex-col items-center gap-1.5 rounded-lg border border-dashed px-4 py-5 text-center',
-              call.status === 'error' ? 'border-destructive/30 bg-destructive-soft/40' : 'border-border'
+              call.status === 'error'
+                ? 'border-destructive/30 bg-destructive-soft/40'
+                : 'border-border'
             )}
           >
             <div className="flex items-center gap-2">
@@ -603,11 +659,13 @@ export function CallDetail() {
         </Reveal>
       )}
 
-      <div className="grid gap-3 lg:grid-cols-5 lg:items-start">
-      {hasAnalysis && (
-        <div className="order-2 space-y-3 lg:col-span-2 lg:col-start-1 lg:row-start-1">
-          <Reveal>
-            <Card>
+      {/* 2. Metasell 2-Pane Split Coaching Workspace (5 cols Evaluation + 7 cols Transcript) */}
+      <div className="grid gap-4 lg:grid-cols-12 lg:items-start">
+        {hasAnalysis && (
+          <div className="space-y-4 lg:col-span-5">
+            {/* Card 1: Consolidated AI Evaluation Card (Score + Summary + 7-Dim Rubric) */}
+            <Reveal>
+              <Card>
                 <div
                   aria-hidden="true"
                   className={cn(
@@ -621,409 +679,423 @@ export function CallDetail() {
                           : 'bg-destructive'
                   )}
                 />
-                <CardContent className="flex flex-col items-center justify-center gap-3 py-7">
-                  <ScoreRing score={overall ?? 0} size={132} stroke={10} delay={0.15} />
-                  <p className={cn('text-sm font-semibold', scoreColor(overall))}>
-                    {scoreLabel(overall, lang)}
-                  </p>
-                  {analysis.coach_decision && (
-                    <Badge
-                      variant={
-                        analysis.coach_decision === 'ESCALATE'
-                          ? 'destructive'
-                          : analysis.coach_decision === 'COACH'
-                            ? 'warning'
-                            : 'success'
-                      }
-                      className="font-mono text-2xs"
-                    >
-                      {t('call.coach_decision')}: {analysis.coach_decision}
-                    </Badge>
-                  )}
-                </CardContent>
-              </Card>
-            </Reveal>
-
-            <Reveal>
-              <Card>
-                <CardHeader className="border-b border-border-subtle pb-2.5">
-                  <CardTitle className="flex items-center gap-1.5">
-                    <Lightbulb aria-hidden="true" className="size-3.5 text-warning" />
-                    {t('call.summary')}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 pt-3">
-                  <p className="text-sm leading-relaxed text-muted-foreground">{analysis.summary}</p>
-                  <Separator />
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="rounded-md bg-surface-sunken px-2.5 py-2 ring-1 ring-border-subtle ring-inset">
-                      <p className="eyebrow">{t('call.outcome')}</p>
-                      <p className="mt-0.5 text-sm font-medium capitalize">
-                        {analysis.outcome ?? '—'}
-                      </p>
-                    </div>
-                    <div className="rounded-md bg-surface-sunken px-2.5 py-2 ring-1 ring-border-subtle ring-inset">
-                      <p className="eyebrow">{t('call.talk_ratio')}</p>
-                      <p className="mt-0.5 text-sm font-medium tabular-nums">
-                        {analysis.rep_share_of_talk != null
-                          ? `${Math.round(analysis.rep_share_of_talk * 100)}%`
-                          : '—'}
-                      </p>
+                <CardContent className="space-y-4 p-4">
+                  {/* Compact side-by-side Score + Outcome + Talk Share header */}
+                  <div className="flex flex-wrap items-center gap-4">
+                    <ScoreRing score={overall ?? 0} size={88} stroke={8} delay={0.1} />
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className={cn('text-sm font-semibold', scoreColor(overall))}>
+                          {scoreLabel(overall, lang)}
+                        </p>
+                        {analysis.coach_decision && (
+                          <Badge
+                            variant={
+                              analysis.coach_decision === 'ESCALATE'
+                                ? 'destructive'
+                                : analysis.coach_decision === 'COACH'
+                                  ? 'warning'
+                                  : 'success'
+                            }
+                            className="font-mono text-2xs"
+                          >
+                            {t('call.coach_decision')}: {analysis.coach_decision}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded-md bg-surface-sunken px-2.5 py-1.5 ring-1 ring-border-subtle ring-inset">
+                          <p className="eyebrow">{t('call.outcome')}</p>
+                          <p className="mt-0.5 text-xs font-semibold capitalize">
+                            {analysis.outcome ?? '—'}
+                          </p>
+                        </div>
+                        <div className="rounded-md bg-surface-sunken px-2.5 py-1.5 ring-1 ring-border-subtle ring-inset">
+                          <p className="eyebrow">{t('call.talk_ratio')}</p>
+                          <p className="mt-0.5 text-xs font-semibold tabular-nums">
+                            {analysis.rep_share_of_talk != null
+                              ? `${Math.round(analysis.rep_share_of_talk * 100)}%`
+                              : '—'}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  {analysis.key_metrics?.length ? (
+
+                  {/* Executive Summary */}
+                  {analysis.summary && (
                     <>
                       <Separator />
-                      <div>
-                        <p className="eyebrow mb-1.5">{t('call.key_metrics')}</p>
-                        <ul className="flex flex-wrap gap-1">
-                          {analysis.key_metrics.map((m, i) => (
-                            <li key={i}>
-                              <Badge variant="outline" className="font-normal">
-                                <span className="text-muted-foreground">{m.name}:</span> {m.value}
-                              </Badge>
-                            </li>
-                          ))}
-                        </ul>
+                      <div className="space-y-1.5">
+                        <p className="eyebrow flex items-center gap-1.5">
+                          <Lightbulb aria-hidden="true" className="size-3 text-warning" />
+                          {t('call.summary')}
+                        </p>
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                          {analysis.summary}
+                        </p>
                       </div>
                     </>
-                  ) : null}
-                </CardContent>
-              </Card>
-            </Reveal>
+                  )}
 
-            {acoustics && (
-              <Reveal>
-                <Card>
-                  <CardHeader className="border-b border-border-subtle pb-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <CardTitle className="flex items-center gap-1.5">
-                        <Activity aria-hidden="true" className="size-3.5 text-primary" />
-                        {t('call.acoustics.title')}
-                      </CardTitle>
-                      <Badge variant="outline" className="font-mono text-[10px]">
-                        {acoustics.channels >= 2
-                          ? t('call.acoustics.stereo')
-                          : t('call.acoustics.mono')}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-3 gap-2 pt-3">
-                    <div className="rounded-md bg-surface-sunken px-2.5 py-2 ring-1 ring-border-subtle ring-inset">
-                      <p className="eyebrow">{t('call.acoustics.dead_air')}</p>
-                      <p className="mt-0.5 text-sm font-semibold tabular-nums">
-                        {Math.round((acoustics.silence_ratio ?? 0) * 100)}%
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {formatDuration(acoustics.silence_sec)}
-                      </p>
-                    </div>
-                    <div className="rounded-md bg-surface-sunken px-2.5 py-2 ring-1 ring-border-subtle ring-inset">
-                      <p className="eyebrow">{t('call.acoustics.longest_silence')}</p>
-                      <p className="mt-0.5 text-sm font-semibold tabular-nums">
-                        {formatDuration(acoustics.longest_silence_sec)}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {acoustics.dead_air_count} gaps ≥3s
-                      </p>
-                    </div>
-                    <div className="rounded-md bg-surface-sunken px-2.5 py-2 ring-1 ring-border-subtle ring-inset">
-                      <p className="eyebrow">{t('call.acoustics.interruptions')}</p>
-                      <p className="mt-0.5 text-sm font-semibold tabular-nums">
-                        {acoustics.interruption_count ?? 0}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {formatDuration(acoustics.talk_over_sec ?? 0)}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Reveal>
-            )}
-
-          {problem && (
-            <Reveal>
-              <Card>
-                <div aria-hidden="true" className="h-0.5 w-full bg-warning" />
-                <CardHeader className="border-b border-border-subtle pb-2.5">
-                  <CardTitle className="flex items-center gap-1.5">
-                    <TriangleAlert aria-hidden="true" className="size-3.5 text-warning" />
-                    {t('call.problem')}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 pt-3">
-                  <p className="text-sm leading-relaxed text-muted-foreground">{problem}</p>
-                  {solutions.length > 0 && (
-                    <>
-                      <Separator />
-                      <p className="eyebrow">{t('call.solutions')}</p>
-                      <ol className="space-y-2">
-                        {solutions.map((s, i) => (
-                          <li
-                            key={i}
-                            className="flex items-start gap-2.5 rounded-md bg-warning-soft px-3 py-2.5 text-warning-soft-foreground"
-                          >
-                            <span className="mt-px flex size-5 shrink-0 items-center justify-center rounded-sm text-2xs font-semibold tabular-nums ring-1 ring-current/20 ring-inset">
-                              {i + 1}
-                            </span>
-                            <span className="text-sm leading-relaxed">{s}</span>
+                  {/* Key Metrics Badges */}
+                  {analysis.key_metrics?.length ? (
+                    <div className="space-y-1.5">
+                      <p className="eyebrow">{t('call.key_metrics')}</p>
+                      <ul className="flex flex-wrap gap-1">
+                        {analysis.key_metrics.map((m, i) => (
+                          <li key={i}>
+                            <Badge variant="outline" className="font-normal">
+                              <span className="text-muted-foreground">{m.name}:</span> {m.value}
+                            </Badge>
                           </li>
                         ))}
-                      </ol>
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  {/* Integrated 7-Dimension Rubric Scorecard */}
+                  {analysis.scorecard && (
+                    <>
+                      <Separator />
+                      <ScorecardView scorecard={analysis.scorecard} embedded />
                     </>
                   )}
                 </CardContent>
               </Card>
             </Reveal>
-          )}
 
-          <Reveal>
-            {analysis.scorecard && <ScorecardView scorecard={analysis.scorecard} />}
-          </Reveal>
+            {/* Card 2: Tabbed Coaching, Action Items & Acoustic Telemetry Card */}
+            <Reveal>
+              <Card>
+                <Tabs defaultValue="coaching" className="gap-0">
+                  <CardHeader className="border-b border-border-subtle pb-2.5">
+                    <TabsList className="w-full justify-start">
+                      <TabsTrigger value="coaching">
+                        <Lightbulb aria-hidden="true" className="text-warning" />
+                        {t('call.tab.coaching')}
+                        {coachingCount > 0 ? <Count>{coachingCount}</Count> : null}
+                      </TabsTrigger>
+                      <TabsTrigger value="action-items">
+                        <CheckSquare aria-hidden="true" className="text-primary" />
+                        {t('call.tab.action_items')}
+                        {actionCount > 0 ? <Count>{actionCount}</Count> : null}
+                      </TabsTrigger>
+                      {acoustics && (
+                        <TabsTrigger value="acoustics">
+                          <Activity aria-hidden="true" className="text-chart-6" />
+                          {t('call.acoustics.title')}
+                        </TabsTrigger>
+                      )}
+                    </TabsList>
+                  </CardHeader>
 
-          <Reveal>
-            <Card>
-              <Tabs defaultValue="action-items" className="gap-0">
-                <CardHeader className="border-b border-border-subtle pb-2.5">
-                  <TabsList>
-                <TabsTrigger value="action-items">
-                  <CheckSquare aria-hidden="true" className="text-primary" />
-                  {t('call.tab.action_items')}
-                  {analysis.action_items?.length ? (
-                    <Count>{analysis.action_items.length}</Count>
-                  ) : null}
-                </TabsTrigger>
-                <TabsTrigger value="coaching">
-                  <Lightbulb aria-hidden="true" className="text-warning" />
-                  {t('call.tab.coaching')}
-                  {analysis.coaching_points?.length ? (
-                    <Count>{analysis.coaching_points.length}</Count>
-                  ) : null}
-                </TabsTrigger>
-                  <TabsTrigger value="next-steps">
-                    <Target aria-hidden="true" className="text-chart-6" />
-                    {t('call.tab.next_steps')}
-                    {analysis.next_steps?.length ? (
-                      <Count>{analysis.next_steps.length}</Count>
-                    ) : null}
-                  </TabsTrigger>
-                </TabsList>
-                </CardHeader>
+                  <CardContent className="pt-3">
+                    {/* Tab 1: Problem & Solutions + Coaching Points + Clickable Evidence Quotes */}
+                    <TabsContent value="coaching" className="space-y-4">
+                      {problem && (
+                        <div className="space-y-2.5 rounded-lg border border-warning/30 bg-warning-soft/40 p-3">
+                          <div className="flex items-center gap-1.5 text-xs font-semibold text-warning-soft-foreground">
+                            <TriangleAlert aria-hidden="true" className="size-3.5 text-warning" />
+                            {t('call.problem')}
+                          </div>
+                          <p className="text-sm leading-relaxed text-foreground">{problem}</p>
+                          {solutions.length > 0 && (
+                            <div className="space-y-1.5 border-t border-warning/20 pt-2">
+                              <p className="eyebrow">{t('call.solutions')}</p>
+                              <ol className="space-y-1.5">
+                                {solutions.map((s, i) => (
+                                  <li
+                                    key={i}
+                                    className="flex items-start gap-2 text-xs leading-relaxed text-warning-soft-foreground"
+                                  >
+                                    <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-sm text-2xs font-semibold tabular-nums ring-1 ring-current/25 ring-inset">
+                                      {i + 1}
+                                    </span>
+                                    <span>{s}</span>
+                                  </li>
+                                ))}
+                              </ol>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
-                <CardContent className="pt-3">
+                      {analysis.coaching_points?.length ? (
+                        <ol className="space-y-2">
+                          {analysis.coaching_points.map((s, i) => (
+                            <motion.li
+                              key={i}
+                              initial={{ opacity: 0, y: 4 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: i * 0.04 }}
+                              className="flex items-start gap-2.5 rounded-md bg-surface-sunken px-3 py-2.5 ring-1 ring-border-subtle ring-inset"
+                            >
+                              <span className="mt-px flex size-5 shrink-0 items-center justify-center rounded-sm bg-primary-soft text-2xs font-semibold tabular-nums text-primary-soft-foreground">
+                                {i + 1}
+                              </span>
+                              <span className="text-sm leading-relaxed">{s}</span>
+                            </motion.li>
+                          ))}
+                        </ol>
+                      ) : !problem ? (
+                        <p className="py-6 text-center text-xs text-muted-foreground">
+                          {t('emp.no_coaching')}
+                        </p>
+                      ) : null}
 
-                  <TabsContent value="action-items">
-                    {analysis.action_items?.length ? (
-                      <ol className="space-y-2">
-                        {analysis.action_items.map((item, i) => (
-                          <motion.li
-                            key={i}
-                            initial={{ opacity: 0, y: 4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.04 }}
-                            className="flex items-start gap-2.5 rounded-md bg-surface-sunken px-3 py-2.5 ring-1 ring-border-subtle ring-inset"
-                          >
-                            <span className="mt-px flex size-5 shrink-0 items-center justify-center rounded-sm bg-primary-soft text-2xs font-semibold tabular-nums text-primary-soft-foreground">
-                              {i + 1}
-                            </span>
-                            <div className="min-w-0 flex-1 space-y-1.5">
-                              <p className="text-sm leading-relaxed">{item.description}</p>
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <Badge
-                                  variant={
-                                    item.priority === 'high'
-                                      ? 'destructive'
-                                      : item.priority === 'medium'
-                                        ? 'warning'
-                                        : 'secondary'
-                                  }
-                                >
-                                  {item.priority}
+                      {analysis.evidence_quotes?.length ? (
+                        <div className="space-y-2 border-t border-border-subtle pt-3">
+                          <p className="eyebrow">{t('call.evidence_quotes')}</p>
+                          {analysis.evidence_quotes.map((eq, idx) => (
+                            <div
+                              key={idx}
+                              onClick={() => {
+                                if (eq.start_sec != null) playerRef.current?.seek(eq.start_sec)
+                              }}
+                              className={cn(
+                                'rounded-md border border-border-subtle bg-surface-sunken/70 p-2.5 text-xs transition-colors',
+                                eq.start_sec != null &&
+                                  'cursor-pointer hover:border-primary/40 hover:bg-surface-hover'
+                              )}
+                            >
+                              <div className="mb-1 flex items-center justify-between gap-2">
+                                <Badge variant="outline" className="text-[10px] capitalize">
+                                  {eq.dimension.replace(/_/g, ' ')}
                                 </Badge>
-                                {item.assignee && (
-                                  <Badge variant="secondary" className="capitalize">
-                                    {item.assignee}
-                                  </Badge>
-                                )}
-                                {item.due_date && (
-                                  <span className="inline-flex items-center gap-1 text-2xs tabular-nums text-muted-foreground">
-                                    <Clock aria-hidden="true" className="size-2.5" />
-                                    {item.due_date}
+                                {eq.start_sec != null && (
+                                  <span className="inline-flex items-center gap-1 font-mono text-[10px] text-primary">
+                                    <Play className="size-2.5 fill-current" />
+                                    {formatDuration(eq.start_sec)}
                                   </span>
                                 )}
                               </div>
+                              <p className="italic text-foreground">“{eq.quote}”</p>
                             </div>
-                          </motion.li>
-                        ))}
-                      </ol>
-                    ) : (
-                      <p className="py-8 text-center text-xs text-muted-foreground">
-                        {t('call.no_action_items')}
-                      </p>
-                    )}
-                  </TabsContent>
+                          ))}
+                        </div>
+                      ) : null}
+                    </TabsContent>
 
-                  <TabsContent value="coaching">
-                    <ol className="space-y-2">
-                      {(analysis.coaching_points ?? []).map((s, i) => (
-                        <motion.li
-                          key={i}
-                          initial={{ opacity: 0, y: 4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: i * 0.04 }}
-                          className="flex items-start gap-2.5 rounded-md bg-surface-sunken px-3 py-2.5 ring-1 ring-border-subtle ring-inset"
-                        >
-                          <span className="mt-px flex size-5 shrink-0 items-center justify-center rounded-sm bg-primary-soft text-2xs font-semibold tabular-nums text-primary-soft-foreground">
-                            {i + 1}
-                          </span>
-                          <span className="text-sm leading-relaxed">{s}</span>
-                        </motion.li>
-                      ))}
-                    </ol>
-                    {analysis.evidence_quotes?.length ? (
-                      <div className="mt-4 space-y-2 border-t border-border-subtle pt-3">
-                        <p className="eyebrow">{t('call.evidence_quotes')}</p>
-                        {analysis.evidence_quotes.map((eq, idx) => (
-                          <div
-                            key={idx}
-                            onClick={() => {
-                              if (eq.start_sec != null) playerRef.current?.seek(eq.start_sec)
-                            }}
-                            className={cn(
-                              'rounded-md border border-border-subtle bg-surface-sunken/70 p-2.5 text-xs transition-colors',
-                              eq.start_sec != null && 'cursor-pointer hover:border-primary/40 hover:bg-surface-hover',
-                            )}
-                          >
-                            <div className="mb-1 flex items-center justify-between gap-2">
-                              <Badge variant="outline" className="text-[10px] capitalize">
-                                {eq.dimension.replace(/_/g, ' ')}
-                              </Badge>
-                              {eq.start_sec != null && (
-                                <span className="inline-flex items-center gap-1 font-mono text-[10px] text-primary">
-                                  <Play className="size-2.5 fill-current" />
-                                  {formatDuration(eq.start_sec)}
+                    {/* Tab 2: Action Items + Next Steps */}
+                    <TabsContent value="action-items" className="space-y-4">
+                      {analysis.action_items?.length ? (
+                        <ol className="space-y-2">
+                          {analysis.action_items.map((item, i) => (
+                            <motion.li
+                              key={i}
+                              initial={{ opacity: 0, y: 4 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: i * 0.04 }}
+                              className="flex items-start gap-2.5 rounded-md bg-surface-sunken px-3 py-2.5 ring-1 ring-border-subtle ring-inset"
+                            >
+                              <span className="mt-px flex size-5 shrink-0 items-center justify-center rounded-sm bg-primary-soft text-2xs font-semibold tabular-nums text-primary-soft-foreground">
+                                {i + 1}
+                              </span>
+                              <div className="min-w-0 flex-1 space-y-1.5">
+                                <p className="text-sm leading-relaxed">{item.description}</p>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <Badge
+                                    variant={
+                                      item.priority === 'high'
+                                        ? 'destructive'
+                                        : item.priority === 'medium'
+                                          ? 'warning'
+                                          : 'secondary'
+                                    }
+                                  >
+                                    {item.priority}
+                                  </Badge>
+                                  {item.assignee && (
+                                    <Badge variant="secondary" className="capitalize">
+                                      {item.assignee}
+                                    </Badge>
+                                  )}
+                                  {item.due_date && (
+                                    <span className="inline-flex items-center gap-1 text-2xs tabular-nums text-muted-foreground">
+                                      <Clock aria-hidden="true" className="size-2.5" />
+                                      {item.due_date}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </motion.li>
+                          ))}
+                        </ol>
+                      ) : (
+                        <p className="py-4 text-center text-xs text-muted-foreground">
+                          {t('call.no_action_items')}
+                        </p>
+                      )}
+
+                      {analysis.next_steps?.length ? (
+                        <div className="space-y-2 border-t border-border-subtle pt-3">
+                          <p className="eyebrow flex items-center gap-1.5">
+                            <Target aria-hidden="true" className="size-3 text-chart-6" />
+                            {t('call.tab.next_steps')}
+                          </p>
+                          <ol className="space-y-2">
+                            {analysis.next_steps.map((s, i) => (
+                              <li
+                                key={i}
+                                className="flex items-start gap-2.5 rounded-md bg-surface-sunken px-3 py-2 ring-1 ring-border-subtle ring-inset"
+                              >
+                                <span className="mt-px flex size-5 shrink-0 items-center justify-center rounded-sm bg-surface-active text-2xs font-semibold tabular-nums text-muted-foreground">
+                                  {i + 1}
                                 </span>
-                              )}
-                            </div>
-                            <p className="italic text-foreground">“{eq.quote}”</p>
+                                <span className="text-sm leading-relaxed">{s}</span>
+                              </li>
+                            ))}
+                          </ol>
+                        </div>
+                      ) : null}
+                    </TabsContent>
+
+                    {/* Tab 3: Acoustic Telemetry */}
+                    {acoustics && (
+                      <TabsContent value="acoustics">
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="rounded-md bg-surface-sunken px-2.5 py-2 ring-1 ring-border-subtle ring-inset">
+                            <p className="eyebrow">{t('call.acoustics.dead_air')}</p>
+                            <p className="mt-0.5 text-sm font-semibold tabular-nums">
+                              {Math.round((acoustics.silence_ratio ?? 0) * 100)}%
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {formatDuration(acoustics.silence_sec)}
+                            </p>
                           </div>
-                        ))}
-                      </div>
-                    ) : null}
-                  </TabsContent>
-
-                  <TabsContent value="next-steps">
-                    <ol className="space-y-2">
-                      {(analysis.next_steps ?? []).map((s, i) => (
-                        <motion.li
-                          key={i}
-                          initial={{ opacity: 0, y: 4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: i * 0.04 }}
-                          className="flex items-start gap-2.5 rounded-md bg-surface-sunken px-3 py-2.5 ring-1 ring-border-subtle ring-inset"
-                        >
-                          <span className="mt-px flex size-5 shrink-0 items-center justify-center rounded-sm bg-surface-active text-2xs font-semibold tabular-nums text-muted-foreground">
-                            {i + 1}
-                          </span>
-                          <span className="text-sm leading-relaxed">{s}</span>
-                        </motion.li>
-                      ))}
-                    </ol>
-                  </TabsContent>
-                </CardContent>
-              </Tabs>
-            </Card>
-          </Reveal>
-        </div>
-      )}
-
-        <div className="order-1 space-y-3 lg:col-span-3 lg:col-start-3 lg:row-start-1">
-          {call.audio_path && (
-          <Reveal>
-            <div className="z-20 lg:sticky lg:top-16">
-              <Card size="sm">
-                <CardContent className="py-3">
-                  <WavePlayer
-                    ref={playerRef}
-                    url={api.audioUrl(callId)}
-                    onTimeUpdate={setCurrentTime}
-                  />
-                </CardContent>
+                          <div className="rounded-md bg-surface-sunken px-2.5 py-2 ring-1 ring-border-subtle ring-inset">
+                            <p className="eyebrow">{t('call.acoustics.longest_silence')}</p>
+                            <p className="mt-0.5 text-sm font-semibold tabular-nums">
+                              {formatDuration(acoustics.longest_silence_sec)}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {acoustics.dead_air_count} gaps ≥3s
+                            </p>
+                          </div>
+                          <div className="rounded-md bg-surface-sunken px-2.5 py-2 ring-1 ring-border-subtle ring-inset">
+                            <p className="eyebrow">{t('call.acoustics.interruptions')}</p>
+                            <p className="mt-0.5 text-sm font-semibold tabular-nums">
+                              {acoustics.interruption_count ?? 0}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {formatDuration(acoustics.talk_over_sec ?? 0)}
+                            </p>
+                          </div>
+                        </div>
+                      </TabsContent>
+                    )}
+                  </CardContent>
+                </Tabs>
               </Card>
-            </div>
-          </Reveal>
-          )}
+            </Reveal>
+          </div>
+        )}
 
+        {/* Right Pane: Synchronized Chat-Style Transcript (7 cols when analysis exists, 12 cols otherwise) */}
+        <div className={cn(hasAnalysis ? 'lg:col-span-7' : 'lg:col-span-12')}>
           <Reveal>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 border-b border-border-subtle pb-2.5">
-            <CardTitle className="flex items-center gap-1.5">
-              <MessageSquare aria-hidden="true" className="size-3.5 text-primary" />
-              {t('call.transcript')}
-            </CardTitle>
-            <div className="flex gap-1.5">
-              {editing ? (
-                <>
-                  <Button size="sm" onClick={() => void saveTranscript()} title={t('call.save_shortcut')}>
-                    <Check aria-hidden="true" className="size-3.5" />
-                    {t('call.save')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setEditing(false)
-                      setDraft(call.transcript)
-                    }}
-                  >
-                    {t('call.cancel')}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button size="sm" variant="outline" onClick={() => void copyTranscript()} disabled={!call.transcript}>
-                    {copied ? <Check aria-hidden="true" className="size-3.5" /> : <Copy aria-hidden="true" className="size-3.5" />}
-                    <span className="sr-only sm:not-sr-only">{copied ? t('call.copied') : t('call.copy')}</span>
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setDraft(call.transcript)
-                      setEditing(true)
-                    }}
-                    disabled={!call.transcript}
-                  >
-                    <FilePenLine aria-hidden="true" className="size-3.5" />
-                    {t('call.edit')}
-                  </Button>
-                </>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="pt-3">
-            {editing ? (
-              <Textarea
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                rows={Math.max(8, call.transcript.split('\n').length + 2)}
-                className="font-mono text-sm"
-                aria-label={t('call.transcript')}
-              />
-            ) : call.transcript ? (
-              <TranscriptView
-                call={call}
-                currentTime={currentTime}
-                onSeek={(sec) => playerRef.current?.seek(sec)}
-              />
-            ) : (
-              <div className="flex flex-col items-center gap-2 py-10 text-center">
-                <MessageSquare aria-hidden="true" className="size-7 text-muted-foreground/40" />
-                <p className="text-xs text-muted-foreground">{t('call.no_transcript')}</p>
-              </div>
-            )}
-          </CardContent>
-          </Card>
+            <Card>
+              <CardHeader className="flex flex-col gap-2.5 border-b border-border-subtle pb-3 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="flex items-center gap-1.5">
+                  <MessageSquare aria-hidden="true" className="size-3.5 text-primary" />
+                  {t('call.transcript')}
+                  {call.segments.length > 0 && <Count>{call.segments.length}</Count>}
+                </CardTitle>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {!editing && call.segments.length > 0 && (
+                    <div className="relative w-44 sm:w-52">
+                      <Search
+                        aria-hidden="true"
+                        className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+                      />
+                      <Input
+                        value={transcriptQuery}
+                        onChange={(e) => setTranscriptQuery(e.target.value)}
+                        placeholder={t('calls.search_placeholder')}
+                        aria-label={t('calls.search_placeholder')}
+                        className="h-8 pl-8 text-xs"
+                      />
+                    </div>
+                  )}
+                  {editing ? (
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() => void saveTranscript()}
+                        title={t('call.save_shortcut')}
+                      >
+                        <Check aria-hidden="true" className="size-3.5" />
+                        {t('call.save')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditing(false)
+                          setDraft(call.transcript)
+                        }}
+                      >
+                        {t('call.cancel')}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void copyTranscript()}
+                        disabled={!call.transcript}
+                      >
+                        {copied ? (
+                          <Check aria-hidden="true" className="size-3.5" />
+                        ) : (
+                          <Copy aria-hidden="true" className="size-3.5" />
+                        )}
+                        <span className="sr-only sm:not-sr-only">
+                          {copied ? t('call.copied') : t('call.copy')}
+                        </span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setDraft(call.transcript)
+                          setEditing(true)
+                        }}
+                        disabled={!call.transcript}
+                      >
+                        <FilePenLine aria-hidden="true" className="size-3.5" />
+                        {t('call.edit')}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="pt-3">
+                {editing ? (
+                  <Textarea
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    rows={Math.max(8, call.transcript.split('\n').length + 2)}
+                    className="font-mono text-sm"
+                    aria-label={t('call.transcript')}
+                  />
+                ) : call.transcript ? (
+                  <TranscriptView
+                    call={call}
+                    currentTime={currentTime}
+                    query={transcriptQuery}
+                    onSeek={(sec) => playerRef.current?.seek(sec)}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 py-12 text-center">
+                    <MessageSquare aria-hidden="true" className="size-7 text-muted-foreground/40" />
+                    <p className="text-xs text-muted-foreground">{t('call.no_transcript')}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </Reveal>
         </div>
       </div>
@@ -1052,7 +1124,9 @@ export function CallDetail() {
               <Select value={editClient} onValueChange={setEditClient}>
                 <SelectTrigger id="edit-call-client" className="w-full" disabled={clientsLoading}>
                   <SelectValue
-                    placeholder={clientsLoading ? t('call.loading_clients') : t('upload.no_client')}
+                    placeholder={
+                      clientsLoading ? t('call.loading_clients') : t('upload.no_client')
+                    }
                   />
                 </SelectTrigger>
                 <SelectContent>

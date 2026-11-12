@@ -15,12 +15,15 @@ import {
 } from 'lucide-react'
 import type { Role } from '@/lib/types'
 
+export type NavGroupKey = 'workspace' | 'coaching' | 'company'
+
 export interface NavItem {
   to: string
   labelKey: string
   icon: LucideIcon
   /** Roles allowed to see this item. */
   roles: Role[]
+  group: NavGroupKey
   /** Exact-path match, or prefix match when `section` is true. */
   exact?: boolean
   section?: boolean
@@ -29,8 +32,7 @@ export interface NavItem {
 
 /**
  * One nav definition drives the sidebar, the breadcrumb and the ⌘K palette,
- * tailored cleanly per role so employees, supervisors and company admins each
- * see a focused workspace.
+ * organized into Metasell-style functional groups per role.
  */
 export const NAV: NavItem[] = [
   {
@@ -38,6 +40,7 @@ export const NAV: NavItem[] = [
     labelKey: 'nav.dashboard',
     icon: LayoutDashboard,
     roles: ['admin'],
+    group: 'workspace',
     exact: true,
     keywords: 'analytics overview stats dashboard company',
   },
@@ -46,6 +49,7 @@ export const NAV: NavItem[] = [
     labelKey: 'nav.coaching_desk',
     icon: Sparkles,
     roles: ['yonalish'],
+    group: 'workspace',
     exact: true,
     keywords: 'coaching desk supervisor escalate review quality',
   },
@@ -54,6 +58,7 @@ export const NAV: NavItem[] = [
     labelKey: 'nav.my_day',
     icon: Sun,
     roles: ['manager', 'receptionist'],
+    group: 'workspace',
     exact: true,
     keywords: 'my day overview personal score rank coaching',
   },
@@ -62,6 +67,7 @@ export const NAV: NavItem[] = [
     labelKey: 'nav.calls',
     icon: Mic,
     roles: ['admin', 'manager', 'receptionist', 'yonalish'],
+    group: 'workspace',
     keywords: 'recordings transcript score upload',
   },
   {
@@ -69,6 +75,7 @@ export const NAV: NavItem[] = [
     labelKey: 'nav.tasks',
     icon: ListTodo,
     roles: ['admin', 'manager', 'receptionist', 'yonalish'],
+    group: 'workspace',
     keywords: 'tasks action items follow ups alerts todo',
   },
   {
@@ -76,20 +83,23 @@ export const NAV: NavItem[] = [
     labelKey: 'nav.clients',
     icon: Users,
     roles: ['admin', 'manager', 'receptionist', 'yonalish'],
+    group: 'workspace',
     keywords: 'customers contacts companies',
   },
   {
-    to: '/managers/admin',
-    labelKey: 'nav.submenu.admin',
-    icon: UserCog,
-    roles: ['admin'],
-    keywords: 'administrators owners access',
+    to: '/telegram',
+    labelKey: 'nav.telegram',
+    icon: MessageSquare,
+    roles: ['admin', 'receptionist', 'yonalish'],
+    group: 'workspace',
+    keywords: 'telegram messages clients questions',
   },
   {
     to: '/managers',
     labelKey: 'nav.submenu.managers',
     icon: BarChart3,
     roles: ['admin', 'yonalish'],
+    group: 'coaching',
     exact: true,
     keywords: 'performance rankings coaching',
   },
@@ -98,6 +108,7 @@ export const NAV: NavItem[] = [
     labelKey: 'nav.submenu.directions',
     icon: SlidersHorizontal,
     roles: ['admin', 'yonalish'],
+    group: 'coaching',
     keywords: 'employees solved problems directions',
   },
   {
@@ -105,20 +116,23 @@ export const NAV: NavItem[] = [
     labelKey: 'nav.team',
     icon: Users,
     roles: ['admin'],
+    group: 'company',
     keywords: 'accounts roles invites team',
   },
   {
-    to: '/telegram',
-    labelKey: 'nav.telegram',
-    icon: MessageSquare,
-    roles: ['admin', 'receptionist', 'yonalish'],
-    keywords: 'telegram messages clients questions',
+    to: '/managers/admin',
+    labelKey: 'nav.submenu.admin',
+    icon: UserCog,
+    roles: ['admin'],
+    group: 'company',
+    keywords: 'administrators owners access',
   },
   {
     to: '/settings',
     labelKey: 'nav.settings',
     icon: Settings,
     roles: ['admin'],
+    group: 'company',
     keywords: 'mode privacy stt gemini configuration zadarma',
   },
   {
@@ -126,6 +140,7 @@ export const NAV: NavItem[] = [
     labelKey: 'nav.profile',
     icon: ShieldCheck,
     roles: ['admin', 'manager', 'receptionist', 'yonalish'],
+    group: 'company',
     keywords: 'profile password security sessions token account',
   },
 ]

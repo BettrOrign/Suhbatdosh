@@ -78,6 +78,11 @@ def _user_payload(u: dict, org: dict | None = None) -> dict:
         "org_name": org.get("name") or config.DEFAULT_ORG_NAME,
         "org_slug": org.get("slug") or config.DEFAULT_ORG_SLUG,
         "sip_extension": u.get("sip_extension") or "",
+        "job_title": u.get("job_title") or "",
+        "department": u.get("department") or "",
+        "skills": u.get("skills") or "",
+        "telegram_id": u.get("telegram_id") or "",
+        "phone": u.get("phone") or "",
     }
 
 
@@ -412,6 +417,12 @@ def list_users(user: dict = Depends(require_role("admin", "yonalish"))):
             "role": u["role"],
             "active": u["active"],
             "sip_extension": u.get("sip_extension") or "",
+            "job_title": u.get("job_title") or "",
+            "department": u.get("department") or "",
+            "skills": u.get("skills") or "",
+            "supervisor_id": u.get("supervisor_id"),
+            "telegram_id": u.get("telegram_id") or "",
+            "phone": u.get("phone") or "",
             **({"api_token": u["api_token"]} if is_admin else {}),
         }
         for u in db.list_users(org_id=user["org_id"])
@@ -425,6 +436,12 @@ def create_user(payload: dict, user: dict = Depends(require_role("admin"))):
     password = payload.get("password") or ""
     role = payload.get("role") or "manager"
     sip_extension = (payload.get("sip_extension") or "").strip()[:32]
+    job_title = (payload.get("job_title") or "").strip()[:100]
+    department = (payload.get("department") or "").strip()[:100]
+    skills = (payload.get("skills") or "").strip()[:500]
+    supervisor_id = payload.get("supervisor_id")
+    telegram_id = (payload.get("telegram_id") or "").strip()[:64]
+    phone = (payload.get("phone") or "").strip()[:32]
     if not name or not email or not password:
         raise HTTPException(400, "name, email and password are required")
     if role not in VALID_ROLES:
@@ -439,6 +456,12 @@ def create_user(payload: dict, user: dict = Depends(require_role("admin"))):
         role,
         sip_extension=sip_extension,
         org_id=user["org_id"],
+        job_title=job_title,
+        department=department,
+        skills=skills,
+        supervisor_id=supervisor_id if isinstance(supervisor_id, int) else None,
+        telegram_id=telegram_id,
+        phone=phone,
     )
     return {
         "id": user_id,
@@ -447,6 +470,12 @@ def create_user(payload: dict, user: dict = Depends(require_role("admin"))):
         "role": role,
         "active": True,
         "sip_extension": sip_extension,
+        "job_title": job_title,
+        "department": department,
+        "skills": skills,
+        "supervisor_id": supervisor_id,
+        "telegram_id": telegram_id,
+        "phone": phone,
     }
 
 
@@ -464,6 +493,12 @@ def update_user(user_id: int, payload: dict, user: dict = Depends(require_role("
             fields[key] = payload[key]
             if key in ("role", "active") and payload[key] != target.get(key):
                 revoke_sessions = True
+    for attr in ("job_title", "department", "skills", "telegram_id", "phone"):
+        if attr in payload:
+            fields[attr] = str(payload.get(attr) or "").strip()
+    if "supervisor_id" in payload:
+        sup_id = payload.get("supervisor_id")
+        fields["supervisor_id"] = sup_id if isinstance(sup_id, int) else None
     if "sip_extension" in payload:
         fields["sip_extension"] = (payload.get("sip_extension") or "").strip()[:32]
     if "password" in payload and payload["password"]:

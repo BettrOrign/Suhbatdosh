@@ -7,9 +7,56 @@ export interface User {
   role: Role
   api_token?: string | null
   sip_extension?: string | null
+  job_title?: string
+  department?: string
+  skills?: string
+  supervisor_id?: number | null
+  telegram_id?: string
+  phone?: string
   org_id?: number
   org_name?: string
   org_slug?: string
+}
+
+export interface Escalation {
+  id: number
+  org_id: number
+  call_id: number
+  call_name?: string
+  call_user_name?: string
+  detected_problem: string
+  severity: 'low' | 'medium' | 'high' | 'critical'
+  assigned_to_user_id: number | null
+  assigned_user_name?: string | null
+  assigned_user_email?: string | null
+  assigned_user_role?: Role | null
+  assigned_user_title?: string | null
+  assigned_user_department?: string | null
+  assigned_reason: string
+  action_plan: string[]
+  channel: 'email' | 'telegram' | 'both'
+  status: 'open' | 'sent' | 'resolved'
+  email_status: string
+  telegram_status: string
+  resolved_at?: string | null
+  resolution_notes?: string
+  created_at: string
+}
+
+export interface NotificationSettings {
+  smtp_enabled: boolean
+  smtp_host: string
+  smtp_port: number
+  smtp_user: string
+  smtp_password?: string
+  has_smtp_password?: boolean
+  smtp_from_name: string
+  telegram_alerts_enabled: boolean
+  telegram_bot_token: string
+  telegram_default_chat_id: string
+  auto_escalate_enabled: boolean
+  escalation_score_threshold: number
+  escalate_on_coach_decision: boolean
 }
 
 export interface Invite {

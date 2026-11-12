@@ -71,6 +71,11 @@ export function PersonDialog({
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<Role>(lockRoleTo ?? person?.role ?? 'manager')
   const [sipExtension, setSipExtension] = useState(person?.sip_extension ?? '')
+  const [jobTitle, setJobTitle] = useState(person?.job_title ?? '')
+  const [department, setDepartment] = useState(person?.department ?? '')
+  const [skills, setSkills] = useState(person?.skills ?? '')
+  const [telegramId, setTelegramId] = useState(person?.telegram_id ?? '')
+  const [phone, setPhone] = useState(person?.phone ?? '')
   const [active, setActive] = useState(person?.active ?? true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -90,6 +95,11 @@ export function PersonDialog({
           password,
           role,
           sip_extension: sipExtension.trim(),
+          job_title: jobTitle.trim(),
+          department: department.trim(),
+          skills: skills.trim(),
+          telegram_id: telegramId.trim(),
+          phone: phone.trim(),
         })
         toast.success(t('users.created'))
       } else if (person) {
@@ -99,6 +109,11 @@ export function PersonDialog({
           role,
           active,
           sip_extension: sipExtension.trim(),
+          job_title: jobTitle.trim(),
+          department: department.trim(),
+          skills: skills.trim(),
+          telegram_id: telegramId.trim(),
+          phone: phone.trim(),
           ...(password.trim() ? { password: password.trim() } : {}),
         })
         toast.success(t('users.updated'))
@@ -200,14 +215,66 @@ export function PersonDialog({
             </div>
           </div>
 
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="person-job-title">{t('users.job_title')}</Label>
+              <Input
+                id="person-job-title"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                placeholder={t('users.job_title_placeholder')}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="person-department">{t('users.department')}</Label>
+              <Input
+                id="person-department"
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                placeholder={t('users.department_placeholder')}
+              />
+            </div>
+          </div>
+
           <div className="space-y-1.5">
-            <Label htmlFor="person-sip">{t('users.sip_extension')}</Label>
+            <Label htmlFor="person-skills">{t('users.skills')}</Label>
             <Input
-              id="person-sip"
-              value={sipExtension}
-              onChange={(e) => setSipExtension(e.target.value)}
-              placeholder={t('users.sip_placeholder')}
+              id="person-skills"
+              value={skills}
+              onChange={(e) => setSkills(e.target.value)}
+              placeholder={t('users.skills_placeholder')}
             />
+            <p className="text-2xs text-muted-foreground">{t('users.skills_desc')}</p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="person-sip">{t('users.sip_extension')}</Label>
+              <Input
+                id="person-sip"
+                value={sipExtension}
+                onChange={(e) => setSipExtension(e.target.value)}
+                placeholder={t('users.sip_placeholder')}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="person-telegram">{t('users.telegram_id')}</Label>
+              <Input
+                id="person-telegram"
+                value={telegramId}
+                onChange={(e) => setTelegramId(e.target.value)}
+                placeholder="@username yoki ID"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="person-phone">{t('users.phone')}</Label>
+              <Input
+                id="person-phone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+998..."
+              />
+            </div>
           </div>
 
           {mode === 'edit' && (
@@ -276,15 +343,34 @@ export function PersonRow({
           <UserRound className="size-3.5" />
         </div>
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             <p className="truncate text-sm font-medium">{person.name}</p>
+            {person.job_title && (
+              <Badge variant="outline" className="border-primary/30 bg-primary/5 text-primary text-2xs">
+                {person.job_title}
+              </Badge>
+            )}
+            {person.department && (
+              <Badge variant="secondary" className="text-2xs">
+                {person.department}
+              </Badge>
+            )}
             {self && (
               <Badge variant="secondary" className="text-2xs">
                 {t('users.you')}
               </Badge>
             )}
           </div>
-          <p className="truncate text-xs text-muted-foreground">{person.email}</p>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span className="truncate">{person.email}</span>
+            {person.phone && <span>&bull; {person.phone}</span>}
+            {person.telegram_id && <span className="text-primary/80">&bull; TG: {person.telegram_id}</span>}
+          </div>
+          {person.skills && (
+            <p className="mt-0.5 line-clamp-1 text-2xs italic text-muted-foreground/80">
+              {person.skills}
+            </p>
+          )}
         </div>
       </div>
 

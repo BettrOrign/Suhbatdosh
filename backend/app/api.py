@@ -140,6 +140,23 @@ def _analyze_call(call_id: int):
                 extra_updates["language"] = lang
             if extra_updates:
                 db.update_call(call_id, **extra_updates)
+
+            # Interactive & Outactive Problem Escalation:
+            # If problems are detected in conversation, AI selects the most competent
+            # employee (e.g. principal if teacher failed) and dispatches Gmail/Telegram alert.
+            try:
+                from .escalation import evaluate_and_escalate_call
+                asyncio.run(
+                    evaluate_and_escalate_call(
+                        call_id=call_id,
+                        analysis_data=result,
+                        transcript=call["transcript"],
+                        org_id=org_id,
+                    )
+                )
+            except Exception as esc_err:
+                logger.warning("Auto-escalation check failed for call %d: %s", call_id, esc_err)
+
             return  # success
 
         except Exception as e:
@@ -480,4 +497,104 @@ async def stats_ask_ai(payload: dict, user: dict = ORG_WIDE_STATS):
     except Exception as exc:
         logger.exception("stats_ask_ai failed")
         raise HTTPException(502, f"AI query failed: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
+# Problem Escalations & Interactive Dispatch
+# ---------------------------------------------------------------------------
+
+
+@router.get("/calls/{call_id}/escalation")
+def get_call_escalation_endpoint(call_id: int, user: dict = Depends(get_current_user)):
+    """Return the most recent problem escalation for a specific call."""
+    call = db.get_call(call_id)
+    if not call or (call.get("org_id") or 1) != (user.get("org_id") or 1):
+        raise HTTPException(404, "Call not found")
+    esc = db.get_call_escalation(call_id)
+    return {"escalation": esc}
+
+
+@router.post("/calls/{call_id}/escalate")
+async def trigger_call_escalation(
+    call_id: int,
+    payload: dict | None = None,
+    user: dict = Depends(require_role("admin", "yonalish")),
+):
+    """Manually trigger or re-assign an escalation for a call."""
+    call = db.get_call(call_id)
+    if not call or (call.get("org_id") or 1) != (user.get("org_id") or 1):
+        raise HTTPException(404, "Call not found")
+    org_id = user.get("org_id") or 1
+    payload = payload or {}
+
+    assigned_user_id = payload.get("assigned_to_user_id")
+    detected_problem = (payload.get("detected_problem") or "").strip()
+    reason = (payload.get("assigned_reason") or "").strip()
+    action_plan = payload.get("action_plan") or []
+
+    # If specific assignment was given manually
+    if assigned_user_id:
+        target_user = db.get_user(assigned_user_id)
+        if not target_user or (target_user.get("org_id") or 1) != org_id:
+            raise HTTPException(400, "Assigned user not found in organization")
+        if not detected_problem:
+            detected_problem = f"Qoʻngʻiroqda muammo aniqlandi ({call.get('name', 'Nomsiz')})"
+        if not reason:
+            reason = f"{user.get('name', 'Admin')} tomonidan masʼul etib tayinlandi"
+
+        esc_id = db.create_escalation(
+            org_id=org_id,
+            call_id=call_id,
+            detected_problem=detected_problem,
+            assigned_to_user_id=assigned_user_id,
+            assigned_reason=reason,
+            action_plan=action_plan if isinstance(action_plan, list) else [str(action_plan)],
+            severity=payload.get("severity", "high"),
+            channel=payload.get("channel", "email"),
+        )
+        from .notifications_dispatcher import dispatch_problem_escalation
+        dispatch_results = dispatch_problem_escalation(esc_id, org_id=org_id)
+        return {"escalation": db.get_escalation(esc_id), "dispatch": dispatch_results}
+
+    # Otherwise trigger AI evaluation
+    analysis_data = {}
+    if call.get("analysis"):
+        try:
+            analysis_data = json.loads(call["analysis"]) if isinstance(call["analysis"], str) else call["analysis"]
+        except Exception:
+            pass
+    from .escalation import evaluate_and_escalate_call
+    esc = await evaluate_and_escalate_call(
+        call_id=call_id,
+        analysis_data=analysis_data,
+        transcript=call.get("transcript") or "",
+        org_id=org_id,
+    )
+    return {"escalation": esc}
+
+
+@router.post("/escalations/{escalation_id}/resolve")
+def resolve_call_escalation(
+    escalation_id: int,
+    payload: dict | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """Mark an escalation as resolved with resolution notes."""
+    esc = db.get_escalation(escalation_id)
+    if not esc or (esc.get("org_id") or 1) != (user.get("org_id") or 1):
+        raise HTTPException(404, "Escalation not found")
+    notes = (payload or {}).get("notes", "")
+    db.resolve_escalation(escalation_id, resolution_notes=notes)
+    return {"ok": True, "escalation": db.get_escalation(escalation_id)}
+
+
+@router.get("/escalations")
+def list_org_escalations(
+    status: str | None = None,
+    user: dict = Depends(require_role("admin", "yonalish")),
+):
+    """List all problem escalations in the current organization."""
+    org_id = user.get("org_id") or 1
+    return db.list_escalations(org_id=org_id, status=status)
+
 

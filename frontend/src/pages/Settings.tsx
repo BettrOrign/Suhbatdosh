@@ -7,13 +7,14 @@ import {
   FileCode2,
   HardDrive,
   Loader2,
+  Mail,
   PhoneCall,
   RefreshCw,
   Search,
+  Send,
   ShieldAlert,
   Sliders,
   Trash2,
-  Wrench,
   type LucideIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -42,7 +43,7 @@ import { useMode } from '@/lib/mode'
 import { useI18n } from '@/i18n/i18n'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/format'
-import type { OrgProfile, OrgSearchResult, SettingsFlags } from '@/lib/types'
+import type { NotificationSettings, OrgProfile, OrgSearchResult, SettingsFlags } from '@/lib/types'
 
 function Coming() {
   const { t } = useI18n()
@@ -379,6 +380,274 @@ function OrgProfileCard() {
   )
 }
 
+function NotificationsAndEscalationCard() {
+  const { t } = useI18n()
+  const [settings, setSettings] = useState<NotificationSettings | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [password, setPassword] = useState('')
+  const [testEmailLoading, setTestEmailLoading] = useState(false)
+  const [testTgLoading, setTestTgLoading] = useState(false)
+  const [testRecipient, setTestRecipient] = useState('')
+
+  useEffect(() => {
+    void api
+      .getNotificationSettings()
+      .then((s) => {
+        setSettings(s)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
+
+  const save = async () => {
+    if (!settings) return
+    setSaving(true)
+    try {
+      const payload = {
+        ...settings,
+        ...(password.trim() ? { smtp_password: password.trim() } : {}),
+      }
+      const updated = await api.updateNotificationSettings(payload)
+      setSettings(updated)
+      setPassword('')
+      toast.success(t('settings.notifications.saved'))
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const sendTestEmail = async () => {
+    setTestEmailLoading(true)
+    try {
+      const res = await api.testEmailSettings(
+        testRecipient || undefined,
+        password.trim() ? { smtp_password: password.trim() } : undefined,
+      )
+      toast.success(res.message || t('settings.notifications.test_email_success'))
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setTestEmailLoading(false)
+    }
+  }
+
+  const sendTestTelegram = async () => {
+    if (!settings) return
+    setTestTgLoading(true)
+    try {
+      const res = await api.testTelegramSettings({
+        telegram_bot_token: settings.telegram_bot_token,
+        telegram_default_chat_id: settings.telegram_default_chat_id,
+      })
+      toast.success(res.message || t('settings.notifications.test_tg_success'))
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setTestTgLoading(false)
+    }
+  }
+
+  if (loading || !settings) {
+    return (
+      <Card className="lg:col-span-2">
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-1.5">
+          <Bell aria-hidden="true" className="size-3.5 text-primary" />
+          {t('settings.notifications.title')}
+        </CardTitle>
+        <CardDescription>{t('settings.notifications.desc')}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Avto-Eskalatsiya Qoidalari */}
+        <div className="rounded-lg border border-border bg-surface-sunken p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold">{t('settings.notifications.auto_escalate')}</p>
+              <p className="text-xs text-muted-foreground">{t('settings.notifications.auto_escalate_desc')}</p>
+            </div>
+            <Switch
+              checked={settings.auto_escalate_enabled}
+              onCheckedChange={(v) => setSettings({ ...settings, auto_escalate_enabled: v })}
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 pt-2 border-t border-border">
+            <div className="space-y-1.5">
+              <Label htmlFor="threshold">{t('settings.notifications.threshold')}</Label>
+              <Input
+                id="threshold"
+                type="number"
+                min="0"
+                max="100"
+                value={settings.escalation_score_threshold}
+                onChange={(e) => setSettings({ ...settings, escalation_score_threshold: Number(e.target.value) })}
+              />
+              <p className="text-2xs text-muted-foreground">{t('settings.notifications.threshold_desc')}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Gmail / SMTP Sozlamalari */}
+        <div className="rounded-lg border border-border p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Mail className="size-4 text-primary" />
+              <div>
+                <p className="text-sm font-semibold">{t('settings.notifications.smtp_title')}</p>
+                <p className="text-xs text-muted-foreground">{t('settings.notifications.smtp_desc')}</p>
+              </div>
+            </div>
+            <Switch
+              checked={settings.smtp_enabled}
+              onCheckedChange={(v) => setSettings({ ...settings, smtp_enabled: v })}
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="smtp-host">{t('settings.notifications.smtp_host')}</Label>
+              <Input
+                id="smtp-host"
+                value={settings.smtp_host}
+                onChange={(e) => setSettings({ ...settings, smtp_host: e.target.value })}
+                placeholder="smtp.gmail.com"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="smtp-port">{t('settings.notifications.smtp_port')}</Label>
+              <Input
+                id="smtp-port"
+                type="number"
+                value={settings.smtp_port}
+                onChange={(e) => setSettings({ ...settings, smtp_port: Number(e.target.value) })}
+                placeholder="587"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="smtp-user">{t('settings.notifications.smtp_user')}</Label>
+              <Input
+                id="smtp-user"
+                type="email"
+                value={settings.smtp_user}
+                onChange={(e) => setSettings({ ...settings, smtp_user: e.target.value })}
+                placeholder="markaz@gmail.com"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="smtp-password">{t('settings.notifications.smtp_pass')}</Label>
+              <Input
+                id="smtp-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={settings.has_smtp_password ? "•••••••• (O'zgartirish uchun yangi parol kiriting)" : "Gmail App Password"}
+              />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="smtp-from">{t('settings.notifications.smtp_from')}</Label>
+              <Input
+                id="smtp-from"
+                value={settings.smtp_from_name}
+                onChange={(e) => setSettings({ ...settings, smtp_from_name: e.target.value })}
+                placeholder="Suhbatdosh AI Nazoratchi"
+              />
+            </div>
+          </div>
+
+          {/* Test Email */}
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border">
+            <Input
+              className="max-w-xs"
+              placeholder={t('settings.notifications.test_recipient_placeholder')}
+              value={testRecipient}
+              onChange={(e) => setTestRecipient(e.target.value)}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void sendTestEmail()}
+              disabled={testEmailLoading || !settings.smtp_user}
+            >
+              {testEmailLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+              {t('settings.notifications.send_test_email')}
+            </Button>
+          </div>
+        </div>
+
+        {/* Telegram Sozlamalari */}
+        <div className="rounded-lg border border-border p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Send className="size-4 text-primary" />
+              <div>
+                <p className="text-sm font-semibold">{t('settings.notifications.tg_title')}</p>
+                <p className="text-xs text-muted-foreground">{t('settings.notifications.tg_desc')}</p>
+              </div>
+            </div>
+            <Switch
+              checked={settings.telegram_alerts_enabled}
+              onCheckedChange={(v) => setSettings({ ...settings, telegram_alerts_enabled: v })}
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="tg-token">{t('settings.notifications.tg_token')}</Label>
+              <Input
+                id="tg-token"
+                type="password"
+                value={settings.telegram_bot_token}
+                onChange={(e) => setSettings({ ...settings, telegram_bot_token: e.target.value })}
+                placeholder="123456789:ABCdefGhI..."
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="tg-chat">{t('settings.notifications.tg_chat_id')}</Label>
+              <Input
+                id="tg-chat"
+                value={settings.telegram_default_chat_id}
+                onChange={(e) => setSettings({ ...settings, telegram_default_chat_id: e.target.value })}
+                placeholder="-100123456789 yoki user_id"
+              />
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-border">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void sendTestTelegram()}
+              disabled={testTgLoading || !settings.telegram_bot_token || !settings.telegram_default_chat_id}
+            >
+              {testTgLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+              {t('settings.notifications.send_test_tg')}
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <Button onClick={() => void save()} disabled={saving}>
+            {saving && <Loader2 className="size-3.5 animate-spin" />}
+            {t('common.save_changes')}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 /**
  * Settings: every control here is wired to the backend — processing mode and
  * the transcription/data/notification toggles persist through
@@ -618,34 +887,8 @@ export function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* --- notifications -------------------------- */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-1.5">
-              <Bell aria-hidden="true" className="size-3.5 text-primary" />
-              {t('settings.section_notifications')}
-            </CardTitle>
-            <CardDescription>{t('settings.section_notifications_desc')}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Row
-              icon={Bell}
-              title={t('settings.row.problem_alerts')}
-              description={t('settings.row.problem_alerts_desc')}
-            >
-              <Switch
-                checked={flags?.problem_alerts ?? true}
-                disabled={!flags}
-                onCheckedChange={(v) => void updateFlag('problem_alerts', v)}
-                aria-label={t('settings.row.problem_alerts')}
-              />
-            </Row>
-            <Separator />
-            <Row icon={Wrench} title={t('settings.row.digest_time')} description={t('settings.row.digest_time_desc')}>
-              <Coming />
-            </Row>
-          </CardContent>
-        </Card>
+        {/* --- notifications & outbound escalation -------------------------- */}
+        <NotificationsAndEscalationCard />
 
         {/* --- Zadarma PBX -------------------------- */}
         <ZadarmaCard />

@@ -111,6 +111,12 @@ def init_db():
                 active INTEGER NOT NULL DEFAULT 1,
                 api_token TEXT UNIQUE,
                 sip_extension TEXT DEFAULT '',
+                job_title TEXT DEFAULT '',
+                department TEXT DEFAULT '',
+                skills TEXT DEFAULT '',
+                supervisor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                telegram_id TEXT DEFAULT '',
+                phone TEXT DEFAULT '',
                 created_at TEXT NOT NULL
             );
 
@@ -244,6 +250,24 @@ def init_db():
                 created_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS escalations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL DEFAULT 1,
+                call_id INTEGER NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
+                detected_problem TEXT NOT NULL,
+                severity TEXT NOT NULL DEFAULT 'high',
+                assigned_to_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                assigned_reason TEXT NOT NULL,
+                action_plan TEXT NOT NULL DEFAULT '[]',
+                channel TEXT NOT NULL DEFAULT 'email',
+                status TEXT NOT NULL DEFAULT 'open',
+                email_status TEXT DEFAULT '',
+                telegram_status TEXT DEFAULT '',
+                resolved_at TEXT,
+                resolution_notes TEXT DEFAULT '',
+                created_at TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS bot_settings (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL,
@@ -298,12 +322,26 @@ def init_db():
             db.execute("ALTER TABLE calls ADD COLUMN bookmarked INTEGER NOT NULL DEFAULT 0")
         if "bookmark_note" not in cols:
             db.execute("ALTER TABLE calls ADD COLUMN bookmark_note TEXT DEFAULT ''")
+        if "escalated" not in cols:
+            db.execute("ALTER TABLE calls ADD COLUMN escalated INTEGER NOT NULL DEFAULT 0")
 
         user_cols = {r[1] for r in db.execute("PRAGMA table_info(users)").fetchall()}
         if "org_id" not in user_cols:
             db.execute("ALTER TABLE users ADD COLUMN org_id INTEGER NOT NULL DEFAULT 1")
         if "sip_extension" not in user_cols:
             db.execute("ALTER TABLE users ADD COLUMN sip_extension TEXT DEFAULT ''")
+        if "job_title" not in user_cols:
+            db.execute("ALTER TABLE users ADD COLUMN job_title TEXT DEFAULT ''")
+        if "department" not in user_cols:
+            db.execute("ALTER TABLE users ADD COLUMN department TEXT DEFAULT ''")
+        if "skills" not in user_cols:
+            db.execute("ALTER TABLE users ADD COLUMN skills TEXT DEFAULT ''")
+        if "supervisor_id" not in user_cols:
+            db.execute("ALTER TABLE users ADD COLUMN supervisor_id INTEGER REFERENCES users(id) ON DELETE SET NULL")
+        if "telegram_id" not in user_cols:
+            db.execute("ALTER TABLE users ADD COLUMN telegram_id TEXT DEFAULT ''")
+        if "phone" not in user_cols:
+            db.execute("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''")
 
         for tbl in ("clients", "tags", "telegram_users", "telegram_messages", "youtube_whitelist"):
             tcols = {r[1] for r in db.execute(f"PRAGMA table_info({tbl})").fetchall()}
@@ -326,6 +364,10 @@ def init_db():
         db.execute("CREATE INDEX IF NOT EXISTS idx_clients_manager ON clients(manager_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_call_tags_call ON call_tags(call_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_call_tags_tag ON call_tags(tag_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_escalations_org ON escalations(org_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_escalations_call ON escalations(call_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_escalations_assigned ON escalations(assigned_to_user_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_escalations_status ON escalations(status)")
 
 
 # ---------------------------------------------------------------------------
@@ -483,6 +525,12 @@ def create_user(
     role: str = "manager",
     sip_extension: str = "",
     org_id: int = 1,
+    job_title: str = "",
+    department: str = "",
+    skills: str = "",
+    supervisor_id: int | None = None,
+    telegram_id: str = "",
+    phone: str = "",
 ) -> int:
     """Insert a user with a freshly generated API token and return the new row id."""
     from .auth import generate_api_token
@@ -490,8 +538,25 @@ def create_user(
     api_token = generate_api_token()
     with get_db() as db:
         cur = db.execute(
-            "INSERT INTO users (org_id, name, email, password_hash, role, api_token, sip_extension, created_at) VALUES (?,?,?,?,?,?,?,?)",
-            (org_id, name, email, password_hash, role, api_token, sip_extension, ts),
+            "INSERT INTO users (org_id, name, email, password_hash, role, api_token, sip_extension, "
+            "job_title, department, skills, supervisor_id, telegram_id, phone, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                org_id,
+                name,
+                email,
+                password_hash,
+                role,
+                api_token,
+                sip_extension,
+                job_title,
+                department,
+                skills,
+                supervisor_id,
+                telegram_id,
+                phone,
+                ts,
+            ),
         )
         return cur.lastrowid
 
@@ -1128,6 +1193,167 @@ def is_youtube_allowed(channel_id: str | None = None, url: str | None = None, or
 
 
 # ---------------------------------------------------------------------------
+# Problem Escalations & Smart Dispatch
+# ---------------------------------------------------------------------------
+
+
+def _row_to_escalation(row) -> dict:
+    if not row:
+        return {}
+    d = dict(row)
+    if "action_plan" in d and isinstance(d["action_plan"], str):
+        try:
+            d["action_plan"] = json.loads(d["action_plan"])
+        except Exception:
+            d["action_plan"] = [d["action_plan"]] if d["action_plan"] else []
+    return d
+
+
+def create_escalation(
+    org_id: int,
+    call_id: int,
+    detected_problem: str,
+    assigned_to_user_id: int | None,
+    assigned_reason: str,
+    action_plan: list | str = "[]",
+    severity: str = "high",
+    channel: str = "email",
+    status: str = "open",
+    email_status: str = "",
+    telegram_status: str = "",
+) -> int:
+    """Record an AI-detected problem escalation and mark call as escalated."""
+    ts = now()
+    plan_json = json.dumps(action_plan, ensure_ascii=False) if isinstance(action_plan, (list, dict)) else str(action_plan)
+    with get_db() as db:
+        cur = db.execute(
+            """
+            INSERT INTO escalations (
+                org_id, call_id, detected_problem, severity, assigned_to_user_id,
+                assigned_reason, action_plan, channel, status, email_status,
+                telegram_status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                org_id,
+                call_id,
+                detected_problem.strip(),
+                severity,
+                assigned_to_user_id,
+                assigned_reason.strip(),
+                plan_json,
+                channel,
+                status,
+                email_status,
+                telegram_status,
+                ts,
+            ),
+        )
+        esc_id = cur.lastrowid
+        db.execute("UPDATE calls SET escalated = 1 WHERE id = ?", (call_id,))
+        return esc_id
+
+
+def get_escalation(escalation_id: int) -> dict | None:
+    """Return an escalation row joined with assigned user details and call details."""
+    sql = """
+        SELECT e.*,
+               u.name AS assigned_user_name,
+               u.email AS assigned_user_email,
+               u.role AS assigned_user_role,
+               u.job_title AS assigned_user_title,
+               u.department AS assigned_user_department,
+               c.name AS call_name,
+               c.user_id AS call_user_id,
+               cu.name AS call_user_name
+        FROM escalations e
+        LEFT JOIN users u ON u.id = e.assigned_to_user_id
+        LEFT JOIN calls c ON c.id = e.call_id
+        LEFT JOIN users cu ON cu.id = c.user_id
+        WHERE e.id = ?
+    """
+    with get_db() as db:
+        row = db.execute(sql, (escalation_id,)).fetchone()
+        return _row_to_escalation(row) if row else None
+
+
+def get_call_escalation(call_id: int) -> dict | None:
+    """Return the most recent escalation for a specific call."""
+    sql = """
+        SELECT e.*,
+               u.name AS assigned_user_name,
+               u.email AS assigned_user_email,
+               u.role AS assigned_user_role,
+               u.job_title AS assigned_user_title,
+               u.department AS assigned_user_department,
+               c.name AS call_name,
+               c.user_id AS call_user_id,
+               cu.name AS call_user_name
+        FROM escalations e
+        LEFT JOIN users u ON u.id = e.assigned_to_user_id
+        LEFT JOIN calls c ON c.id = e.call_id
+        LEFT JOIN users cu ON cu.id = c.user_id
+        WHERE e.call_id = ?
+        ORDER BY e.id DESC
+        LIMIT 1
+    """
+    with get_db() as db:
+        row = db.execute(sql, (call_id,)).fetchone()
+        return _row_to_escalation(row) if row else None
+
+
+def list_escalations(org_id: int = 1, status: str | None = None, limit: int = 50) -> list[dict]:
+    """List escalations in an organization, newest first."""
+    sql = """
+        SELECT e.*,
+               u.name AS assigned_user_name,
+               u.email AS assigned_user_email,
+               u.role AS assigned_user_role,
+               u.job_title AS assigned_user_title,
+               u.department AS assigned_user_department,
+               c.name AS call_name,
+               c.user_id AS call_user_id,
+               cu.name AS call_user_name
+        FROM escalations e
+        LEFT JOIN users u ON u.id = e.assigned_to_user_id
+        LEFT JOIN calls c ON c.id = e.call_id
+        LEFT JOIN users cu ON cu.id = c.user_id
+        WHERE e.org_id = ?
+    """
+    params: list = [org_id]
+    if status:
+        sql += " AND e.status = ?"
+        params.append(status)
+    sql += " ORDER BY e.id DESC LIMIT ?"
+    params.append(limit)
+    with get_db() as db:
+        rows = db.execute(sql, params).fetchall()
+        return [_row_to_escalation(r) for r in rows]
+
+
+def update_escalation(escalation_id: int, **fields):
+    """Update fields on an escalation row."""
+    if not fields:
+        return
+    if "action_plan" in fields and isinstance(fields["action_plan"], (list, dict)):
+        fields["action_plan"] = json.dumps(fields["action_plan"], ensure_ascii=False)
+    cols = ", ".join(f"{k} = ?" for k in fields)
+    vals = list(fields.values())
+    with get_db() as db:
+        db.execute(f"UPDATE escalations SET {cols} WHERE id = ?", (*vals, escalation_id))
+
+
+def resolve_escalation(escalation_id: int, resolution_notes: str = "") -> None:
+    """Mark an escalation as resolved with current timestamp."""
+    ts = now()
+    with get_db() as db:
+        db.execute(
+            "UPDATE escalations SET status = 'resolved', resolved_at = ?, resolution_notes = ? WHERE id = ?",
+            (ts, resolution_notes.strip(), escalation_id),
+        )
+
+
+# ---------------------------------------------------------------------------
 # Bot / Organization Settings
 # ---------------------------------------------------------------------------
 
@@ -1260,6 +1486,57 @@ def get_retention_days(org_id: int = 1) -> int:
 
 def set_retention_days(days: int, org_id: int = 1) -> None:
     set_bot_setting("retention_days", str(days), org_id=org_id)
+
+
+NOTIFICATION_SETTINGS_DEFAULTS = {
+    "smtp_enabled": False,
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "smtp_user": "",
+    "smtp_password": "",
+    "smtp_from_name": "Suhbatdosh AI",
+    "telegram_alerts_enabled": False,
+    "telegram_bot_token": "",
+    "telegram_default_chat_id": "",
+    "auto_escalate_enabled": True,
+    "escalation_score_threshold": 50,
+    "escalate_on_coach_decision": True,
+}
+
+
+def get_notification_settings(org_id: int = 1) -> dict:
+    """Return all outbound dispatch & notification settings for the organization."""
+    out = {}
+    for key, default in NOTIFICATION_SETTINGS_DEFAULTS.items():
+        raw = get_bot_setting(f"notif_{key}", "", org_id=org_id)
+        if raw == "":
+            out[key] = default
+        elif isinstance(default, bool):
+            out[key] = raw.lower() == "true"
+        elif isinstance(default, int):
+            try:
+                out[key] = int(raw)
+            except ValueError:
+                out[key] = default
+        else:
+            out[key] = raw
+    return out
+
+
+def set_notification_settings(payload: dict, org_id: int = 1) -> dict:
+    """Update outbound notification settings for the organization."""
+    for key, val in payload.items():
+        if key not in NOTIFICATION_SETTINGS_DEFAULTS:
+            continue
+        default = NOTIFICATION_SETTINGS_DEFAULTS[key]
+        if isinstance(default, bool):
+            str_val = "true" if bool(val) else "false"
+        elif isinstance(default, int):
+            str_val = str(int(val))
+        else:
+            str_val = str(val or "")
+        set_bot_setting(f"notif_{key}", str_val, org_id=org_id)
+    return get_notification_settings(org_id=org_id)
 
 
 def expired_audio(days: int, org_id: int | None = None) -> list[dict]:

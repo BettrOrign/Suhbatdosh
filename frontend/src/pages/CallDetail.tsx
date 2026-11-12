@@ -12,11 +12,13 @@ import {
   FilePenLine,
   Globe,
   Lightbulb,
+  Mail,
   MessageSquare,
   PhoneCall,
   Play,
   RefreshCw,
   Search,
+  Send,
   Star,
   Target,
   Trash2,
@@ -73,7 +75,9 @@ import {
   type Call,
   type CallType,
   type Client,
+  type Escalation,
   type Segment,
+  type User,
 } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -276,6 +280,14 @@ export function CallDetail() {
   const [clientsLoading, setClientsLoading] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [transcriptQuery, setTranscriptQuery] = useState('')
+  const [escalation, setEscalation] = useState<Escalation | null>(null)
+  const [escalateModalOpen, setEscalateModalOpen] = useState(false)
+  const [assignUserList, setAssignUserList] = useState<User[]>([])
+  const [assigneeId, setAssigneeId] = useState<string>('')
+  const [problemDescription, setProblemDescription] = useState('')
+  const [escalateReason, setEscalateReason] = useState('')
+  const [escalating, setEscalating] = useState(false)
+  const [resolving, setResolving] = useState(false)
 
   const timer = useRef<number | null>(null)
   const playerRef = useRef<WavePlayerHandle>(null)
@@ -289,6 +301,12 @@ export function CallDetail() {
       callRef.current = next
       setCall(next)
       setMissing(false)
+      try {
+        const escRes = await api.getCallEscalation(callId)
+        setEscalation(escRes.escalation)
+      } catch {
+        /* ignore */
+      }
     } catch (e) {
       if (callRef.current === null) setMissing(true)
       toast.error(t('call.load_failed', { error: (e as Error).message }))
@@ -296,6 +314,48 @@ export function CallDetail() {
       setLoading(false)
     }
   }, [callId, t])
+
+  const handleResolveEscalation = async () => {
+    if (!escalation) return
+    setResolving(true)
+    try {
+      const res = await api.resolveEscalation(escalation.id, "Muammo to'liq hal qilindi")
+      setEscalation(res.escalation)
+      toast.success(t('escalation.resolved_toast'))
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setResolving(false)
+    }
+  }
+
+  const openEscalateModal = async () => {
+    setEscalateModalOpen(true)
+    try {
+      const users = await api.listUsers()
+      setAssignUserList(users)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const handleManualEscalate = async () => {
+    setEscalating(true)
+    try {
+      const res = await api.escalateCall(callId, {
+        assigned_to_user_id: assigneeId ? Number(assigneeId) : undefined,
+        detected_problem: problemDescription.trim() || undefined,
+        assigned_reason: escalateReason.trim() || undefined,
+      })
+      setEscalation(res.escalation)
+      setEscalateModalOpen(false)
+      toast.success(t('escalation.dispatched_toast'))
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setEscalating(false)
+    }
+  }
 
   useEffect(() => {
     if (!Number.isFinite(callId) || callId <= 0) {
@@ -597,6 +657,16 @@ export function CallDetail() {
                     <RefreshCw aria-hidden="true" className="size-3.5" />
                     {t('call.reanalyze')}
                   </Button>
+                  {(user?.role === 'admin' || user?.role === 'yonalish') && (
+                    <Button
+                      variant={escalation ? 'outline' : 'secondary'}
+                      size="sm"
+                      onClick={() => void openEscalateModal()}
+                    >
+                      <Send aria-hidden="true" className="size-3.5 text-primary" />
+                      {escalation ? t('escalation.reassign') : t('escalation.button')}
+                    </Button>
+                  )}
                   {isAdmin && (
                     <Button variant="outline" size="sm" onClick={openEdit}>
                       <FilePenLine aria-hidden="true" className="size-3.5" />
@@ -663,6 +733,107 @@ export function CallDetail() {
       <div className="grid gap-4 lg:grid-cols-12 lg:items-start">
         {hasAnalysis && (
           <div className="space-y-4 lg:col-span-5">
+            {/* Outactive AI Escalation Banner */}
+            {escalation && (
+              <Reveal>
+                <div
+                  className={cn(
+                    'rounded-lg border p-3.5 shadow-xs transition-all',
+                    escalation.status === 'resolved'
+                      ? 'border-success/30 bg-success/5'
+                      : escalation.severity === 'critical'
+                        ? 'border-destructive/40 bg-destructive/10'
+                        : 'border-warning/40 bg-warning/10'
+                  )}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2.5">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Badge
+                          variant={
+                            escalation.status === 'resolved'
+                              ? 'success'
+                              : escalation.severity === 'critical'
+                                ? 'destructive'
+                                : 'warning'
+                          }
+                          className="font-mono text-2xs"
+                        >
+                          {escalation.status === 'resolved'
+                            ? t('escalation.resolved')
+                            : `${t('escalation.badge')}: ${escalation.severity.toUpperCase()}`}
+                        </Badge>
+                        <span className="text-xs font-semibold">{escalation.detected_problem}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        <strong className="text-foreground">{t('escalation.assigned_to')}:</strong>{' '}
+                        <span className="font-medium text-foreground">
+                          {escalation.assigned_user_name || 'Masʼul xodim'}
+                        </span>{' '}
+                        ({escalation.assigned_user_title || escalation.assigned_user_role}) &bull;{' '}
+                        <span>{escalation.assigned_user_email}</span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {escalation.status !== 'resolved' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={resolving}
+                          className="border-success/40 text-success hover:bg-success/10 hover:text-success"
+                          onClick={() => void handleResolveEscalation()}
+                        >
+                          <Check className="size-3.5" />
+                          {t('escalation.mark_resolved')}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-2.5 rounded-md border border-border/60 bg-background/70 p-2.5 text-xs text-muted-foreground space-y-1.5">
+                    <p>
+                      <strong className="text-foreground">{t('escalation.reason')}:</strong>{' '}
+                      {escalation.assigned_reason}
+                    </p>
+                    {escalation.action_plan && escalation.action_plan.length > 0 && (
+                      <div>
+                        <strong className="text-foreground">{t('escalation.action_plan')}:</strong>
+                        <ul className="mt-1 list-disc pl-4 space-y-0.5">
+                          {escalation.action_plan.map((step, idx) => (
+                            <li key={idx}>{step}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Delivery Status */}
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-2xs">
+                    <span className="text-muted-foreground">{t('escalation.dispatch_status')}:</span>
+                    {escalation.email_status && (
+                      <Badge
+                        variant={escalation.email_status === 'sent' ? 'outline' : 'secondary'}
+                        className={escalation.email_status === 'sent' ? 'border-primary/40 text-primary' : ''}
+                      >
+                        <Mail className="mr-1 size-3" />
+                        Gmail: {escalation.email_status}
+                      </Badge>
+                    )}
+                    {escalation.telegram_status && (
+                      <Badge
+                        variant={escalation.telegram_status === 'sent' ? 'outline' : 'secondary'}
+                        className={escalation.telegram_status === 'sent' ? 'border-primary/40 text-primary' : ''}
+                      >
+                        <Send className="mr-1 size-3" />
+                        Telegram: {escalation.telegram_status}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </Reveal>
+            )}
+
             {/* Card 1: Consolidated AI Evaluation Card (Score + Summary + 7-Dim Rubric) */}
             <Reveal>
               <Card>
@@ -1143,6 +1314,65 @@ export function CallDetail() {
           </div>
           <DialogFooter>
             <Button onClick={() => void saveEdit()}>{t('common.save_changes')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Escalate / Outbound Dispatch Dialog */}
+      <Dialog open={escalateModalOpen} onOpenChange={setEscalateModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('escalation.modal_title')}</DialogTitle>
+            <DialogDescription>{t('escalation.modal_desc')}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="esc-assignee">{t('escalation.select_assignee')}</Label>
+              <Select value={assigneeId} onValueChange={setAssigneeId}>
+                <SelectTrigger id="esc-assignee">
+                  <SelectValue placeholder={t('escalation.auto_ai_choice')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">{t('escalation.auto_ai_choice')}</SelectItem>
+                  {assignUserList.map((u) => (
+                    <SelectItem key={u.id} value={String(u.id)}>
+                      {u.name} ({u.job_title || u.role}) — {u.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="esc-problem">{t('escalation.problem_label')}</Label>
+              <Input
+                id="esc-problem"
+                value={problemDescription}
+                onChange={(e) => setProblemDescription(e.target.value)}
+                placeholder={t('escalation.problem_placeholder')}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="esc-reason">{t('escalation.reason_label')}</Label>
+              <Textarea
+                id="esc-reason"
+                rows={2}
+                value={escalateReason}
+                onChange={(e) => setEscalateReason(e.target.value)}
+                placeholder={t('escalation.reason_placeholder')}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEscalateModalOpen(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={() => void handleManualEscalate()} disabled={escalating}>
+              {t('escalation.dispatch_action')}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

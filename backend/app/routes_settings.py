@@ -157,3 +157,104 @@ def update_settings(payload: dict, user: dict = Depends(require_role("admin"))):
     if "mode" not in payload and "flags" not in payload and "retention_days" not in payload:
         raise HTTPException(400, "nothing to update: pass mode, flags or retention_days")
     return _settings_payload(org_id=org_id)
+
+
+# ---------------------------------------------------------------------------
+# Outbound Dispatch & Notification Settings
+# ---------------------------------------------------------------------------
+
+
+@router.get("/settings/notifications")
+def get_notification_settings_endpoint(user: dict = Depends(get_current_user)):
+    """Return outbound notification and escalation settings for the user's organization."""
+    org_id = user.get("org_id") or 1
+    settings = db.get_notification_settings(org_id=org_id)
+    # Mask password for non-empty display
+    masked = dict(settings)
+    if masked.get("smtp_password"):
+        masked["has_smtp_password"] = True
+        masked["smtp_password"] = "••••••••"
+    else:
+        masked["has_smtp_password"] = False
+    return masked
+
+
+@router.patch("/settings/notifications")
+def update_notification_settings_endpoint(payload: dict, user: dict = Depends(require_role("admin"))):
+    """Update outbound notification settings (Gmail/SMTP and Telegram). Admin only."""
+    org_id = user.get("org_id") or 1
+    # If smtp_password is the masked placeholder, don't overwrite the existing password
+    clean_payload = dict(payload)
+    if clean_payload.get("smtp_password") == "••••••••":
+        clean_payload.pop("smtp_password")
+    updated = db.set_notification_settings(clean_payload, org_id=org_id)
+    logger.info("Notification settings updated by %s (org=%d)", user["email"], org_id)
+    masked = dict(updated)
+    masked["has_smtp_password"] = bool(updated.get("smtp_password"))
+    masked["smtp_password"] = "••••••••" if masked["has_smtp_password"] else ""
+    return masked
+
+
+@router.post("/settings/notifications/test-email")
+def test_email_endpoint(payload: dict, user: dict = Depends(require_role("admin"))):
+    """Send a real test email to verify SMTP / Gmail configuration."""
+    org_id = user.get("org_id") or 1
+    settings = db.get_notification_settings(org_id=org_id)
+    recipient = (payload.get("recipient") or user.get("email") or "").strip()
+    if not recipient:
+        raise HTTPException(400, "Recipient email is required")
+
+    from .notifications_dispatcher import send_email
+    subject = "Suhbatdosh AI — Sinov Xabari (Test Email)"
+    html_body = f"""
+    <div style="font-family: sans-serif; padding: 20px; background: #f8fafc; border-radius: 8px;">
+        <h2 style="color: #4f46e5;">Suhbatdosh AI Sinov Xabari</h2>
+        <p>Tabriklaymiz! Elektron pochta (SMTP / Gmail) muvaffaqiyatli ulandi.</p>
+        <p style="color: #64748b; font-size: 13px;">Yuborilgan vaqt: {db.now()} | Qabul qiluvchi: {recipient}</p>
+    </div>
+    """
+    plain_body = f"Suhbatdosh AI Sinov Xabari\n\nElektron pochta (SMTP / Gmail) muvaffaqiyatli ulandi!\nQabul qiluvchi: {recipient}"
+
+    # If payload contains overrides for testing before saving
+    test_settings = dict(settings)
+    for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_from_name"):
+        if k in payload and payload[k]:
+            test_settings[k] = payload[k]
+    if payload.get("smtp_password") and payload["smtp_password"] != "••••••••":
+        test_settings["smtp_password"] = payload["smtp_password"]
+
+    ok, msg = send_email(
+        to_email=recipient,
+        subject=subject,
+        html_body=html_body,
+        plain_body=plain_body,
+        settings=test_settings,
+    )
+    if not ok:
+        raise HTTPException(400, f"Email yuborishda xatolik: {msg}")
+    return {"ok": True, "message": "Test email muvaffaqiyatli yuborildi"}
+
+
+@router.post("/settings/notifications/test-telegram")
+def test_telegram_endpoint(payload: dict, user: dict = Depends(require_role("admin"))):
+    """Send a real test message to verify Telegram bot and chat configuration."""
+    org_id = user.get("org_id") or 1
+    settings = db.get_notification_settings(org_id=org_id)
+    bot_token = (payload.get("telegram_bot_token") or settings.get("telegram_bot_token") or "").strip()
+    chat_id = (payload.get("telegram_default_chat_id") or settings.get("telegram_default_chat_id") or "").strip()
+
+    if not bot_token:
+        raise HTTPException(400, "Telegram Bot Token kiritilmagan")
+    if not chat_id:
+        raise HTTPException(400, "Telegram Chat ID kiritilmagan")
+
+    from .notifications_dispatcher import send_telegram_alert
+    text = (
+        "<b>Suhbatdosh AI &bull; Sinov Xabari</b>\n\n"
+        "Tabriklaymiz! Telegram xabarnoma kanali muvaffaqiyatli sozlandi.\n"
+        "Endi muammoli qoʻngʻiroqlar haqida bildirishnomalar shu yerga yuboriladi."
+    )
+    ok, msg = send_telegram_alert(chat_id=chat_id, text=text, bot_token=bot_token)
+    if not ok:
+        raise HTTPException(400, f"Telegramga yuborishda xatolik: {msg}")
+    return {"ok": True, "message": "Test Telegram xabari muvaffaqiyatli yuborildi"}

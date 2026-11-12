@@ -4,9 +4,11 @@ import type {
   CrossCallAnswer,
   CrossCallInsights,
   EmployeeOverview,
+  Escalation,
   Invite,
   InviteInfo,
   Notification,
+  NotificationSettings,
   OrgProfile,
   OrgProfileResponse,
   OrgSearchResult,
@@ -117,11 +119,35 @@ export const api = {
 
   // users (admin)
   listUsers: () => request<(User & { active: boolean })[]>('/api/users'),
-  createUser: (data: { name: string; email: string; password: string; role: string; sip_extension?: string }) =>
-    request<User>('/api/users', jsonBody('POST', data)),
+  createUser: (data: {
+    name: string
+    email: string
+    password: string
+    role: string
+    sip_extension?: string
+    job_title?: string
+    department?: string
+    skills?: string
+    supervisor_id?: number | null
+    telegram_id?: string
+    phone?: string
+  }) => request<User>('/api/users', jsonBody('POST', data)),
   updateUser: (
     id: number,
-    data: Partial<{ name: string; email: string; password: string; role: string; active: boolean; sip_extension: string }>,
+    data: Partial<{
+      name: string
+      email: string
+      password: string
+      role: string
+      active: boolean
+      sip_extension: string
+      job_title: string
+      department: string
+      skills: string
+      supervisor_id: number | null
+      telegram_id: string
+      phone: string
+    }>,
   ) => request<{ ok: boolean }>(`/api/users/${id}`, jsonBody('PATCH', data)),
   deleteUser: (id: number) =>
     request<{ ok: boolean }>(`/api/users/${id}`, { method: 'DELETE' }),
@@ -237,4 +263,36 @@ export const api = {
       '/api/zadarma/sync',
       jsonBody('POST', data ?? {}),
     ),
+
+  // notifications & outbound dispatch (Gmail / SMTP & Telegram)
+  getNotificationSettings: () =>
+    request<NotificationSettings>('/api/settings/notifications'),
+  updateNotificationSettings: (data: Partial<NotificationSettings>) =>
+    request<NotificationSettings>('/api/settings/notifications', jsonBody('PATCH', data)),
+  testEmailSettings: (recipient?: string, settings?: Partial<NotificationSettings>) =>
+    request<{ ok: boolean; message: string }>(
+      '/api/settings/notifications/test-email',
+      jsonBody('POST', { recipient, ...(settings ?? {}) }),
+    ),
+  testTelegramSettings: (data: { telegram_bot_token?: string; telegram_default_chat_id?: string }) =>
+    request<{ ok: boolean; message: string }>(
+      '/api/settings/notifications/test-telegram',
+      jsonBody('POST', data),
+    ),
+
+  // problem escalations & smart dispatch
+  getCallEscalation: (callId: number) =>
+    request<{ escalation: Escalation | null }>(`/api/calls/${callId}/escalation`),
+  escalateCall: (callId: number, data?: Partial<Escalation>) =>
+    request<{ escalation: Escalation; dispatch?: Record<string, string> }>(
+      `/api/calls/${callId}/escalate`,
+      jsonBody('POST', data ?? {}),
+    ),
+  resolveEscalation: (escalationId: number, notes?: string) =>
+    request<{ ok: boolean; escalation: Escalation }>(
+      `/api/escalations/${escalationId}/resolve`,
+      jsonBody('POST', { notes: notes ?? '' }),
+    ),
+  listEscalations: (status?: string) =>
+    request<Escalation[]>(status ? `/api/escalations?status=${encodeURIComponent(status)}` : '/api/escalations'),
 }

@@ -31,9 +31,29 @@ import { useAuth } from '@/lib/auth'
 import { api } from '@/lib/api'
 import { useI18n } from '@/i18n/i18n'
 import { formatDate, matches } from '@/lib/format'
-import type { Client } from '@/lib/types'
+import type { Client, PipelineStage, SourceChannel } from '@/lib/types'
 
 const NO_MANAGER = '__none__'
+const STAGES: PipelineStage[] = ['new_lead', 'consulted', 'test_scheduled', 'tested', 'enrolled', 'lost']
+const CHANNELS: SourceChannel[] = ['manual', 'phone', 'telegram', 'instagram', 'website']
+
+const STAGE_LABEL_UZ: Record<PipelineStage, string> = {
+  new_lead: 'Yangi murojaat',
+  consulted: 'Maʼlumot berildi',
+  test_scheduled: 'Test belgilandi',
+  tested: 'Test topshirdi',
+  enrolled: 'Qabul qilindi',
+  lost: 'Rad etildi',
+}
+
+const STAGE_LABEL_EN: Record<PipelineStage, string> = {
+  new_lead: 'New Lead',
+  consulted: 'Consulted',
+  test_scheduled: 'Test Scheduled',
+  tested: 'Tested',
+  enrolled: 'Enrolled',
+  lost: 'Lost',
+}
 
 /** `/api/managers/options` projection — deliberately not a full User. */
 interface ManagerOption {
@@ -56,14 +76,20 @@ function ClientDialog({
   onClose: () => void
   onSaved: () => void
 }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
+  const isUz = lang === 'uz'
   const [form, setForm] = useState({
     name: client?.name ?? '',
     phone: client?.phone ?? '',
     company: client?.company ?? '',
     email: client?.email ?? '',
     notes: client?.notes ?? '',
+    student_grade: client?.student_grade ?? '',
+    test_date: client?.test_date ?? '',
+    test_location: client?.test_location ?? '',
   })
+  const [stage, setStage] = useState<PipelineStage>(client?.pipeline_stage ?? 'new_lead')
+  const [channel, setChannel] = useState<SourceChannel>(client?.source_channel ?? 'manual')
   const [manager, setManager] = useState<string>(
     client?.manager_id != null ? String(client.manager_id) : NO_MANAGER,
   )
@@ -79,6 +105,8 @@ function ClientDialog({
     setSaving(true)
     const payload = {
       ...Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v.trim()])),
+      pipeline_stage: stage,
+      source_channel: channel,
       ...(showManagerField ? { manager_id: manager === NO_MANAGER ? null : Number(manager) } : {}),
     }
     try {
@@ -168,6 +196,67 @@ function ClientDialog({
               </Select>
             </div>
           )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>{isUz ? 'Bosqich' : 'Pipeline Stage'}</Label>
+              <Select value={stage} onValueChange={(v) => setStage(v as PipelineStage)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STAGES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {isUz ? STAGE_LABEL_UZ[s] : STAGE_LABEL_EN[s]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>{isUz ? 'Kanal' : 'Source Channel'}</Label>
+              <Select value={channel} onValueChange={(v) => setChannel(v as SourceChannel)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CHANNELS.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="client-grade">{isUz ? 'Sinf / Yoʻnalish' : 'Student Grade'}</Label>
+              <Input
+                id="client-grade"
+                value={form.student_grade}
+                onChange={set('student_grade')}
+                placeholder="9-sinf / SAT"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="client-test-date">{isUz ? 'Test sanasi' : 'Test Date'}</Label>
+              <Input
+                id="client-test-date"
+                value={form.test_date}
+                onChange={set('test_date')}
+                placeholder="2026-11-20 10:00"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="client-test-loc">{isUz ? 'Test joyi' : 'Test Location'}</Label>
+              <Input
+                id="client-test-loc"
+                value={form.test_location}
+                onChange={set('test_location')}
+                placeholder="MBSI Room 204"
+              />
+            </div>
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="client-notes">{t('clients.notes')}</Label>
             <Textarea
@@ -206,7 +295,7 @@ function ClientRow({
   onEdit: (c: Client) => void
   onChanged: () => void
 }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
 
   const remove = async () => {
     if (!window.confirm(t('clients.delete_confirm', { name: client.name }))) return
@@ -248,7 +337,17 @@ function ClientRow({
         </p>
       </div>
 
-      <div className="flex shrink-0 items-center gap-3">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {client.source_channel && client.source_channel !== 'manual' && (
+          <Badge variant="secondary" className="text-2xs">
+            {client.source_channel}
+          </Badge>
+        )}
+        {client.pipeline_stage && (
+          <Badge variant={client.pipeline_stage === 'enrolled' ? 'success' : client.pipeline_stage === 'lost' ? 'destructive' : 'outline'}>
+            {(lang === 'uz' ? STAGE_LABEL_UZ : STAGE_LABEL_EN)[client.pipeline_stage] ?? client.pipeline_stage}
+          </Badge>
+        )}
         <Badge variant="outline" className="max-w-40 truncate">
           {client.manager_name ?? t('clients.unassigned')}
         </Badge>

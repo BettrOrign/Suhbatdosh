@@ -386,6 +386,7 @@ function NotificationsAndEscalationCard() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [password, setPassword] = useState('')
+  const [tgToken, setTgToken] = useState('')
   const [testEmailLoading, setTestEmailLoading] = useState(false)
   const [testTgLoading, setTestTgLoading] = useState(false)
   const [testRecipient, setTestRecipient] = useState('')
@@ -407,10 +408,12 @@ function NotificationsAndEscalationCard() {
       const payload = {
         ...settings,
         ...(password.trim() ? { smtp_password: password.trim() } : {}),
+        ...(tgToken.trim() ? { telegram_bot_token: tgToken.trim() } : {}),
       }
       const updated = await api.updateNotificationSettings(payload)
       setSettings(updated)
       setPassword('')
+      setTgToken('')
       toast.success(t('settings.notifications.saved'))
     } catch (e) {
       toast.error((e as Error).message)
@@ -439,7 +442,7 @@ function NotificationsAndEscalationCard() {
     setTestTgLoading(true)
     try {
       const res = await api.testTelegramSettings({
-        telegram_bot_token: settings.telegram_bot_token,
+        ...(tgToken.trim() ? { telegram_bot_token: tgToken.trim() } : {}),
         telegram_default_chat_id: settings.telegram_default_chat_id,
       })
       toast.success(res.message || t('settings.notifications.test_tg_success'))
@@ -608,9 +611,9 @@ function NotificationsAndEscalationCard() {
               <Input
                 id="tg-token"
                 type="password"
-                value={settings.telegram_bot_token}
-                onChange={(e) => setSettings({ ...settings, telegram_bot_token: e.target.value })}
-                placeholder="123456789:ABCdefGhI..."
+                value={tgToken}
+                onChange={(e) => setTgToken(e.target.value)}
+                placeholder={settings.has_telegram_bot_token ? "•••••••• (O'zgartirish uchun yangi token kiriting)" : "123456789:ABCdefGhI..."}
               />
             </div>
             <div className="space-y-1.5">
@@ -629,7 +632,7 @@ function NotificationsAndEscalationCard() {
               variant="outline"
               size="sm"
               onClick={() => void sendTestTelegram()}
-              disabled={testTgLoading || !settings.telegram_bot_token || !settings.telegram_default_chat_id}
+              disabled={testTgLoading || (!tgToken.trim() && !settings.has_telegram_bot_token) || !settings.telegram_default_chat_id.trim()}
             >
               {testTgLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
               {t('settings.notifications.send_test_tg')}
@@ -838,6 +841,19 @@ export function SettingsPage() {
                 aria-label={t('settings.row.speaker_labels')}
               />
             </Row>
+            <Separator />
+            <Row
+              icon={Bell}
+              title={t('settings.row.problem_alerts')}
+              description={t('settings.row.problem_alerts_desc')}
+            >
+              <Switch
+                checked={flags?.problem_alerts ?? true}
+                disabled={!flags}
+                onCheckedChange={(v) => void updateFlag('problem_alerts', v)}
+                aria-label={t('settings.row.problem_alerts')}
+              />
+            </Row>
           </CardContent>
         </Card>
 
@@ -901,6 +917,7 @@ function ZadarmaCard() {
   const { t } = useI18n()
   const [configured, setConfigured] = useState(false)
   const [balance, setBalance] = useState<string | null>(null)
+  const [statusError, setStatusError] = useState<string | null>(null)
   const [apiKey, setApiKey] = useState('')
   const [apiSecret, setApiSecret] = useState('')
   const [saving, setSaving] = useState(false)
@@ -911,6 +928,7 @@ function ZadarmaCard() {
       .getZadarmaConfig()
       .then((r) => {
         setConfigured(r.configured)
+        setStatusError((r as { error?: string }).error ?? null)
         if (r.balance !== undefined && r.balance !== null) {
           setBalance(`${r.balance} ${r.currency ?? ''}`.trim())
         } else {
@@ -976,6 +994,11 @@ function ZadarmaCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        {statusError && (
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-2xs text-destructive">
+            {statusError}
+          </p>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="zd-key">{t('settings.zadarma.api_key')}</Label>

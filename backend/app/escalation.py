@@ -55,9 +55,11 @@ async def evaluate_and_escalate_call(
     analysis_data: dict,
     transcript: str = "",
     org_id: int = 1,
-    dashboard_base_url: str = "http://localhost:5173",
+    dashboard_base_url: str | None = None,
 ) -> dict | None:
     """Assess call problems and dispatch an escalation to the best-suited employee."""
+    from . import config
+    dashboard_base_url = (dashboard_base_url or config.APP_BASE_URL).rstrip("/")
     settings = db.get_notification_settings(org_id=org_id)
     if not settings.get("auto_escalate_enabled", True):
         logger.info("Auto-escalation disabled for org %d; skipping call %d", org_id, call_id)

@@ -34,6 +34,7 @@ Shuningdek hisoblang:
 - evidence_quotes: transkripsiyadan har bir asosiy oʻlchov yoki xulosa uchun aniq iqtiboslar (dimension, quote, speaker, start_sec)
 - objections: mijoz tomonidan aytilgan asosiy eʼtirozlar yoki shubhalar roʻyxati (masalan: "Narxi qimmat", "Vaqti mos emas", "Boshqa markaz bilan solishtiryapti")
 - action_items: suhbatdagi aniq majburiyatlar va keyingi vazifalar (description, due_date ISO yoki null, assignee: 'manager'|'client'|'team', priority: 'high'|'medium'|'low')
+- lead_extraction: agar suhbatda oʻquvchi/mijoz sinfi, toʻlovga rozilik yoki kirish testi (sana, joy) muhokama qilingan boʻlsa, `student_grade`, `agreed_to_tuition`, `test_scheduled`, `test_date`, `test_location`, `suggested_stage` ('new_lead'|'consulted'|'test_scheduled'|'tested'|'enrolled'|'lost') maydonlarini toʻldiring.
 
 Agar muassasa konteksti berilgan boʻlsa, barcha baholar va maslahatlar aynan shu muassasa qoidalari, xizmatlari va nuqson taʼrifiga asoslanishi shart — umumiy sotuv shablonlariga emas.
 """
@@ -83,9 +84,28 @@ def org_context_block(profile: dict | None) -> str:
     return block
 
 
-def scoring_system_prompt(profile: dict | None = None) -> str:
-    """The live scoring prompt: base rubric + organization context, if any."""
-    return SCORING_SYSTEM_PROMPT + org_context_block(profile)
+def rubric_context_block(rubric: dict | None) -> str:
+    """Render an active organization rubric as scoring instructions."""
+    if not rubric or not rubric.get("criteria"):
+        return ""
+    lines = [
+        f"- {c.get('key')}: {c.get('label')} (vazn: {c.get('weight', 0)}%) — {c.get('description', '')}"
+        for c in rubric["criteria"]
+        if isinstance(c, dict) and c.get("key")
+    ]
+    if not lines:
+        return ""
+    return (
+        f"\n\nFAOL BAHOLASH MEZONI ({rubric.get('name', 'Rubric')} — turi: {rubric.get('call_type', 'all')}):\n"
+        + "\n".join(lines)
+        + "\nHar bir yuqoridagi mezon uchun `rubric_scores` roʻyxatini (key, label, score 0-100, evidence) toʻldiring "
+        "va `scorecard.overall` ni ushbu vaznlar asosida hisoblang."
+    )
+
+
+def scoring_system_prompt(profile: dict | None = None, rubric: dict | None = None) -> str:
+    """The live scoring prompt: base rubric + organization context + custom rubric, if any."""
+    return SCORING_SYSTEM_PROMPT + org_context_block(profile) + rubric_context_block(rubric)
 
 
 # ---------------------------------------------------------------------------
@@ -132,3 +152,12 @@ Faqat qidiruvda uchragan ishonchli maʼlumotlarni yozing; internetda topilmagan 
 CROSS_CALL_QA_PROMPT = """Siz Suhbatdosh AI tahlilchisisiz. Sizga oxirgi qoʻngʻiroqlarning tahlillari (id, mavzu, menejer, ball, xulosa, nuqsonlar va mijoz eʼtirozlari) berilgan.
 Rahbarning savoliga OʻZBEK TILIDA aniq, qisqa va amaliy javob bering. Javobingizda konkret qoʻngʻiroq ID raqamlariga (`cited_call_ids`) va menejer nomlariga tayaning."""
 
+
+
+TELEGRAM_REPLY_SCORING_PROMPT = """Siz oʻquv markazi/maktab sifat nazoratchisisiz. Mijozning (ota-onaning) Telegramdagi savoli va xodimning yozgan javobini 0-100 ball bilan baholang.
+Mezonlar:
+1) Xushmuomalalik va iliq ohang
+2) Savolga aniq va toʻliq javob (dastur, narx, shartlar)
+3) Keyingi qadamga chaqiruv (kirish testi, telefon raqami yoki tashrif taklifi)
+
+Natijani JSON formatda qaytaring: `score` (0-100) va `feedback` (OʻZBEK TILIDA 1-2 gapli qisqa tavsiya)."""

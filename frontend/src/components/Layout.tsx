@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CommandPalette, OPEN_EVENT } from '@/components/CommandPalette'
+import { IcoAvatarWidget } from '@/components/IcoAvatarWidget'
 import { LanguageToggleIcon } from '@/i18n/LanguageToggle'
 import { NotificationBell } from '@/components/NotificationBell'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -305,6 +306,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {modeLoading && <div className="sr-only">{t('analytics.loading')}</div>}
       <CommandPalette />
+      {user && <IcoAvatarWidget />}
     </div>
   )
 }

@@ -1,5 +1,7 @@
 import {
+  AlertTriangle,
   BarChart3,
+  ClipboardCheck,
   LayoutDashboard,
   ListTodo,
   MessageSquare,
@@ -110,6 +112,22 @@ export const NAV: NavItem[] = [
     roles: ['admin', 'yonalish'],
     group: 'coaching',
     keywords: 'employees solved problems directions',
+  },
+  {
+    to: '/escalations',
+    labelKey: 'nav.escalations',
+    icon: AlertTriangle,
+    roles: ['admin', 'yonalish'],
+    group: 'coaching',
+    keywords: 'escalations problems alerts sla review',
+  },
+  {
+    to: '/rubrics',
+    labelKey: 'nav.rubrics',
+    icon: ClipboardCheck,
+    roles: ['admin', 'yonalish'],
+    group: 'coaching',
+    keywords: 'rubrics scoring criteria script qa',
   },
   {
     to: '/users',

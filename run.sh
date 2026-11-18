@@ -30,6 +30,7 @@ mkdir -p "$PROJECT_ROOT/logs"
 # ---------- defaults ----------
 HOST="127.0.0.1"
 NET_LAN=false
+DESKTOP_MODE=""
 
 # ---------- usage ----------
 usage() {
@@ -40,17 +41,21 @@ Usage:
   ./run.sh [OPTIONS]
 
 Options:
-  --netLAN       Listen on 0.0.0.0 — accessible from any device on the local network
-  --stop         Stop running Suhbatdosh servers
-  --help, -h     Show this help message
+  --netLAN         Listen on 0.0.0.0 — accessible from any device on the local network
+  --desktop        Launch Suhbatdosh in its own Tauri desktop window (dev mode)
+  --desktop-build  Build the Tauri desktop app bundle (.deb / .AppImage / .exe)
+  --stop           Stop running Suhbatdosh servers
+  --help, -h       Show this help message
 
 Environment variables:
   SUHBATDOSH_PORT              Backend port  (default: 8123)
   SUHBATDOSH_FRONTEND_PORT     Frontend port (default: 5173)
 
 Examples:
-  ./run.sh                  Start on localhost only (127.0.0.1)
-  ./run.sh --netLAN         Start accessible to everyone on the LAN
+  ./run.sh                  Start web app on localhost only (127.0.0.1)
+  ./run.sh --netLAN         Start web app accessible to everyone on the LAN
+  ./run.sh --desktop        Open Suhbatdosh in its own desktop window
+  ./run.sh --desktop-build  Build release desktop installer
   ./run.sh --stop           Stop all Suhbatdosh servers
 
 Login: ADMIN_EMAIL from backend/.env
@@ -61,6 +66,7 @@ EOF
 stop_servers() {
     echo "Stopping Suhbatdosh servers..."
     pkill -f "uvicorn app.main:app" 2>/dev/null || true
+    pkill -f "run_server.py" 2>/dev/null || true
     pkill -f "vite" 2>/dev/null || true
     sleep 1
     echo "Stopped."
@@ -78,6 +84,14 @@ while [[ $# -gt 0 ]]; do
             NET_LAN=true
             shift
             ;;
+        --desktop)
+            DESKTOP_MODE="dev"
+            shift
+            ;;
+        --desktop-build)
+            DESKTOP_MODE="build"
+            shift
+            ;;
         --help|-h)
             usage
             exit 0
@@ -89,6 +103,36 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# ---------- desktop (Tauri) mode ----------
+if [[ -n "$DESKTOP_MODE" ]]; then
+    # avoid leftover servers on desktop start
+    pkill -f "uvicorn app.main:app" 2>/dev/null || true
+    pkill -f "run_server.py" 2>/dev/null || true
+    pkill -f "vite" 2>/dev/null || true
+
+    # ensure backend .venv exists
+    if [[ ! -d "$BACKEND_DIR/.venv" ]]; then
+        echo "==> Preparing backend environment (uv sync) ..."
+        cd "$BACKEND_DIR"
+        uv sync --quiet || { echo "ERROR: uv sync failed" >&2; exit 1; }
+    fi
+
+    if [[ ! -d "$FRONTEND_DIR/node_modules" ]] || [[ ! -x "$FRONTEND_DIR/node_modules/.bin/tauri" ]]; then
+        echo "==> Installing frontend + Tauri dependencies ..."
+        cd "$FRONTEND_DIR" && npm install
+    fi
+    TAURI_BIN="$FRONTEND_DIR/node_modules/.bin/tauri"
+    if [[ "$DESKTOP_MODE" == "dev" ]]; then
+        echo "==> Launching Suhbatdosh Desktop Window (Tauri dev) ..."
+        cd "$PROJECT_ROOT"
+        exec "$TAURI_BIN" dev
+    else
+        echo "==> Building Suhbatdosh Desktop Bundle (Tauri build) ..."
+        cd "$PROJECT_ROOT"
+        exec "$TAURI_BIN" build
+    fi
+fi
 
 # avoid duplicates
 pkill -f "uvicorn app.main:app" 2>/dev/null || true

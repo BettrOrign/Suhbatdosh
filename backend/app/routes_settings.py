@@ -114,7 +114,7 @@ def purge_audio(user: dict = Depends(require_role("admin"))):
         )
     from . import audio
 
-    removed = audio.purge_expired_audio(days)
+    removed = audio.purge_expired_audio(days, org_id=org_id)
     logger.info("Manual audio purge: %d file(s) by %s", removed, user["email"])
     return {"ok": True, "purged": removed}
 
@@ -164,35 +164,61 @@ def update_settings(payload: dict, user: dict = Depends(require_role("admin"))):
 # ---------------------------------------------------------------------------
 
 
-@router.get("/settings/notifications")
-def get_notification_settings_endpoint(user: dict = Depends(get_current_user)):
-    """Return outbound notification and escalation settings for the user's organization."""
-    org_id = user.get("org_id") or 1
-    settings = db.get_notification_settings(org_id=org_id)
-    # Mask password for non-empty display
+def _mask_notification_settings(settings: dict) -> dict:
     masked = dict(settings)
     if masked.get("smtp_password"):
         masked["has_smtp_password"] = True
         masked["smtp_password"] = "••••••••"
     else:
         masked["has_smtp_password"] = False
+        masked["smtp_password"] = ""
+    if masked.get("telegram_bot_token"):
+        masked["has_telegram_bot_token"] = True
+        masked["telegram_bot_token"] = "••••••••"
+    else:
+        masked["has_telegram_bot_token"] = False
+        masked["telegram_bot_token"] = ""
     return masked
+
+
+@router.get("/settings/notifications")
+def get_notification_settings_endpoint(user: dict = Depends(get_current_user)):
+    """Return outbound notification and escalation settings for the user's organization."""
+    org_id = user.get("org_id") or 1
+    settings = db.get_notification_settings(org_id=org_id)
+    return _mask_notification_settings(settings)
 
 
 @router.patch("/settings/notifications")
-def update_notification_settings_endpoint(payload: dict, user: dict = Depends(require_role("admin"))):
+async def update_notification_settings_endpoint(payload: dict, user: dict = Depends(require_role("admin"))):
     """Update outbound notification settings (Gmail/SMTP and Telegram). Admin only."""
     org_id = user.get("org_id") or 1
-    # If smtp_password is the masked placeholder, don't overwrite the existing password
     clean_payload = dict(payload)
-    if clean_payload.get("smtp_password") == "••••••••":
-        clean_payload.pop("smtp_password")
+    if clean_payload.get("smtp_password") in ("••••••••", None):
+        clean_payload.pop("smtp_password", None)
+    if clean_payload.get("telegram_bot_token") in ("••••••••", None):
+        clean_payload.pop("telegram_bot_token", None)
+    if "escalation_score_threshold" in clean_payload:
+        try:
+            clean_payload["escalation_score_threshold"] = max(0, min(100, int(clean_payload["escalation_score_threshold"])))
+        except (TypeError, ValueError):
+            clean_payload.pop("escalation_score_threshold", None)
+    if "smtp_port" in clean_payload:
+        try:
+            clean_payload["smtp_port"] = max(1, min(65535, int(clean_payload["smtp_port"])))
+        except (TypeError, ValueError):
+            clean_payload.pop("smtp_port", None)
+
+    tg_token_changed = "telegram_bot_token" in clean_payload
     updated = db.set_notification_settings(clean_payload, org_id=org_id)
     logger.info("Notification settings updated by %s (org=%d)", user["email"], org_id)
-    masked = dict(updated)
-    masked["has_smtp_password"] = bool(updated.get("smtp_password"))
-    masked["smtp_password"] = "••••••••" if masked["has_smtp_password"] else ""
-    return masked
+
+    if tg_token_changed:
+        import asyncio
+        from . import main as app_main
+        asyncio.create_task(app_main.restart_telegram_bot())
+
+    return _mask_notification_settings(updated)
 
 
 @router.post("/settings/notifications/test-email")
@@ -240,7 +266,10 @@ def test_telegram_endpoint(payload: dict, user: dict = Depends(require_role("adm
     """Send a real test message to verify Telegram bot and chat configuration."""
     org_id = user.get("org_id") or 1
     settings = db.get_notification_settings(org_id=org_id)
-    bot_token = (payload.get("telegram_bot_token") or settings.get("telegram_bot_token") or "").strip()
+    raw_token = (payload.get("telegram_bot_token") or "").strip()
+    if raw_token == "••••••••":
+        raw_token = ""
+    bot_token = (raw_token or settings.get("telegram_bot_token") or "").strip()
     chat_id = (payload.get("telegram_default_chat_id") or settings.get("telegram_default_chat_id") or "").strip()
 
     if not bot_token:

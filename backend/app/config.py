@@ -1,11 +1,16 @@
 import os
+import sys
 from pathlib import Path
 
 import yaml
 from dotenv import load_dotenv
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+_FROZEN = getattr(sys, "frozen", False)
+BASE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent)) if _FROZEN else Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
+if os.getenv("SUHBATDOSH_DATA_DIR") or os.getenv("DATA_DIR"):
+    _early_data = Path(os.getenv("SUHBATDOSH_DATA_DIR") or os.getenv("DATA_DIR") or "")
+    load_dotenv(_early_data / ".env")
 
 # Optional path to a YAML config; falls back to config.yaml next to backend/.
 CONFIG_PATH = Path(os.getenv("CONFIG_YAML", BASE_DIR / "config.yaml"))
@@ -66,14 +71,31 @@ LOCAL_STT_LANGUAGES = ["uz", "ru", "en", "kk", "ky"]
 
 # --- Storage paths ---------------------------------------------------------
 _data_dir = (
-    os.getenv("DATA_DIR")
+    os.getenv("SUHBATDOSH_DATA_DIR")
+    or os.getenv("DATA_DIR")
     or _CFG.get("paths", {}).get("data_dir")
-    or (BASE_DIR / ".." / "data")
+    or (Path.home() / ".suhbatdosh" if _FROZEN else (BASE_DIR / ".." / "data"))
 )
 DATA_DIR = Path(_data_dir).resolve()
 AUDIO_DIR = DATA_DIR / "audio"
 PCM_DIR = DATA_DIR / "pcm"
 DB_PATH = DATA_DIR / "suhbatdosh.db"
+
+# --- Windows & Linux ffmpeg discovery --------------------------------------
+def _setup_ffmpeg_path() -> None:
+    candidates = [
+        os.getenv("FFMPEG_DIR"),
+        str(DATA_DIR / "bin"),
+        str(Path(sys.executable).parent) if _FROZEN else None,
+        str(BASE_DIR / "bin"),
+    ]
+    cur_path = os.environ.get("PATH", "")
+    for c in candidates:
+        if c and os.path.isdir(c) and c not in cur_path.split(os.pathsep):
+            os.environ["PATH"] = c + os.pathsep + cur_path
+
+
+_setup_ffmpeg_path()
 
 # --- Admin bootstrap credentials -------------------------------------------
 # These are read from the environment (.env) only and never hardcoded in code,
@@ -89,6 +111,8 @@ TELEGRAM_READER_ORG_ID = int(os.getenv("TELEGRAM_READER_ORG_ID", "1") or "1")
 
 
 APP_ENV = (os.getenv("APP_ENV", "") or "").strip().lower()
+APP_BASE_URL = str(_resolve("app", "base_url", "APP_BASE_URL", "http://localhost:5173")).rstrip("/")
+SECRET_ENCRYPTION_KEY = os.getenv("SECRET_ENCRYPTION_KEY", "")
 
 
 # --- CORS -------------------------------------------------------------------

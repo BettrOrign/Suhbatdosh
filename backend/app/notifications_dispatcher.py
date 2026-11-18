@@ -250,6 +250,21 @@ def send_telegram_alert(
                 logger.info("Telegram alert sent to chat %s", target_chat)
                 return True, "sent"
             err = data.get("description") or f"HTTP {resp.status_code}"
+            if "chat not found" in err.lower():
+                bot_hint = ""
+                try:
+                    me_resp = client.get(f"https://api.telegram.org/bot{token}/getMe")
+                    me_data = me_resp.json()
+                    uname = (me_data.get("result") or {}).get("username")
+                    if uname:
+                        bot_hint = f" (@{uname})"
+                except Exception:
+                    pass
+                err = (
+                    f"{err} — Chat ID '{target_chat}' topilmadi. "
+                    f"Telegramda{bot_hint} botiga /start bosing yoki botni guruhga qo'shing "
+                    f"(superguruh/kanal IDsi -100 bilan boshlanishi kerak; /chatid buyrug'i bilan tekshiring)."
+                )
             logger.warning("Telegram send failed for chat %s: %s", target_chat, err)
             return False, err
     except Exception as exc:
@@ -261,9 +276,11 @@ def send_telegram_alert(
 def dispatch_problem_escalation(
     escalation_id: int,
     org_id: int = 1,
-    dashboard_base_url: str = "http://localhost:5173",
+    dashboard_base_url: str | None = None,
 ) -> dict:
     """Send notifications for an existing escalation via Email and/or Telegram."""
+    from . import config
+    dashboard_base_url = (dashboard_base_url or config.APP_BASE_URL).rstrip("/")
     esc = db.get_escalation(escalation_id)
     if not esc:
         return {"error": "Escalation not found"}
@@ -326,11 +343,19 @@ def dispatch_problem_escalation(
     telegram_status = "disabled"
     tg_token = settings.get("telegram_bot_token")
     assigned_tg = ""
-    # Check if assigned user has telegram_id
+    # Check if assigned user has telegram_id (either on users.telegram_id or linked in telegram_users)
     if esc.get("assigned_to_user_id"):
         user_row = db.get_user(esc["assigned_to_user_id"])
         if user_row:
             assigned_tg = (user_row.get("telegram_id") or "").strip()
+        if not assigned_tg:
+            with db.get_db() as conn:
+                tu_row = conn.execute(
+                    "SELECT telegram_id FROM telegram_users WHERE user_id = ? AND active = 1 ORDER BY id DESC LIMIT 1",
+                    (esc["assigned_to_user_id"],),
+                ).fetchone()
+                if tu_row and tu_row["telegram_id"]:
+                    assigned_tg = str(tu_row["telegram_id"])
     target_tg = assigned_tg or settings.get("telegram_default_chat_id")
 
     if settings.get("telegram_alerts_enabled") and tg_token and target_tg:

@@ -108,8 +108,10 @@ def _trend_arrow(trend: str) -> str:
     return {"up": "[Trend]", "down": "", "same": "->"}.get(trend, "")
 
 
-def _is_admin(user_id: int) -> bool:
-    return user_id in config.TELEGRAM_ADMIN_IDS
+def _is_admin(user_id: int, linked_user: dict | None = None) -> bool:
+    if user_id in config.TELEGRAM_ADMIN_IDS:
+        return True
+    return bool(linked_user and linked_user.get("role") == "admin")
 
 
 def _fmt_duration(seconds: float | None) -> str:
@@ -197,11 +199,12 @@ async def _show_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Display the main menu."""
     await _typing(update)
     user = update.effective_user
-    is_adm = _is_admin(user.id) if user else False
     linked = await _linked_user(user.id) if user else None
+    is_adm = _is_admin(user.id, linked) if user else False
+    org_id = linked.get("org_id") or 1 if linked else 1
 
     name = user.first_name if user else "there"
-    stats = db.get_org_stats()
+    stats = db.get_org_stats(org_id=org_id)
 
     lines = [
         _header(f"Hey, {name}! "),
@@ -230,8 +233,10 @@ async def home_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user = query.from_user
-    is_adm = _is_admin(user.id)
-    stats = db.get_org_stats()
+    linked = await _linked_user(user.id) if user else None
+    is_adm = _is_admin(user.id, linked)
+    org_id = linked.get("org_id") or 1 if linked else 1
+    stats = db.get_org_stats(org_id=org_id)
     name = user.first_name if user else "there"
 
     lines = [
@@ -788,9 +793,10 @@ def _org_intro(first_question: str) -> str:
 async def org_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Begin the org-profile interview (admin only)."""
     user = update.effective_user
-    if not _is_admin(user.id):
+    linked = await _linked_user(user.id) if user else None
+    if not _is_admin(user.id, linked):
         await update.message.reply_text(
-            "[X] Admin access required.\nSet TELEGRAM_ADMIN_IDS in .env."
+            "[X] Admin access required.\nLink an admin account via /link or set TELEGRAM_ADMIN_IDS in .env."
         )
         return True
     context.user_data["org_flow"] = {"step": 0, "answers": {}}
@@ -888,8 +894,10 @@ async def stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     await _typing(query)
 
-    stats = db.get_org_stats()
-    source = db.get_source_breakdown()
+    linked = await _linked_user(query.from_user.id) if query.from_user else None
+    org_id = linked.get("org_id") or 1 if linked else 1
+    stats = db.get_org_stats(org_id=org_id)
+    source = db.get_source_breakdown(org_id=org_id)
 
     lines = [
         _header("[Stats] Statistics"),
@@ -999,7 +1007,9 @@ async def alerts_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     await _typing(query)
 
-    problems = db.get_problem_calls(limit=5)
+    linked = await _linked_user(query.from_user.id) if query.from_user else None
+    org_id = linked.get("org_id") or 1 if linked else 1
+    problems = db.get_problem_calls(limit=5, org_id=org_id)
 
     if not problems:
         await query.edit_message_text(
@@ -1094,15 +1104,17 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     user = query.from_user
-    if not _is_admin(user.id):
+    linked = await _linked_user(user.id) if user else None
+    if not _is_admin(user.id, linked):
         await query.edit_message_text(
-            "[X] Admin access required.\nSet TELEGRAM_ADMIN_IDS in .env.",
+            "[X] Admin access required.\nLink an admin account via /link or set TELEGRAM_ADMIN_IDS in .env.",
             reply_markup=InlineKeyboardMarkup([[_home_button()]]),
         )
         return
 
     await _typing(query)
-    stats = db.get_org_stats()
+    org_id = linked.get("org_id") or 1 if linked else 1
+    stats = db.get_org_stats(org_id=org_id)
     wl = db.list_youtube_whitelist()
     tags = db.list_tags()
 
@@ -1169,7 +1181,8 @@ async def admin_sub_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.edit_message_text("\n".join(lines), parse_mode="HTML", reply_markup=buttons)
 
     elif action == "org":
-        if not _is_admin(query.from_user.id):
+        linked = await _linked_user(query.from_user.id) if query.from_user else None
+        if not _is_admin(query.from_user.id, linked):
             await query.edit_message_text(
                 "[X] Admin access required.",
                 reply_markup=InlineKeyboardMarkup([[_home_button()]]),
@@ -1193,7 +1206,8 @@ async def youtube_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     user = query.from_user
-    if not _is_admin(user.id):
+    linked = await _linked_user(user.id) if user else None
+    if not _is_admin(user.id, linked):
         await query.edit_message_text(
             "[X] Admin only.",
             reply_markup=InlineKeyboardMarkup([[_home_button()]]),
@@ -1506,6 +1520,8 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lines = [
         _header("Suhbatdosh Bot"),
         "",
+        f"Your Chat ID: <code>{update.effective_chat.id}</code>" if update.effective_chat else "",
+        "",
         "You are not linked to a manager account yet.",
         "",
         "To link your account, get your API token from the",
@@ -1543,9 +1559,9 @@ async def link_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    if user["role"] not in ("admin", "manager"):
+    if user["role"] not in ("admin", "manager", "receptionist", "yonalish"):
         await update.message.reply_text(
-            "Only managers and admins can link accounts.",
+            "Only registered organization members can link accounts.",
             reply_markup=InlineKeyboardMarkup([[_home_button()]]),
         )
         return
@@ -1556,7 +1572,10 @@ async def link_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username=update.effective_user.username,
         first_name=update.effective_user.first_name,
         last_name=update.effective_user.last_name,
+        org_id=user.get("org_id"),
     )
+    if not (user.get("telegram_id") or "").strip():
+        db.update_user(user["id"], telegram_id=str(update.effective_user.id))
 
     await update.message.reply_text(
         f"[OK] Linked to: {user['name']} ({user['email']})\n\n"
@@ -1567,7 +1586,7 @@ async def link_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     linked = await _linked_user(update.effective_user.id) if update.effective_user else None
-    is_adm = _is_admin(update.effective_user.id) if update.effective_user else False
+    is_adm = _is_admin(update.effective_user.id, linked) if update.effective_user else False
 
     lines = [
         _header("Suhbatdosh Bot Commands"),
@@ -1599,6 +1618,184 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "\n".join(lines), parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup([[_home_button()]]),
+    )
+
+
+async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Quick status check: link state + org call summary."""
+    if not update.effective_user or not update.message:
+        return
+    await _typing(update)
+    linked = await _linked_user(update.effective_user.id)
+    org_id = linked.get("org_id") or 1 if linked else 1
+    stats = db.get_org_stats(org_id=org_id)
+    link_line = (
+        f"Linked: <b>{linked['name']}</b> ({linked['role']})"
+        if linked
+        else "Not linked — use /link YOUR_API_TOKEN"
+    )
+    chat_id_line = f"Chat ID: <code>{update.effective_chat.id}</code>" if update.effective_chat else ""
+    lines = [
+        _header("Suhbatdosh Status"),
+        _divider(),
+        "",
+        link_line,
+        chat_id_line,
+        f"Total calls: <b>{stats['total_calls']}</b> | Today: <b>{stats['calls_today']}</b>",
+        f"Processing: <b>{stats['processing_calls']}</b> | Done: <b>{stats['done_calls']}</b>",
+        f"Avg score: <b>{stats['avg_score'] or 'N/A'}</b>/100",
+    ]
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup([[_home_button()]]),
+    )
+
+
+async def chatid_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Reply with the current chat's ID (useful for Settings > Telegram Chat ID)."""
+    if not update.effective_chat or not update.message:
+        return
+    chat = update.effective_chat
+    await update.message.reply_text(
+        f"Chat ID: <code>{chat.id}</code>\nType: <code>{chat.type}</code>",
+        parse_mode="HTML",
+    )
+
+
+async def recordings_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Browse recent recordings via /recordings command."""
+    if not update.effective_user or not update.message:
+        return
+    await _typing(update)
+    linked = await _linked_user(update.effective_user.id)
+    org_id = linked.get("org_id") or 1 if linked else 1
+    calls = db.list_calls(limit=PAGE_SIZE, offset=0, org_id=org_id)
+    if not calls:
+        await update.message.reply_text(
+            _header("No Recordings") + "\n\nNo recordings found yet.",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([[_home_button()]]),
+        )
+        return
+    lines = [_header("[Audio] Recordings"), _divider(), ""]
+    for c in calls:
+        lines.append(_format_call_card(c, compact=True))
+        lines.append("")
+    detail_buttons = [
+        InlineKeyboardButton(f"#{c['id']}", callback_data=f"detail:{c['id']}")
+        for c in calls[:3]
+    ]
+    rows = [detail_buttons] if detail_buttons else []
+    rows.append([InlineKeyboardButton("More...", callback_data="rec_page:0"), _home_button()])
+    await update.message.reply_text(
+        "\n".join(lines), parse_mode="HTML", reply_markup=InlineKeyboardMarkup(rows)
+    )
+
+
+async def search_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Search recordings via /search [query]."""
+    if not update.effective_user or not update.message:
+        return
+    if context.args:
+        query_text = " ".join(context.args).strip()
+        linked = await _linked_user(update.effective_user.id)
+        org_id = linked.get("org_id") or 1 if linked else 1
+        calls = db.list_calls(limit=5, search=query_text, org_id=org_id)
+        if not calls:
+            await update.message.reply_text(
+                f"No recordings matched <code>{query_text}</code>.",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup([[_home_button()]]),
+            )
+            return
+        lines = [_header(f"Search: {query_text}"), _divider(), ""]
+        for c in calls:
+            lines.append(_format_call_card(c, compact=True))
+            lines.append("")
+        detail_buttons = [
+            InlineKeyboardButton(f"#{c['id']}", callback_data=f"detail:{c['id']}")
+            for c in calls[:3]
+        ]
+        rows = [detail_buttons, [_home_button()]] if detail_buttons else [[_home_button()]]
+        await update.message.reply_text(
+            "\n".join(lines), parse_mode="HTML", reply_markup=InlineKeyboardMarkup(rows)
+        )
+        return
+
+    context.user_data["awaiting_search"] = True
+    await update.message.reply_text(
+        "Type your search query:\n\n<i>Search by recording name or transcript content.</i>",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup([[_home_button()]]),
+    )
+
+
+async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show statistics via /stats command."""
+    if not update.effective_user or not update.message:
+        return
+    await _typing(update)
+    linked = await _linked_user(update.effective_user.id)
+    org_id = linked.get("org_id") or 1 if linked else 1
+    stats = db.get_org_stats(org_id=org_id)
+    lines = [
+        _header("[Stats] Statistics"),
+        _divider(),
+        "",
+        f"Total calls: <b>{stats['total_calls']}</b>",
+        f"Completed: <b>{stats['done_calls']}</b>",
+        f"Processing: <b>{stats['processing_calls']}</b>",
+        f"Errors: <b>{stats['error_calls']}</b>",
+        f"Today: <b>{stats['calls_today']}</b>",
+        "",
+        f"Avg score: {_score_chip(stats['avg_score'])}",
+        f"Managers: {stats['total_managers']}  |  Clients: {stats['total_clients']}",
+    ]
+    buttons = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("[Rank] Rankings", callback_data="menu:rankings"),
+            InlineKeyboardButton("[!] Problems", callback_data="menu:problems"),
+        ],
+        [_home_button()],
+    ])
+    await update.message.reply_text(
+        "\n".join(lines), parse_mode="HTML", reply_markup=buttons
+    )
+
+
+async def admin_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Open admin panel via /admin command."""
+    if not update.effective_user or not update.message:
+        return
+    linked = await _linked_user(update.effective_user.id)
+    if not _is_admin(update.effective_user.id, linked):
+        await update.message.reply_text(
+            "[X] Admin access required.\nLink an admin account via /link or set TELEGRAM_ADMIN_IDS in .env.",
+            reply_markup=InlineKeyboardMarkup([[_home_button()]]),
+        )
+        return
+    org_id = linked.get("org_id") or 1 if linked else 1
+    stats = db.get_org_stats(org_id=org_id)
+    lines = [
+        _header("[*] Admin Panel"),
+        _divider(),
+        "",
+        f"Calls: <b>{stats['total_calls']}</b> | Done: <b>{stats['done_calls']}</b>",
+        f"Managers: <b>{stats['total_managers']}</b> | Clients: <b>{stats['total_clients']}</b>",
+    ]
+    buttons = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("[Audio] Recordings", callback_data="rec_page:0"),
+            InlineKeyboardButton("[!] Problems", callback_data="menu:problems"),
+        ],
+        [
+            InlineKeyboardButton("[Org] Institution Profile", callback_data="admin:org"),
+            _home_button(),
+        ],
+    ])
+    await update.message.reply_text(
+        "\n".join(lines), parse_mode="HTML", reply_markup=buttons
     )
 
 
@@ -1696,24 +1893,46 @@ async def send_problem_alerts(application: Application):
 # ---------------------------------------------------------------------------
 
 
+def resolve_bot_token() -> str:
+    """Return Telegram bot token from env or organization notification settings."""
+    env_token = (config.TELEGRAM_BOT_TOKEN or "").strip()
+    if env_token:
+        return env_token
+    try:
+        with db.get_db() as conn:
+            rows = conn.execute(
+                "SELECT org_id FROM org_settings WHERE key = 'notif_telegram_bot_token' AND value != '' ORDER BY org_id ASC"
+            ).fetchall()
+        for row in rows:
+            tok = (db.get_bot_setting("notif_telegram_bot_token", "", org_id=row["org_id"]) or "").strip()
+            if tok:
+                return tok
+    except Exception as exc:
+        logger.debug("Could not resolve bot token from org_settings: %s", exc)
+    return ""
+
+
 async def post_init(application: Application):
     commands = [
         BotCommand("start", "Open main menu"),
         BotCommand("help", "Show commands"),
-        BotCommand("link", "Link your manager account"),
+        BotCommand("status", "Quick status check"),
+        BotCommand("chatid", "Show this chat ID"),
+        BotCommand("link", "Link your account"),
         BotCommand("recordings", "Browse recordings"),
         BotCommand("search", "Search recordings"),
         BotCommand("stats", "View statistics"),
         BotCommand("admin", "Admin panel"),
+        BotCommand("org", "Configure organization profile"),
         BotCommand("unsubscribe", "Stop daily reports"),
     ]
     await application.bot.set_my_commands(commands)
 
 
 def create_bot_application() -> Application | None:
-    token = config.TELEGRAM_BOT_TOKEN
+    token = resolve_bot_token()
     if not token:
-        logger.warning("TELEGRAM_BOT_TOKEN not set, Telegram bot disabled")
+        logger.warning("TELEGRAM_BOT_TOKEN not set (env or settings), Telegram bot disabled")
         return None
 
     application = (
@@ -1726,7 +1945,13 @@ def create_bot_application() -> Application | None:
     # --- Command handlers ---
     application.add_handler(CommandHandler("start", start_cmd))
     application.add_handler(CommandHandler("help", help_cmd))
+    application.add_handler(CommandHandler("status", status_cmd))
+    application.add_handler(CommandHandler("chatid", chatid_cmd))
     application.add_handler(CommandHandler("link", link_cmd))
+    application.add_handler(CommandHandler("recordings", recordings_cmd))
+    application.add_handler(CommandHandler("search", search_cmd))
+    application.add_handler(CommandHandler("stats", stats_cmd))
+    application.add_handler(CommandHandler("admin", admin_cmd))
     application.add_handler(CommandHandler("unsubscribe", unsubscribe_cmd))
     application.add_handler(CommandHandler("org", org_start))
     application.add_handler(CommandHandler("skip", org_skip))
@@ -1741,7 +1966,7 @@ def create_bot_application() -> Application | None:
     application.add_handler(CallbackQueryHandler(recordings_callback, pattern=r"^menu:recordings"))
     application.add_handler(CallbackQueryHandler(search_callback, pattern=r"^menu:search"))
     application.add_handler(CallbackQueryHandler(stats_callback, pattern=r"^menu:stats"))
-    application.add_handler(CallbackQueryHandler(alerts_callback, pattern=r"^menu:alerts"))
+    application.add_handler(CallbackQueryHandler(alerts_callback, pattern=r"^menu:(alerts|problems)"))
     application.add_handler(CallbackQueryHandler(rankings_callback, pattern=r"^menu:rankings"))
     application.add_handler(CallbackQueryHandler(admin_callback, pattern=r"^menu:admin"))
     application.add_handler(CallbackQueryHandler(youtube_callback, pattern=r"^menu:youtube"))

@@ -174,7 +174,8 @@ def _run_sync(start: str, end: str, user_id: int, org_id: int = 1):
     existing_zids = set()
     with db.get_db() as conn:
         rows = conn.execute(
-            "SELECT source_meta FROM calls WHERE source_type = 'zadarma'"
+            "SELECT source_meta FROM calls WHERE source_type = 'zadarma' AND org_id = ?",
+            (org_id,),
         ).fetchall()
         for r in rows:
             meta = json.loads(r[0] or "{}")
@@ -268,9 +269,8 @@ def _run_sync(start: str, end: str, user_id: int, org_id: int = 1):
         db.update_call(call_id, status="queued")
 
         # Enqueue transcription + analysis
-        from .api import _process_call, _analyze_call
-        threading.Thread(target=_process_call, args=(call_id,), daemon=True).start()
-        threading.Thread(target=_analyze_call, args=(call_id,), daemon=True).start()
+        from . import job_queue
+        job_queue.enqueue_call_pipeline(call_id, org_id=org_id)
 
         imported += 1
         log.info("Imported Zadarma call %s as call_id=%d", z_call_id, call_id)
@@ -352,20 +352,32 @@ def _check_webhook_secret(request: Request, form_secret: str | None = None) -> N
         raise HTTPException(401, "Invalid webhook secret")
 
 
+def _resolve_webhook_org_id(org_slug: str | None) -> int:
+    if not org_slug:
+        return 1
+    org = db.get_organization_by_slug(org_slug)
+    if not org:
+        raise HTTPException(404, "Organization not found")
+    return org["id"]
+
+
 @router.get("/webhook")
-async def webhook_verify(request: Request):
+@router.get("/webhook/{org_slug}")
+async def webhook_verify(request: Request, org_slug: str | None = None):
     """Zadarma URL verification — echo ``zd_echo`` back after checking the secret.
 
     When ZADARMA_WEBHOOK_SECRET is set, ``zd_echo`` must equal it. When it is
     unset the webhook is disabled entirely and we return 503.
     """
+    _resolve_webhook_org_id(org_slug)
     _check_webhook_secret(request)
     from fastapi.responses import PlainTextResponse
     return PlainTextResponse(request.query_params.get("zd_echo", ""))
 
 
 @router.post("/webhook")
-async def webhook_notify(request: Request, background: BackgroundTasks):
+@router.post("/webhook/{org_slug}")
+async def webhook_notify(request: Request, background: BackgroundTasks, org_slug: str | None = None):
     """Receive NOTIFY_RECORD webhooks from Zadarma.
 
     Zadarma POSTs form-encoded data with:
@@ -376,6 +388,7 @@ async def webhook_notify(request: Request, background: BackgroundTasks):
     The shared secret in ``X-Webhook-Secret`` (or the ``webhook_secret`` form
     field) is verified before anything is queued for import.
     """
+    org_id = _resolve_webhook_org_id(org_slug)
     body = await request.form()
     _check_webhook_secret(request, body.get("webhook_secret"))
 
@@ -390,25 +403,25 @@ async def webhook_notify(request: Request, background: BackgroundTasks):
     if not call_id_with_rec:
         return {"ok": True, "error": "missing call_id_with_rec"}
 
-    # Check for duplicate via exact JSON field match
+    # Check for duplicate via exact JSON field match within the organization
     with db.get_db() as conn:
         existing = conn.execute(
-            "SELECT id FROM calls WHERE source_type = 'zadarma' AND json_extract(source_meta, '$.zadarma_call_id') = ?",
-            (str(call_id_with_rec),),
+            "SELECT id FROM calls WHERE source_type = 'zadarma' AND org_id = ? AND json_extract(source_meta, '$.zadarma_call_id') = ?",
+            (org_id, str(call_id_with_rec)),
         ).fetchone()
         if existing:
             return {"ok": True, "duplicate": True, "call_id": existing[0]}
 
     # Launch background import
-    background.add_task(_import_webhook_recording, call_id_with_rec, pbx_call_id)
+    background.add_task(_import_webhook_recording, call_id_with_rec, pbx_call_id, org_id)
     return {"ok": True, "queued": True}
 
 
-def _import_webhook_recording(call_id_with_rec: str, pbx_call_id: str):
+def _import_webhook_recording(call_id_with_rec: str, pbx_call_id: str, org_id: int = 1):
     """Background: download and import a single recording from a webhook event."""
     log = logging.getLogger("suhbatdosh.zadarma_webhook")
 
-    client = _get_client()
+    client = _get_client(org_id=org_id)
     if client is None:
         log.error("Zadarma not configured, cannot import webhook recording")
         return
@@ -477,11 +490,11 @@ def _import_webhook_recording(call_id_with_rec: str, pbx_call_id: str):
         client_id=None,
         source_type="zadarma",
         source_meta=source_meta,
+        org_id=org_id,
     )
     db.update_call(call_id, status="queued")
 
-    from .api import _process_call, _analyze_call
-    threading.Thread(target=_process_call, args=(call_id,), daemon=True).start()
-    threading.Thread(target=_analyze_call, args=(call_id,), daemon=True).start()
+    from . import job_queue
+    job_queue.enqueue_call_pipeline(call_id, org_id=org_id)
 
     log.info("Imported webhook recording as call_id=%d", call_id)

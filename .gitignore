@@ -49,6 +49,12 @@ Thumbs.db
 *.tmp
 *.bak
 
+# tauri desktop
+src-tauri/target/
+src-tauri/gen/
+backend/dist/
+backend/build/
+
 # Offline STT model weights (215 MB, fetched separately — see local-stt/README.md)
 local-stt/model/*.onnx
 

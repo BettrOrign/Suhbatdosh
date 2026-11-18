@@ -68,6 +68,12 @@ async def ingest(
     finally:
         tmp_path.unlink(missing_ok=True)
 
+    org_id = sender.get("org_id") or 1
+    if client_id is not None:
+        client = db.get_client(client_id)
+        if not client or (client.get("org_id") or 1) != org_id:
+            raise HTTPException(404, "Client not found")
+
     ctype = (call_type or "manager").strip()
     if ctype not in ("manager", "receptionist"):
         ctype = "manager"
@@ -79,6 +85,7 @@ async def ingest(
         call_type=ctype,
         user_id=sender["id"],
         client_id=client_id,
+        org_id=org_id,
     )
     db.update_call(call_id, status="queued")
     background.add_task(_process_call, call_id)

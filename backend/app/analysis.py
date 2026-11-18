@@ -13,6 +13,7 @@ from .prompts import (
     CROSS_CALL_QA_PROMPT,
     ORG_SUMMARY_PROMPT,
     ORG_WEB_FACTS_PROMPT,
+    TELEGRAM_REPLY_SCORING_PROMPT,
     scoring_system_prompt,
 )
 
@@ -57,6 +58,26 @@ class EvidenceQuote(BaseModel):
     start_sec: float | None = None
 
 
+class RubricCriterionScore(BaseModel):
+    """Score and evidence for a single custom rubric criterion."""
+
+    key: str
+    label: str
+    score: int
+    evidence: str = ""
+
+
+class LeadExtraction(BaseModel):
+    """Admissions/lead details automatically extracted from the conversation."""
+
+    student_grade: str = ""
+    agreed_to_tuition: bool | None = None
+    test_scheduled: bool = False
+    test_date: str = ""
+    test_location: str = ""
+    suggested_stage: Literal["new_lead", "consulted", "test_scheduled", "tested", "enrolled", "lost"] | None = None
+
+
 class CallAnalysis(BaseModel):
     """Structured coaching report returned by the analysis model."""
 
@@ -73,6 +94,15 @@ class CallAnalysis(BaseModel):
     action_items: list[ActionItem]
     evidence_quotes: list[EvidenceQuote] = []
     objections: list[str] = []
+    rubric_scores: list[RubricCriterionScore] = []
+    lead_extraction: LeadExtraction | None = None
+
+
+class TelegramReplyScore(BaseModel):
+    """Quality score and feedback for a staff reply to a Telegram inquiry."""
+
+    score: int
+    feedback: str
 
 
 class CrossCallAnswer(BaseModel):
@@ -90,19 +120,20 @@ class Analyzer:
         self._client = genai.Client(api_key=api_key or config.GEMINI_API_KEY)
         self._org_id = org_id
 
-    async def analyze(self, transcript: str) -> dict:
+    async def analyze(self, transcript: str, call_type: str = "manager") -> dict:
         """Asynchronously generate a CallAnalysis from a transcript string."""
         if not transcript or not transcript.strip():
             return {"error": "empty transcript"}
         profile = db.get_org_profile() if self._org_id == 1 else db.get_org_profile(org_id=self._org_id)
+        rubric = db.get_active_rubric(org_id=self._org_id, call_type=call_type)
         resp = await asyncio.wait_for(
             self._client.aio.models.generate_content(
                 model=config.GEMINI_ANALYSIS_MODEL,
                 contents=transcript,
                 config=types.GenerateContentConfig(
-                    # Read fresh per analysis so a profile edit applies to the
+                    # Read fresh per analysis so a profile/rubric edit applies to the
                     # very next call without a restart.
-                    system_instruction=scoring_system_prompt(profile),
+                    system_instruction=scoring_system_prompt(profile, rubric=rubric),
                     response_mime_type="application/json",
                     response_schema=CallAnalysis,
                 ),
@@ -147,7 +178,12 @@ class Analyzer:
             logger.error("Action items extraction returned non-JSON: %.300s", text)
             return []
 
-    async def ask_across_calls(self, question: str, calls_context: list[dict]) -> dict:
+    async def ask_across_calls(
+        self,
+        question: str,
+        calls_context: list[dict],
+        history: list[dict] | None = None,
+    ) -> dict:
         """Answer a supervisor's natural-language question across recent analysed calls."""
         if not calls_context:
             return {
@@ -156,7 +192,11 @@ class Analyzer:
                 "recommendations": [],
             }
         payload = json.dumps(
-            {"question": question, "calls": calls_context},
+            {
+                "question": question,
+                "history": (history or [])[-6:],
+                "calls": calls_context,
+            },
             ensure_ascii=False,
         )
         resp = await asyncio.wait_for(
@@ -179,6 +219,68 @@ class Analyzer:
                 "cited_call_ids": [],
                 "recommendations": [],
             }
+
+    async def draft_followup(self, transcript: str, analysis_data: dict | None = None) -> dict:
+        """Draft a polite Uzbek follow-up message for the parent/client after a call."""
+        profile = db.get_org_profile(org_id=self._org_id)
+        org_name = profile.get("name") or "MBSI"
+        prompt = (
+            f"Siz {org_name} oʻquv markazi/maktabi uchun mijoz (ota-ona) bilan qayta aloqa xabari "
+            "tayyorlovchi yordamchisiz. Suhbat transkripsiyasi va tahlil natijasiga asoslanib, "
+            "Telegram yoki SMS orqali yuborishga tayyor, qisqa, samimiy va aniq xabarni OʻZBEK TILIDA yozing. "
+            "Agar kirish testi sanasi/joyi yoki keyingi qadam aytilgan boʻlsa, uni albatta kiriting."
+        )
+        context = json.dumps(
+            {
+                "transcript": (transcript or "")[:4000],
+                "summary": (analysis_data or {}).get("summary", ""),
+                "next_steps": (analysis_data or {}).get("next_steps", []),
+                "lead_extraction": (analysis_data or {}).get("lead_extraction", {}),
+            },
+            ensure_ascii=False,
+        )
+        resp = await asyncio.wait_for(
+            self._client.aio.models.generate_content(
+                model=config.GEMINI_ANALYSIS_MODEL,
+                contents=context,
+                config=types.GenerateContentConfig(system_instruction=prompt),
+            ),
+            timeout=30,
+        )
+        return {"message": (resp.text or "").strip()}
+
+    async def score_telegram_reply(self, question_text: str, reply_text: str) -> dict:
+        """Score a staff member's written Telegram reply against org context."""
+        profile = db.get_org_profile(org_id=self._org_id)
+        ctx = json.dumps(
+            {
+                "org_name": profile.get("name", "MBSI"),
+                "services": profile.get("services", ""),
+                "question": question_text,
+                "staff_reply": reply_text,
+            },
+            ensure_ascii=False,
+        )
+        resp = await asyncio.wait_for(
+            self._client.aio.models.generate_content(
+                model=config.GEMINI_ANALYSIS_MODEL,
+                contents=ctx,
+                config=types.GenerateContentConfig(
+                    system_instruction=TELEGRAM_REPLY_SCORING_PROMPT,
+                    response_mime_type="application/json",
+                    response_schema=TelegramReplyScore,
+                ),
+            ),
+            timeout=25,
+        )
+        try:
+            data = json.loads(resp.text)
+            return {
+                "score": max(0, min(100, int(data.get("score", 70)))),
+                "feedback": str(data.get("feedback", "")).strip(),
+            }
+        except Exception:
+            return {"score": 70, "feedback": ""}
 
 
 class OrgProfileDraft(BaseModel):

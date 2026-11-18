@@ -295,4 +295,34 @@ export const api = {
     ),
   listEscalations: (status?: string) =>
     request<Escalation[]>(status ? `/api/escalations?status=${encodeURIComponent(status)}` : '/api/escalations'),
+  listRubrics: (activeOnly = false) =>
+    request<import('./types').Rubric[]>(`/api/rubrics${activeOnly ? '?active_only=true' : ''}`),
+  createRubric: (body: {
+    name: string
+    call_type: 'manager' | 'receptionist' | 'all'
+    description?: string
+    criteria: import('./types').RubricCriterion[]
+    is_default?: boolean
+  }) => request<import('./types').Rubric>('/api/rubrics', jsonBody('POST', body)),
+  updateRubric: (
+    id: number,
+    body: Partial<{
+      name: string
+      call_type: 'manager' | 'receptionist' | 'all'
+      description: string
+      criteria: import('./types').RubricCriterion[]
+      active: boolean
+      is_default: boolean
+    }>,
+  ) => request<import('./types').Rubric>(`/api/rubrics/${id}`, jsonBody('PATCH', body)),
+  deleteRubric: (id: number) => request<{ ok: boolean }>(`/api/rubrics/${id}`, { method: 'DELETE' }),
+  pipelineSummary: () =>
+    request<{
+      total: number
+      by_stage: Record<string, number>
+      by_channel: Record<string, number>
+    }>('/api/clients/pipeline/summary'),
+  draftFollowup: (callId: number) =>
+    request<{ message: string }>(`/api/calls/${callId}/draft-followup`, jsonBody('POST', {})),
+  getMyActions: () => request<import('./types').EmployeeActionQueue>('/api/me/actions'),
 }

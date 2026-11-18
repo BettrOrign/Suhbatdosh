@@ -588,6 +588,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     // new navigation & role-based workspaces
     'nav.my_day': 'My Day',
     'nav.coaching_desk': 'Coaching Desk',
+    'nav.escalations': 'Escalations',
+    'nav.rubrics': 'Scoring Rubrics',
     'nav.tasks': 'My Tasks',
     'nav.profile': 'Account & Security',
     'nav.group.workspace': 'Workspace',
@@ -1363,6 +1365,8 @@ export const translations: Record<Lang, Record<string, string>> = {
     // new navigation & role-based workspaces
     'nav.my_day': 'Mening kunim',
     'nav.coaching_desk': 'Nazorat paneli',
+    'nav.escalations': 'Eskalatsiyalar',
+    'nav.rubrics': 'Baholash mezonlari',
     'nav.tasks': 'Vazifalarim',
     'nav.profile': 'Profil va Xavfsizlik',
     'nav.group.workspace': 'Ish maydoni',

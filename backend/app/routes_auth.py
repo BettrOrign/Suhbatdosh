@@ -293,6 +293,12 @@ def get_my_overview(user: dict = Depends(get_current_user)):
     return db.get_employee_overview(user["id"], user["role"], org_id=user["org_id"])
 
 
+@router.get("/me/actions")
+def get_my_actions(user: dict = Depends(get_current_user)):
+    """Unified employee action queue: open escalations, due leads, unanswered Telegram inquiries, and action items."""
+    return db.get_employee_action_queue(user["id"], user["role"], org_id=user.get("org_id") or 1)
+
+
 # ---------------------------------------------------------------------------
 # Invitations (admin creates/revokes; employee accepts via token)
 # ---------------------------------------------------------------------------

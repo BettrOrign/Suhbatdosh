@@ -19,6 +19,7 @@ import {
   RefreshCw,
   Search,
   Send,
+  Sparkles,
   Star,
   Target,
   Trash2,
@@ -281,6 +282,8 @@ export function CallDetail() {
   const [currentTime, setCurrentTime] = useState(0)
   const [transcriptQuery, setTranscriptQuery] = useState('')
   const [escalation, setEscalation] = useState<Escalation | null>(null)
+  const [draftMsg, setDraftMsg] = useState<string | null>(null)
+  const [drafting, setDrafting] = useState(false)
   const [escalateModalOpen, setEscalateModalOpen] = useState(false)
   const [assignUserList, setAssignUserList] = useState<User[]>([])
   const [assigneeId, setAssigneeId] = useState<string>('')
@@ -657,6 +660,27 @@ export function CallDetail() {
                     <RefreshCw aria-hidden="true" className="size-3.5" />
                     {t('call.reanalyze')}
                   </Button>
+                  {call.status === 'done' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={drafting}
+                      onClick={async () => {
+                        setDrafting(true)
+                        try {
+                          const res = await api.draftFollowup(callId)
+                          setDraftMsg(res.message)
+                        } catch (err) {
+                          toast.error((err as Error).message)
+                        } finally {
+                          setDrafting(false)
+                        }
+                      }}
+                    >
+                      <Sparkles aria-hidden="true" className="size-3.5 text-primary" />
+                      {drafting ? '...' : lang === 'uz' ? 'Xabar tayyorlash' : 'Draft Follow-up'}
+                    </Button>
+                  )}
                   {(user?.role === 'admin' || user?.role === 'yonalish') && (
                     <Button
                       variant={escalation ? 'outline' : 'secondary'}
@@ -696,6 +720,35 @@ export function CallDetail() {
       </Reveal>
 
       {/* Processing / Error Banner */}
+      {draftMsg && (
+        <Reveal>
+          <Card className="border-primary/30 bg-primary-soft/20">
+            <CardContent className="flex items-start justify-between gap-3 p-4">
+              <div className="space-y-1 text-xs">
+                <p className="font-semibold text-primary">
+                  {lang === 'uz' ? 'Mijozga yuborish uchun xabar:' : 'Drafted Follow-up Message:'}
+                </p>
+                <p className="whitespace-pre-wrap leading-relaxed text-foreground">{draftMsg}</p>
+              </div>
+              <div className="flex shrink-0 gap-1.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(draftMsg)
+                    toast.success(lang === 'uz' ? 'Nusxalandi' : 'Copied')
+                  }}
+                >
+                  {lang === 'uz' ? 'Nusxalash' : 'Copy'}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setDraftMsg(null)}>
+                  ×
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </Reveal>
+      )}
       {(processing || call.status === 'error') && (
         <Reveal>
           <div

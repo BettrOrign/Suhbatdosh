@@ -53,6 +53,7 @@ export interface NotificationSettings {
   smtp_from_name: string
   telegram_alerts_enabled: boolean
   telegram_bot_token: string
+  has_telegram_bot_token?: boolean
   telegram_default_chat_id: string
   auto_escalate_enabled: boolean
   escalation_score_threshold: number
@@ -87,36 +88,59 @@ export interface UserSession {
   expires_at: string
 }
 
+export interface OutcomeMetrics {
+  total_leads: number
+  converted_leads: number
+  overdue_leads: number
+  lead_conversion_rate: number | null
+  total_escalations: number
+  resolved_escalations: number
+  escalation_resolved_rate: number | null
+  avg_sla_hours: number | null
+  avg_telegram_score: number | null
+  outcome_score: number | null
+  composite_score: number | null
+}
+
+export interface EmployeeActionQueue {
+  open_escalations: Escalation[]
+  due_leads: Client[]
+  unanswered_telegram: TelegramMessage[]
+  action_items: Notification[]
+  outcome_metrics: OutcomeMetrics
+}
+
 export interface EmployeeOverview {
-  total_calls: number
-  done_calls: number
-  processing_calls: number
-  calls_today: number
-  calls_week: number
-  avg_score: number | null
-  best_score: number | null
-  avg_talk_ratio: number | null
-  rank: number | null
-  total_peers: number
-  unread_notifications: number
-  open_tasks_count: number
-  daily_trend: { day: string; calls: number; avg_score: number | null }[]
+  kpis: {
+    total_calls: number
+    calls_today: number
+    calls_this_week: number
+    avg_score: number | null
+    best_score: number | null
+    avg_talk_ratio: number | null
+    open_tasks_count: number
+    problem_calls_count: number
+  }
+  rank: {
+    position: number | null
+    total_peers: number
+  }
+  weekly_trend: { day: string; total_calls: number; avg_score: number | null }[]
   rubric_averages: { dimension: string; avg_score: number }[]
-  recent_coaching_points: { call_id: number; call_name: string; text: string; created_at: string }[]
-  open_tasks: Notification[]
-  recent_calls: {
-    id: number
-    name: string
-    status: CallStatus
-    duration_sec: number | null
+  coaching_points: {
+    call_id: number
+    call_title: string
     created_at: string
     score: number | null
-    outcome: string | null
-    coach_decision: 'NO_ACTION' | 'COACH' | 'ESCALATE' | null
-    resolved: boolean
-    bookmarked: boolean
+    point: string
   }[]
+  tasks: Notification[]
+  recent_calls: Call[]
+  outcome_metrics?: OutcomeMetrics
 }
+
+export type PipelineStage = 'new_lead' | 'consulted' | 'test_scheduled' | 'tested' | 'enrolled' | 'lost'
+export type SourceChannel = 'manual' | 'phone' | 'telegram' | 'instagram' | 'website'
 
 export interface Client {
   id: number
@@ -127,6 +151,12 @@ export interface Client {
   notes: string
   manager_id: number | null
   manager_name: string | null
+  pipeline_stage?: PipelineStage
+  source_channel?: SourceChannel
+  student_grade?: string
+  test_date?: string
+  test_location?: string
+  next_follow_up_at?: string
   call_count: number
   created_at: string
 }
@@ -384,4 +414,24 @@ export function callTitle(call: Call): string {
     if (typeof topic === 'string' && topic.trim()) return topic
   }
   return call.name
+}
+
+export interface RubricCriterion {
+  key: string
+  label: string
+  weight: number
+  description: string
+}
+
+export interface Rubric {
+  id: number
+  org_id: number
+  name: string
+  call_type: 'manager' | 'receptionist' | 'all'
+  description: string
+  criteria: RubricCriterion[]
+  is_default: boolean
+  active: boolean
+  created_at: string
+  updated_at: string
 }

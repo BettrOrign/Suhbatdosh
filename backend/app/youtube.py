@@ -153,8 +153,7 @@ def process_youtube_video(
         source_meta=source_meta,
     )
     db.update_call(call_id, status="queued")
-    from .api import _analyze_call, _process_call
+    from . import job_queue
 
-    threading.Thread(target=_process_call, args=(call_id,), daemon=True).start()
-    threading.Thread(target=_analyze_call, args=(call_id,), daemon=True).start()
+    job_queue.enqueue_call_pipeline(call_id, org_id=1)
     return call_id

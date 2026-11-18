@@ -1,0 +1,66 @@
+name: Build Desktop App (Windows & Linux)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            sidecar_name: suhbatdosh-backend
+            target_ext: ""
+          - os: windows-latest
+            sidecar_name: suhbatdosh-backend.exe
+            target_ext: ".exe"
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux system dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf ffmpeg
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build Python backend sidecar (PyInstaller)
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip pyinstaller
+          python -m pip install .
+          pyinstaller --noconfirm suhbatdosh-backend.spec
+
+      - name: Copy sidecar binary into src-tauri
+        shell: bash
+        run: |
+          mkdir -p src-tauri/binaries
+          cp backend/dist/${{ matrix.sidecar_name }} src-tauri/${{ matrix.sidecar_name }}
+
+      - name: Build Tauri bundle
+        uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: .
+          tauriScript: ./frontend/node_modules/.bin/tauri

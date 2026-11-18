@@ -93,6 +93,7 @@ export function Analytics() {
   const [selected, setSelected] = useState<{ id: number; name: string } | null>(null)
   const [selectedCalls, setSelectedCalls] = useState<Call[]>([])
   const [selectedLoading, setSelectedLoading] = useState(false)
+  const [pipeline, setPipeline] = useState<{ total: number; by_stage: Record<string, number>; by_channel: Record<string, number> } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -111,13 +112,15 @@ export function Analytics() {
       api.getSourceBreakdown().catch(() => ({}) as Record<string, number>),
       api.getProblemCalls().catch(() => [] as ProblemCall[]),
       api.getCrossCallInsights().catch(() => null),
+      api.pipelineSummary().catch(() => null),
     ])
-      .then(([ov, day, wt, mr, cl, src, pb, ins]) => {
+      .then(([ov, day, wt, mr, cl, src, pb, ins, pip]) => {
         if (cancelled) return
         setOverview(ov)
         setDod(day)
         setWeekly(wt)
         setRankings(mr)
+        setPipeline(pip)
         setCalls(cl)
         setSources(src)
         setProblems(pb)
@@ -909,6 +912,34 @@ export function Analytics() {
           </div>
         </CardContent>
       </Card>
+
+      {pipeline && pipeline.total > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border-subtle pb-3">
+            <div>
+              <CardTitle className="text-sm">
+                {t('nav.clients')} — Funnel
+              </CardTitle>
+              <p className="mt-0.5 text-2xs text-muted-foreground">
+                {pipeline.total} total leads across channels
+              </p>
+            </div>
+            <Link to="/clients" className="text-2xs font-medium text-primary hover:underline">
+              {t('nav.clients')} →
+            </Link>
+          </CardHeader>
+          <CardContent className="grid gap-3 pt-4 sm:grid-cols-3 lg:grid-cols-6">
+            {(['new_lead', 'consulted', 'test_scheduled', 'tested', 'enrolled', 'lost'] as const).map((st) => (
+              <div key={st} className="rounded-lg bg-surface-sunken px-3 py-2.5">
+                <p className="text-2xs text-muted-foreground">{st.replace('_', ' ')}</p>
+                <p data-numeric className="mt-1 text-lg font-semibold tabular-nums">
+                  {pipeline.by_stage[st] ?? 0}
+                </p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

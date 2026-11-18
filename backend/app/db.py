@@ -273,6 +273,44 @@ def init_db():
                 value TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS rubrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL DEFAULT 1,
+                name TEXT NOT NULL,
+                call_type TEXT NOT NULL DEFAULT 'all',
+                description TEXT DEFAULT '',
+                criteria TEXT NOT NULL DEFAULT '[]',
+                is_default INTEGER NOT NULL DEFAULT 0,
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL DEFAULT 1,
+                user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                action TEXT NOT NULL,
+                target_type TEXT NOT NULL DEFAULT '',
+                target_id INTEGER,
+                details TEXT DEFAULT '',
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS jobs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL DEFAULT 1,
+                job_type TEXT NOT NULL,
+                payload TEXT NOT NULL DEFAULT '{}',
+                status TEXT NOT NULL DEFAULT 'queued',
+                attempts INTEGER NOT NULL DEFAULT 0,
+                max_attempts INTEGER NOT NULL DEFAULT 3,
+                run_after TEXT NOT NULL,
+                last_error TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
             """
         )
 
@@ -348,6 +386,31 @@ def init_db():
             if "org_id" not in tcols:
                 db.execute(f"ALTER TABLE {tbl} ADD COLUMN org_id INTEGER NOT NULL DEFAULT 1")
 
+        call_cols = {r[1] for r in db.execute("PRAGMA table_info(calls)").fetchall()}
+        if "problem_status" not in call_cols:
+            db.execute("ALTER TABLE calls ADD COLUMN problem_status TEXT NOT NULL DEFAULT 'none'")
+
+        client_cols = {r[1] for r in db.execute("PRAGMA table_info(clients)").fetchall()}
+        for col_name, col_def in (
+            ("pipeline_stage", "TEXT NOT NULL DEFAULT 'new_lead'"),
+            ("source_channel", "TEXT NOT NULL DEFAULT 'manual'"),
+            ("student_grade", "TEXT DEFAULT ''"),
+            ("test_date", "TEXT DEFAULT ''"),
+            ("test_location", "TEXT DEFAULT ''"),
+            ("next_follow_up_at", "TEXT DEFAULT ''"),
+        ):
+            if col_name not in client_cols:
+                db.execute(f"ALTER TABLE clients ADD COLUMN {col_name} {col_def}")
+
+        tg_cols = {r[1] for r in db.execute("PRAGMA table_info(telegram_messages)").fetchall()}
+        for col_name, col_def in (
+            ("replied_by_user_id", "INTEGER REFERENCES users(id) ON DELETE SET NULL"),
+            ("reply_score", "INTEGER"),
+            ("reply_feedback", "TEXT DEFAULT ''"),
+        ):
+            if col_name not in tg_cols:
+                db.execute(f"ALTER TABLE telegram_messages ADD COLUMN {col_name} {col_def}")
+
         # Backfill org_settings for org #1 from bot_settings
         db.execute(
             "INSERT OR IGNORE INTO org_settings (org_id, key, value, updated_at) "
@@ -368,6 +431,9 @@ def init_db():
         db.execute("CREATE INDEX IF NOT EXISTS idx_escalations_call ON escalations(call_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_escalations_assigned ON escalations(assigned_to_user_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_escalations_status ON escalations(status)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_rubrics_org ON rubrics(org_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_audit_org ON audit_logs(org_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status, run_after)")
 
 
 # ---------------------------------------------------------------------------
@@ -769,18 +835,71 @@ def delete_sessions_for_user(user_id: int, keep_token: str | None = None):
 # ---------------------------------------------------------------------------
 
 
+PIPELINE_STAGES = ("new_lead", "consulted", "test_scheduled", "tested", "enrolled", "lost")
+SOURCE_CHANNELS = ("manual", "phone", "telegram", "instagram", "website")
+
+
 def create_client(name: str, manager_id: int | None = None, org_id: int | None = None, **fields) -> int:
     """Insert a client (optionally owned by ``manager_id``) and return the new id."""
     ts = now()
+    stage = fields.get("pipeline_stage") or "new_lead"
+    if stage not in PIPELINE_STAGES:
+        stage = "new_lead"
+    channel = fields.get("source_channel") or "manual"
+    if channel not in SOURCE_CHANNELS:
+        channel = "manual"
     with get_db() as db:
         resolved_org = _resolve_org_id(db, org_id, manager_id)
         cur = db.execute(
-            "INSERT INTO clients (org_id, name, phone, company, email, notes, manager_id, created_at) "
-            "VALUES (?,?,?,?,?,?,?,?)",
-            (resolved_org, name, fields.get("phone", ""), fields.get("company", ""), fields.get("email", ""),
-             fields.get("notes", ""), manager_id, ts),
+            "INSERT INTO clients "
+            "(org_id, name, phone, company, email, notes, manager_id, pipeline_stage, source_channel, "
+            "student_grade, test_date, test_location, next_follow_up_at, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                resolved_org,
+                name,
+                fields.get("phone", ""),
+                fields.get("company", ""),
+                fields.get("email", ""),
+                fields.get("notes", ""),
+                manager_id,
+                stage,
+                channel,
+                fields.get("student_grade", ""),
+                fields.get("test_date", ""),
+                fields.get("test_location", ""),
+                fields.get("next_follow_up_at", ""),
+                ts,
+            ),
         )
         return cur.lastrowid
+
+
+def get_client_pipeline_summary(org_id: int = 1) -> dict:
+    """Return lead counts grouped by pipeline stage and source channel."""
+    with get_db() as db:
+        stage_rows = db.execute(
+            "SELECT pipeline_stage, COUNT(*) FROM clients WHERE org_id = ? GROUP BY pipeline_stage",
+            (org_id,),
+        ).fetchall()
+        channel_rows = db.execute(
+            "SELECT source_channel, COUNT(*) FROM clients WHERE org_id = ? GROUP BY source_channel",
+            (org_id,),
+        ).fetchall()
+        by_stage = {s: 0 for s in PIPELINE_STAGES}
+        for r in stage_rows:
+            if r[0] in by_stage:
+                by_stage[r[0]] = r[1]
+        by_channel = {c: 0 for c in SOURCE_CHANNELS}
+        for r in channel_rows:
+            if r[0] in by_channel:
+                by_channel[r[0]] = r[1]
+        total = sum(by_stage.values())
+        return {
+            "total": total,
+            "by_stage": by_stage,
+            "by_channel": by_channel,
+        }
 
 
 def get_client(client_id: int, org_id: int | None = None) -> dict | None:
@@ -1344,13 +1463,19 @@ def update_escalation(escalation_id: int, **fields):
 
 
 def resolve_escalation(escalation_id: int, resolution_notes: str = "") -> None:
-    """Mark an escalation as resolved with current timestamp."""
+    """Mark an escalation as resolved with current timestamp and update the call's problem_status."""
     ts = now()
     with get_db() as db:
+        row = db.execute("SELECT call_id FROM escalations WHERE id = ?", (escalation_id,)).fetchone()
         db.execute(
             "UPDATE escalations SET status = 'resolved', resolved_at = ?, resolution_notes = ? WHERE id = ?",
             (ts, resolution_notes.strip(), escalation_id),
         )
+        if row and row[0]:
+            db.execute(
+                "UPDATE calls SET resolved = 1, problem_status = 'resolved', updated_at = ? WHERE id = ?",
+                (ts, row[0]),
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -1359,34 +1484,37 @@ def resolve_escalation(escalation_id: int, resolution_notes: str = "") -> None:
 
 
 def set_bot_setting(key: str, value: str, org_id: int = 1):
+    from . import crypto
+    stored = crypto.encrypt_secret(value) if key in crypto.SECRET_SETTING_KEYS else value
     ts = now()
     with get_db() as db:
         db.execute(
             "INSERT INTO org_settings (org_id, key, value, updated_at) VALUES (?, ?, ?, ?) "
             "ON CONFLICT(org_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
-            (org_id, key, value, ts),
+            (org_id, key, stored, ts),
         )
         if org_id == 1:
             db.execute(
                 "INSERT INTO bot_settings (key, value, updated_at) VALUES (?, ?, ?) "
                 "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
-                (key, value, ts),
+                (key, stored, ts),
             )
 
 
 def get_bot_setting(key: str, default: str = "", org_id: int = 1) -> str:
+    from . import crypto
     with get_db() as db:
         row = db.execute(
             "SELECT value FROM org_settings WHERE org_id = ? AND key = ?",
             (org_id, key),
         ).fetchone()
-        if row is not None:
-            return row[0]
-        if org_id == 1:
+        val = row[0] if row is not None else None
+        if val is None and org_id == 1:
             row2 = db.execute("SELECT value FROM bot_settings WHERE key = ?", (key,)).fetchone()
-            if row2 is not None:
-                return row2[0]
-        return default
+            val = row2[0] if row2 is not None else None
+        if val is None:
+            return default
+        return crypto.decrypt_secret(val) if key in crypto.SECRET_SETTING_KEYS else val
 
 
 def get_bot_setting_row(key: str, org_id: int = 1) -> dict | None:
@@ -1722,12 +1850,18 @@ def get_manager_rankings(limit: int = 20, org_id: int = 1) -> list[dict]:
                    SUM(CASE WHEN date(c.created_at) = date('now', '-1 day') THEN 1 ELSE 0 END) as calls_yesterday,
                    MAX(CASE WHEN c.status = 'done' THEN json_extract(c.analysis, '$.scorecard.overall') END) as best_score,
                    SUM(CASE WHEN c.status = 'done'
-                             AND json_extract(c.analysis, '$.scorecard.overall') < 50
-                             AND (c.resolved = 1 OR lower(coalesce(c.analysis, '')) LIKE '%hal qilindi%') THEN 1 ELSE 0 END) as solved_problems,
+                             AND (c.problem_status = 'resolved'
+                                  OR (c.problem_status = 'none'
+                                      AND json_extract(c.analysis, '$.scorecard.overall') < 50
+                                      AND (c.resolved = 1 OR lower(coalesce(c.analysis, '')) LIKE '%hal qilindi%')))
+                        THEN 1 ELSE 0 END) as solved_problems,
                    SUM(CASE WHEN c.status = 'done'
-                             AND json_extract(c.analysis, '$.scorecard.overall') < 50
-                             AND c.resolved = 0
-                             AND lower(coalesce(c.analysis, '')) NOT LIKE '%hal qilindi%' THEN 1 ELSE 0 END) as unsolved_problems
+                             AND (c.problem_status = 'open'
+                                  OR (c.problem_status = 'none'
+                                      AND json_extract(c.analysis, '$.scorecard.overall') < 50
+                                      AND c.resolved = 0
+                                      AND lower(coalesce(c.analysis, '')) NOT LIKE '%hal qilindi%'))
+                        THEN 1 ELSE 0 END) as unsolved_problems
             FROM users u
             LEFT JOIN calls c ON c.user_id = u.id AND c.call_type = 'manager' AND c.org_id = u.org_id
             WHERE u.org_id = ? AND u.role IN ('manager', 'yonalish') AND u.active = 1
@@ -1743,6 +1877,7 @@ def get_manager_rankings(limit: int = 20, org_id: int = 1) -> list[dict]:
             calls_today = r[7] or 0
             calls_yesterday = r[8] or 0
             trend = "up" if calls_today > calls_yesterday else ("down" if calls_today < calls_yesterday else "same")
+            om = compute_employee_outcome_metrics(r[0], org_id=org_id, call_avg_score=avg_score)
             result.append({
                 "id": r[0], "name": r[1], "email": r[2], "role": r[3],
                 "total_calls": r[4], "avg_score": avg_score,
@@ -1750,6 +1885,7 @@ def get_manager_rankings(limit: int = 20, org_id: int = 1) -> list[dict]:
                 "calls_today": calls_today, "calls_yesterday": calls_yesterday,
                 "trend": trend, "best_score": round(r[9]) if r[9] is not None else None,
                 "solved_problems": r[10] or 0, "unsolved_problems": r[11] or 0,
+                **om,
             })
         return result
 
@@ -2039,5 +2175,393 @@ def get_employee_overview(user_id: int, role: str, org_id: int = 1) -> dict:
         "coaching_points": coaching_points,
         "tasks": notifications,
         "recent_calls": recent_calls,
+        "outcome_metrics": compute_employee_outcome_metrics(user_id, org_id=org_id, call_avg_score=avg_score),
     }
 
+
+
+# ---------------------------------------------------------------------------
+# Dynamic Rubrics & Audit Logs
+# ---------------------------------------------------------------------------
+
+DEFAULT_RECEPTIONIST_RUBRIC = {
+    "name": "MBSI Reception & Admissions Desk",
+    "call_type": "receptionist",
+    "description": "Ota-onalar murojaatlarini qabul qilish, markaz/toʻlov haqida maʼlumot berish va kirish testini belgilash mezoni",
+    "criteria": [
+        {"key": "greeting", "label": "Salomlashish va iliq munosabat", "weight": 15, "description": "Xushmuomala salomlashish, markaz nomini aytish"},
+        {"key": "center_info", "label": "Markaz va dasturlar haqida toʻliq maʼlumot", "weight": 25, "description": "Yoʻnalishlar, yosh/sinf guruhlari, dars jadvali haqida aniq tushuntirish"},
+        {"key": "tuition_clarity", "label": "Toʻlov va shartlarni aniq tushuntirish", "weight": 20, "description": "Narx, chegirma va toʻlov tartibini shaffof bayon qilish"},
+        {"key": "test_scheduling", "label": "Kirish testi sanasi va joyini belgilash", "weight": 25, "description": "Rozi boʻlgan mijozga test kuni, vaqti va manzilini aniq tayinlash"},
+        {"key": "contact_capture", "label": "Ota-ona va oʻquvchi maʼlumotlarini olish", "weight": 15, "description": "Ism, telefon raqami va sinf/yoshini qayd etish"},
+    ],
+}
+
+DEFAULT_MANAGER_RUBRIC = {
+    "name": "Admissions / Sales Manager",
+    "call_type": "manager",
+    "description": "Ehtiyojni aniqlash, eʼtirozlar bilan ishlash va keyingi bosqichga oʻtkazish mezoni",
+    "criteria": [
+        {"key": "opening", "label": "Suhbatni ochish va maqsadni belgilash", "weight": 15, "description": "Ishonchli boshlash va suhbat rejasini aytish"},
+        {"key": "discovery", "label": "Ehtiyojlarni aniqlash", "weight": 20, "description": "Oʻquvchi/mijoz maqsadlari va muammolarini ochiq savollar bilan aniqlash"},
+        {"key": "value_prop", "label": "Qiymat taklifi", "weight": 20, "description": "Markaz ustunliklari va natijalarni ehtiyojga bogʻlash"},
+        {"key": "objection_handling", "label": "Eʼtirozlar bilan ishlash", "weight": 25, "description": "Narx, vaqt yoki shubhalarga asosli javob berish"},
+        {"key": "closing", "label": "Yakunlash va keyingi qadam", "weight": 20, "description": "Test, uchrashuv yoki toʻlov boʻyicha aniq kelishuv"},
+    ],
+}
+
+
+def _decode_rubric(row) -> dict:
+    d = dict(row)
+    try:
+        d["criteria"] = json.loads(d.get("criteria") or "[]")
+    except json.JSONDecodeError:
+        d["criteria"] = []
+    d["is_default"] = bool(d.get("is_default"))
+    d["active"] = bool(d.get("active"))
+    return d
+
+
+def list_rubrics(org_id: int = 1, active_only: bool = False) -> list[dict]:
+    """List rubrics for an organization; seeds default MBSI rubrics on first access."""
+    with get_db() as db:
+        count = db.execute("SELECT COUNT(*) FROM rubrics WHERE org_id = ?", (org_id,)).fetchone()[0]
+        if count == 0:
+            ts = now()
+            for tpl in (DEFAULT_RECEPTIONIST_RUBRIC, DEFAULT_MANAGER_RUBRIC):
+                db.execute(
+                    "INSERT INTO rubrics (org_id, name, call_type, description, criteria, is_default, active, created_at, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?)",
+                    (org_id, tpl["name"], tpl["call_type"], tpl["description"], json.dumps(tpl["criteria"], ensure_ascii=False), ts, ts),
+                )
+        q = "SELECT * FROM rubrics WHERE org_id = ?"
+        params: list = [org_id]
+        if active_only:
+            q += " AND active = 1"
+        q += " ORDER BY is_default DESC, id ASC"
+        rows = db.execute(q, params).fetchall()
+        return [_decode_rubric(r) for r in rows]
+
+
+def get_rubric(rubric_id: int) -> dict | None:
+    with get_db() as db:
+        row = db.execute("SELECT * FROM rubrics WHERE id = ?", (rubric_id,)).fetchone()
+        return _decode_rubric(row) if row else None
+
+
+def get_active_rubric(org_id: int = 1, call_type: str = "manager") -> dict | None:
+    """Return the active rubric matching ``call_type`` (or ``'all'``) for ``org_id``."""
+    rubrics = list_rubrics(org_id=org_id, active_only=True)
+    for r in rubrics:
+        if r["call_type"] == call_type:
+            return r
+    for r in rubrics:
+        if r["call_type"] == "all":
+            return r
+    return None
+
+
+def create_rubric(
+    org_id: int,
+    name: str,
+    call_type: str = "all",
+    description: str = "",
+    criteria: list[dict] | None = None,
+    is_default: bool = False,
+) -> dict:
+    ts = now()
+    ctype = call_type if call_type in ("manager", "receptionist", "all") else "all"
+    with get_db() as db:
+        cur = db.execute(
+            "INSERT INTO rubrics (org_id, name, call_type, description, criteria, is_default, active, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)",
+            (org_id, name.strip(), ctype, description.strip(), json.dumps(criteria or [], ensure_ascii=False), 1 if is_default else 0, ts, ts),
+        )
+        rid = cur.lastrowid
+    return get_rubric(rid)  # type: ignore[return-value]
+
+
+def update_rubric(rubric_id: int, **fields) -> dict | None:
+    allowed = {"name", "call_type", "description", "criteria", "is_default", "active"}
+    sets = []
+    vals = []
+    for k, v in fields.items():
+        if k not in allowed or v is None:
+            continue
+        if k == "criteria":
+            sets.append("criteria = ?")
+            vals.append(json.dumps(v, ensure_ascii=False))
+        elif k in ("is_default", "active"):
+            sets.append(f"{k} = ?")
+            vals.append(1 if v else 0)
+        else:
+            sets.append(f"{k} = ?")
+            vals.append(str(v).strip())
+    if not sets:
+        return get_rubric(rubric_id)
+    sets.append("updated_at = ?")
+    vals.append(now())
+    vals.append(rubric_id)
+    with get_db() as db:
+        db.execute(f"UPDATE rubrics SET {', '.join(sets)} WHERE id = ?", vals)
+    return get_rubric(rubric_id)
+
+
+def delete_rubric(rubric_id: int) -> None:
+    with get_db() as db:
+        db.execute("DELETE FROM rubrics WHERE id = ?", (rubric_id,))
+
+
+def log_audit(
+    org_id: int,
+    user_id: int | None,
+    action: str,
+    target_type: str = "",
+    target_id: int | None = None,
+    details: str = "",
+) -> int:
+    with get_db() as db:
+        cur = db.execute(
+            "INSERT INTO audit_logs (org_id, user_id, action, target_type, target_id, details, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (org_id, user_id, action, target_type, target_id, details, now()),
+        )
+        return cur.lastrowid
+
+
+def list_audit_logs(org_id: int = 1, limit: int = 50) -> list[dict]:
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT a.*, u.name AS user_name, u.email AS user_email "
+            "FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id "
+            "WHERE a.org_id = ? ORDER BY a.id DESC LIMIT ?",
+            (org_id, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Persistent Job Queue
+# ---------------------------------------------------------------------------
+
+
+def enqueue_job(job_type: str, payload: dict | None = None, org_id: int = 1, max_attempts: int = 3) -> int:
+    ts = now()
+    with get_db() as db:
+        cur = db.execute(
+            "INSERT INTO jobs (org_id, job_type, payload, status, attempts, max_attempts, run_after, created_at, updated_at) "
+            "VALUES (?, ?, ?, 'queued', 0, ?, ?, ?, ?)",
+            (org_id, job_type, json.dumps(payload or {}), max_attempts, ts, ts, ts),
+        )
+        return cur.lastrowid
+
+
+def claim_next_job() -> dict | None:
+    ts = now()
+    with get_db() as db:
+        row = db.execute(
+            "SELECT * FROM jobs WHERE status IN ('queued', 'retry') AND run_after <= ? ORDER BY id ASC LIMIT 1",
+            (ts,),
+        ).fetchone()
+        if not row:
+            return None
+        cur = db.execute(
+            "UPDATE jobs SET status = 'running', attempts = attempts + 1, updated_at = ? "
+            "WHERE id = ? AND status IN ('queued', 'retry')",
+            (ts, row["id"]),
+        )
+        if cur.rowcount == 0:
+            return None
+        d = dict(row)
+        d["status"] = "running"
+        d["attempts"] = d["attempts"] + 1
+        try:
+            d["payload"] = json.loads(d.get("payload") or "{}")
+        except json.JSONDecodeError:
+            d["payload"] = {}
+        return d
+
+
+def complete_job(job_id: int) -> None:
+    with get_db() as db:
+        db.execute("UPDATE jobs SET status = 'done', updated_at = ? WHERE id = ?", (now(), job_id))
+
+
+def fail_job(job_id: int, error: str) -> None:
+    ts = now()
+    with get_db() as db:
+        row = db.execute("SELECT attempts, max_attempts FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if not row:
+            return
+        new_status = "retry" if row["attempts"] < row["max_attempts"] else "dead"
+        db.execute(
+            "UPDATE jobs SET status = ?, last_error = ?, updated_at = ? WHERE id = ?",
+            (new_status, error[:500], ts, job_id),
+        )
+
+
+def recover_stale_jobs() -> int:
+    with get_db() as db:
+        cur = db.execute(
+            "UPDATE jobs SET status = 'queued', updated_at = ? WHERE status = 'running'",
+            (now(),),
+        )
+        return cur.rowcount
+
+
+# ---------------------------------------------------------------------------
+# Employee Action Queue & Outcome Scoring
+# ---------------------------------------------------------------------------
+
+
+def compute_employee_outcome_metrics(
+    user_id: int,
+    org_id: int = 1,
+    call_avg_score: int | None = None,
+) -> dict:
+    """Compute operational outcome metrics (lead conversion, escalation SLA, Telegram reply quality)."""
+    with get_db() as db:
+        lead_row = db.execute(
+            """
+            SELECT COUNT(*) as total,
+                   SUM(CASE WHEN pipeline_stage IN ('test_scheduled', 'tested', 'enrolled') THEN 1 ELSE 0 END) as converted,
+                   SUM(CASE WHEN pipeline_stage IN ('new_lead', 'consulted', 'test_scheduled')
+                             AND next_follow_up_at != '' AND next_follow_up_at < ? THEN 1 ELSE 0 END) as overdue
+            FROM clients
+            WHERE org_id = ? AND manager_id = ?
+            """,
+            (now(), org_id, user_id),
+        ).fetchone()
+        total_leads = lead_row["total"] or 0
+        converted_leads = lead_row["converted"] or 0
+        overdue_leads = lead_row["overdue"] or 0
+        lead_conversion_rate = round((converted_leads / total_leads) * 100) if total_leads > 0 else None
+
+        esc_row = db.execute(
+            """
+            SELECT COUNT(*) as total,
+                   SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) as resolved,
+                   AVG(CASE WHEN status = 'resolved' AND resolved_at IS NOT NULL
+                            THEN (julianday(resolved_at) - julianday(created_at)) * 24.0 END) as avg_hours
+            FROM escalations
+            WHERE org_id = ? AND assigned_to_user_id = ?
+            """,
+            (org_id, user_id),
+        ).fetchone()
+        total_esc = esc_row["total"] or 0
+        resolved_esc = esc_row["resolved"] or 0
+        avg_sla_hours = round(esc_row["avg_hours"], 1) if esc_row["avg_hours"] is not None else None
+        escalation_resolved_rate = round((resolved_esc / total_esc) * 100) if total_esc > 0 else None
+
+        tg_row = db.execute(
+            """
+            SELECT COUNT(*) as replies, AVG(reply_score) as avg_tg
+            FROM telegram_messages
+            WHERE org_id = ? AND replied_by_user_id = ? AND reply_score IS NOT NULL
+            """,
+            (org_id, user_id),
+        ).fetchone()
+        avg_telegram_score = round(tg_row["avg_tg"]) if tg_row["avg_tg"] is not None else None
+
+    # Weighted composite score using available components (Call 40%, Conversion 25%, SLA 20%, Telegram 15%)
+    weighted_sum = 0.0
+    weight_total = 0.0
+    if call_avg_score is not None:
+        weighted_sum += call_avg_score * 0.40
+        weight_total += 0.40
+    if lead_conversion_rate is not None:
+        conv_penalized = max(0, lead_conversion_rate - min(20, overdue_leads * 5))
+        weighted_sum += conv_penalized * 0.25
+        weight_total += 0.25
+    if escalation_resolved_rate is not None:
+        sla_bonus = 10 if (avg_sla_hours is not None and avg_sla_hours <= 24.0) else 0
+        weighted_sum += min(100, escalation_resolved_rate + sla_bonus) * 0.20
+        weight_total += 0.20
+    if avg_telegram_score is not None:
+        weighted_sum += avg_telegram_score * 0.15
+        weight_total += 0.15
+
+    composite_score = round(weighted_sum / weight_total) if weight_total > 0 else None
+
+    # Outcome-only score (excludes call quality)
+    out_sum = 0.0
+    out_w = 0.0
+    if lead_conversion_rate is not None:
+        out_sum += max(0, lead_conversion_rate - min(20, overdue_leads * 5)) * 0.42
+        out_w += 0.42
+    if escalation_resolved_rate is not None:
+        out_sum += escalation_resolved_rate * 0.33
+        out_w += 0.33
+    if avg_telegram_score is not None:
+        out_sum += avg_telegram_score * 0.25
+        out_w += 0.25
+    outcome_score = round(out_sum / out_w) if out_w > 0 else None
+
+    return {
+        "total_leads": total_leads,
+        "converted_leads": converted_leads,
+        "overdue_leads": overdue_leads,
+        "lead_conversion_rate": lead_conversion_rate,
+        "total_escalations": total_esc,
+        "resolved_escalations": resolved_esc,
+        "escalation_resolved_rate": escalation_resolved_rate,
+        "avg_sla_hours": avg_sla_hours,
+        "avg_telegram_score": avg_telegram_score,
+        "outcome_score": outcome_score,
+        "composite_score": composite_score,
+    }
+
+
+def get_employee_action_queue(user_id: int, role: str, org_id: int = 1) -> dict:
+    """Return all active, scorable work items for an employee."""
+    open_escalations = [
+        e for e in list_escalations(org_id=org_id, limit=50)
+        if e.get("status") != "resolved" and (e.get("assigned_to_user_id") == user_id or role in ("admin", "yonalish"))
+    ]
+
+    with get_db() as db:
+        if role == "receptionist":
+            lead_rows = db.execute(
+                """
+                SELECT c.*, u.name AS manager_name
+                FROM clients c LEFT JOIN users u ON u.id = c.manager_id
+                WHERE c.org_id = ? AND c.pipeline_stage IN ('new_lead', 'consulted', 'test_scheduled')
+                ORDER BY CASE WHEN c.next_follow_up_at != '' THEN 0 ELSE 1 END, c.next_follow_up_at ASC, c.id DESC
+                LIMIT 30
+                """,
+                (org_id,),
+            ).fetchall()
+        else:
+            lead_rows = db.execute(
+                """
+                SELECT c.*, u.name AS manager_name
+                FROM clients c LEFT JOIN users u ON u.id = c.manager_id
+                WHERE c.org_id = ? AND (c.manager_id = ? OR c.manager_id IS NULL)
+                  AND c.pipeline_stage IN ('new_lead', 'consulted', 'test_scheduled')
+                ORDER BY CASE WHEN c.next_follow_up_at != '' THEN 0 ELSE 1 END, c.next_follow_up_at ASC, c.id DESC
+                LIMIT 30
+                """,
+                (org_id, user_id),
+            ).fetchall()
+        due_leads = [dict(r) for r in lead_rows]
+
+        unanswered_telegram: list[dict] = []
+        if role in ("receptionist", "admin", "yonalish"):
+            tg_rows = db.execute(
+                """
+                SELECT * FROM telegram_messages
+                WHERE org_id = ? AND is_staff = 0 AND is_bot = 0 AND (reply_text IS NULL OR TRIM(reply_text) = '')
+                ORDER BY id DESC LIMIT 30
+                """,
+                (org_id,),
+            ).fetchall()
+            unanswered_telegram = [dict(r) for r in tg_rows]
+
+    notifications = get_notifications(user_id, unread_only=True, limit=30)
+    return {
+        "open_escalations": open_escalations,
+        "due_leads": due_leads,
+        "unanswered_telegram": unanswered_telegram,
+        "action_items": notifications,
+        "outcome_metrics": compute_employee_outcome_metrics(user_id, org_id=org_id),
+    }

@@ -23,7 +23,7 @@ def _api(token: str, method: str, params: dict | None = None) -> dict:
 
 
 def _staff_handles() -> set[str]:
-    raw = db.get_setting("telegram_staff_handles") or "mr_individ"
+    raw = db.get_bot_setting("telegram_staff_handles", "", org_id=config.TELEGRAM_READER_ORG_ID) or "mr_individ"
     return {h.strip().lstrip("@").lower() for h in raw.split(",") if h.strip()}
 
 
@@ -32,8 +32,11 @@ def _is_staff_or_bot(msg: dict) -> bool:
     if u.get("is_bot"):
         return True
     uid = u.get("id")
-    if uid and (uid in config.TELEGRAM_ADMIN_IDS or db.get_telegram_user(uid)):
-        return True
+    if uid:
+        if uid in config.TELEGRAM_ADMIN_IDS:
+            return True
+        if any(tu.get("telegram_id") == uid for tu in db.get_telegram_users(org_id=config.TELEGRAM_READER_ORG_ID)):
+            return True
     uname = (u.get("username") or "").lower()
     if uname and uname in _staff_handles():
         return True
@@ -80,9 +83,10 @@ def _poll_loop(token: str, stop_event: threading.Event) -> None:
                     with db.get_db() as conn:
                         conn.execute(
                             """INSERT OR IGNORE INTO telegram_messages
-                               (chat_id, message_id, user_id, username, full_name, text, is_bot, is_staff)
-                               VALUES (?,?,?,?,?,?,?,?)""",
+                               (org_id, chat_id, message_id, user_id, username, full_name, text, is_bot, is_staff)
+                               VALUES (?,?,?,?,?,?,?,?,?)""",
                             (
+                                config.TELEGRAM_READER_ORG_ID,
                                 chat_id,
                                 msg["message_id"],
                                 u.get("id"),

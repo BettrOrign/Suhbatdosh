@@ -284,7 +284,7 @@ def normalize_audio(src: Path) -> tuple[Path, Path]:
     return wav_path, pcm_path
 
 
-def purge_expired_audio(days: int) -> int:
+def purge_expired_audio(days: int, org_id: int | None = None) -> int:
     """Delete recordings older than ``days`` (Settings → auto-delete).
 
     Transcripts and analyses are kept; only the WAV (and its PCM cache) is
@@ -294,7 +294,7 @@ def purge_expired_audio(days: int) -> int:
     from . import db
 
     removed = 0
-    for row in db.expired_audio(days):
+    for row in db.expired_audio(days, org_id=org_id):
         wav = resolve_audio_path(row["audio_path"])
         if wav is not None:
             wav.unlink(missing_ok=True)

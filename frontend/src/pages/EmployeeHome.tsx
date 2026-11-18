@@ -88,9 +88,13 @@ export function EmployeeHome() {
     )
   }
 
-  const sortedRubric = [...data.rubric_averages].sort((a, b) => b.avg_score - a.avg_score)
+  const sortedRubric = [...(data.rubric_averages ?? [])].sort((a, b) => b.avg_score - a.avg_score)
   const strongestSkill = sortedRubric[0]
   const weakestSkill = sortedRubric.length > 1 ? sortedRubric[sortedRubric.length - 1] : null
+  const kpis = data.kpis
+  const coachingPoints = data.coaching_points ?? []
+  const openTasks = data.tasks ?? []
+  const recentCalls = data.recent_calls ?? []
 
   return (
     <div className="space-y-4 pb-12">
@@ -104,9 +108,9 @@ export function EmployeeHome() {
               <Link to="/tasks">
                 <ListTodo className="size-3.5" />
                 {t('nav.tasks')}
-                {data.open_tasks_count > 0 && (
+                {kpis.open_tasks_count > 0 && (
                   <Badge variant="default" className="ml-1 text-2xs">
-                    {data.open_tasks_count}
+                    {kpis.open_tasks_count}
                   </Badge>
                 )}
               </Link>
@@ -138,15 +142,21 @@ export function EmployeeHome() {
                 data-numeric
                 className={cn(
                   'text-[1.75rem] leading-none font-semibold tracking-[-0.03em] tabular-nums',
-                  scoreColorClass(data.avg_score)
+                  scoreColorClass(kpis.avg_score)
                 )}
               >
-                {data.avg_score !== null ? data.avg_score : '—'}
+                {kpis.avg_score !== null ? kpis.avg_score : '—'}
               </span>
-              {data.best_score !== null && (
+              {data.outcome_metrics?.composite_score !== null && data.outcome_metrics?.composite_score !== undefined ? (
                 <span className="text-2xs text-muted-foreground">
-                  {t('emp.stat.best_score', { score: data.best_score })}
+                  Outcome: {data.outcome_metrics.composite_score}
                 </span>
+              ) : (
+                kpis.best_score !== null && (
+                  <span className="text-2xs text-muted-foreground">
+                    {t('emp.stat.best_score', { score: kpis.best_score })}
+                  </span>
+                )
               )}
             </div>
           </CardContent>
@@ -167,10 +177,10 @@ export function EmployeeHome() {
                 data-numeric
                 className="text-[1.75rem] leading-none font-semibold tracking-[-0.03em] tabular-nums"
               >
-                {data.calls_today}
+                {kpis.calls_today}
               </span>
               <span className="text-2xs text-muted-foreground">
-                {t('emp.stat.calls_week', { n: data.calls_week })}
+                {t('emp.stat.calls_week', { n: kpis.calls_this_week })}
               </span>
             </div>
           </CardContent>
@@ -187,16 +197,16 @@ export function EmployeeHome() {
               </div>
             </div>
             <div className="mt-3 flex items-baseline justify-between gap-2">
-              {data.rank !== null ? (
+              {data.rank?.position !== null && data.rank?.position !== undefined ? (
                 <>
                   <span
                     data-numeric
                     className="text-[1.75rem] leading-none font-semibold tracking-[-0.03em] tabular-nums text-primary"
                   >
-                    #{data.rank}
+                    #{data.rank.position}
                   </span>
                   <span className="text-2xs text-muted-foreground">
-                    {t('emp.stat.rank_of', { total: data.total_peers })}
+                    {t('emp.stat.rank_of', { total: data.rank.total_peers })}
                   </span>
                 </>
               ) : (
@@ -223,7 +233,7 @@ export function EmployeeHome() {
                 data-numeric
                 className="text-[1.75rem] leading-none font-semibold tracking-[-0.03em] tabular-nums"
               >
-                {data.open_tasks_count}
+                {kpis.open_tasks_count}
               </span>
               <Link to="/tasks" className="text-2xs font-medium text-primary hover:underline">
                 {t('emp.view_all_tasks')} →
@@ -323,18 +333,18 @@ export function EmployeeHome() {
                   <TabsTrigger value="coaching">
                     <Sparkles className="size-3.5 text-warning" />
                     {t('emp.coaching_title')}
-                    {data.recent_coaching_points.length > 0 && (
+                    {coachingPoints.length > 0 && (
                       <span className="ml-1 rounded-full bg-surface-active px-1.5 text-2xs font-semibold tabular-nums text-muted-foreground">
-                        {data.recent_coaching_points.length}
+                        {coachingPoints.length}
                       </span>
                     )}
                   </TabsTrigger>
                   <TabsTrigger value="tasks">
                     <ListTodo className="size-3.5 text-chart-6" />
                     {t('emp.tasks_title')}
-                    {data.open_tasks.length > 0 && (
+                    {openTasks.length > 0 && (
                       <span className="ml-1 rounded-full bg-surface-active px-1.5 text-2xs font-semibold tabular-nums text-muted-foreground">
-                        {data.open_tasks.length}
+                        {openTasks.length}
                       </span>
                     )}
                   </TabsTrigger>
@@ -352,7 +362,7 @@ export function EmployeeHome() {
               <CardContent className="flex-1 p-0">
                 {/* Tab 1: Metasell Recent Calls Data Table */}
                 <TabsContent value="calls" className="m-0">
-                  {data.recent_calls.length === 0 ? (
+                  {recentCalls.length === 0 ? (
                     <div className="flex flex-col items-center gap-3 py-12 text-center">
                       <p className="text-xs text-muted-foreground">{t('dashboard.no_calls_desc')}</p>
                       <Button asChild size="sm">
@@ -378,55 +388,61 @@ export function EmployeeHome() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border-subtle">
-                          {data.recent_calls.map((c) => (
-                            <tr
-                              key={c.id}
-                              className="transition-colors hover:bg-surface-hover"
-                            >
-                              <td className="px-4 py-2.5">
-                                <Link
-                                  to={`/calls/${c.id}`}
-                                  className="block max-w-[240px] truncate text-xs font-semibold text-foreground hover:text-primary"
-                                >
-                                  {c.name}
-                                </Link>
-                              </td>
-                              <td className="px-3 py-2.5">
-                                {c.score !== null ? (
-                                  <div className="flex items-center gap-2">
-                                    <span
-                                      data-numeric
-                                      className={cn(
-                                        'w-7 text-xs font-semibold tabular-nums',
-                                        scoreColorClass(c.score)
-                                      )}
-                                    >
-                                      {c.score}
-                                    </span>
-                                    <div className="hidden h-1.5 w-14 overflow-hidden rounded-full bg-surface-sunken sm:block">
-                                      <div
-                                        className="h-full rounded-full"
-                                        style={{
-                                          width: `${Math.max(4, Math.min(100, c.score))}%`,
-                                          backgroundColor: scoreColorVar(c.score),
-                                        }}
-                                      />
+                          {recentCalls.map((c) => {
+                            const callScore =
+                              typeof c.analysis?.scorecard?.overall === 'number'
+                                ? Math.round(c.analysis.scorecard.overall)
+                                : null
+                            return (
+                              <tr
+                                key={c.id}
+                                className="transition-colors hover:bg-surface-hover"
+                              >
+                                <td className="px-4 py-2.5">
+                                  <Link
+                                    to={`/calls/${c.id}`}
+                                    className="block max-w-[240px] truncate text-xs font-semibold text-foreground hover:text-primary"
+                                  >
+                                    {c.name}
+                                  </Link>
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  {callScore !== null ? (
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        data-numeric
+                                        className={cn(
+                                          'w-7 text-xs font-semibold tabular-nums',
+                                          scoreColorClass(callScore)
+                                        )}
+                                      >
+                                        {callScore}
+                                      </span>
+                                      <div className="hidden h-1.5 w-14 overflow-hidden rounded-full bg-surface-sunken sm:block">
+                                        <div
+                                          className="h-full rounded-full"
+                                          style={{
+                                            width: `${Math.max(4, Math.min(100, callScore))}%`,
+                                            backgroundColor: scoreColorVar(callScore),
+                                          }}
+                                        />
+                                      </div>
                                     </div>
-                                  </div>
-                                ) : (
-                                  <Badge variant="secondary" className="text-2xs">
-                                    {t(`status.${c.status}`)}
-                                  </Badge>
-                                )}
-                              </td>
-                              <td className="hidden px-3 py-2.5 text-xs tabular-nums text-muted-foreground sm:table-cell">
-                                {c.duration_sec !== null ? formatDuration(c.duration_sec) : '—'}
-                              </td>
-                              <td className="px-4 py-2.5 text-right text-2xs text-muted-foreground">
-                                {formatDate(c.created_at)}
-                              </td>
-                            </tr>
-                          ))}
+                                  ) : (
+                                    <Badge variant="secondary" className="text-2xs">
+                                      {t(`status.${c.status}`)}
+                                    </Badge>
+                                  )}
+                                </td>
+                                <td className="hidden px-3 py-2.5 text-xs tabular-nums text-muted-foreground sm:table-cell">
+                                  {c.duration_sec !== null ? formatDuration(c.duration_sec) : '—'}
+                                </td>
+                                <td className="px-4 py-2.5 text-right text-2xs text-muted-foreground">
+                                  {formatDate(c.created_at)}
+                                </td>
+                              </tr>
+                            )
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -435,24 +451,24 @@ export function EmployeeHome() {
 
                 {/* Tab 2: Recent AI Coaching Notes */}
                 <TabsContent value="coaching" className="m-0 p-4">
-                  {data.recent_coaching_points.length === 0 ? (
+                  {coachingPoints.length === 0 ? (
                     <p className="py-10 text-center text-xs text-muted-foreground">
                       {t('emp.no_coaching')}
                     </p>
                   ) : (
                     <ul className="max-h-[340px] space-y-2.5 overflow-y-auto pr-1 [overscroll-behavior:contain] [scrollbar-gutter:stable]">
-                      {data.recent_coaching_points.map((pt, idx) => (
+                      {coachingPoints.map((pt, idx) => (
                         <li
                           key={`${pt.call_id}-${idx}`}
                           className="rounded-lg border border-border-subtle bg-surface-sunken/70 p-3 text-xs"
                         >
-                          <p className="leading-relaxed text-foreground">{pt.text}</p>
+                          <p className="leading-relaxed text-foreground">{pt.point}</p>
                           <div className="mt-2 flex items-center justify-between text-2xs text-muted-foreground">
                             <Link
                               to={`/calls/${pt.call_id}`}
                               className="font-medium text-primary hover:underline"
                             >
-                              {pt.call_name} →
+                              {pt.call_title} →
                             </Link>
                             <span>{formatDate(pt.created_at)}</span>
                           </div>
@@ -464,14 +480,14 @@ export function EmployeeHome() {
 
                 {/* Tab 3: Open Follow-Up Tasks */}
                 <TabsContent value="tasks" className="m-0 p-4">
-                  {data.open_tasks.length === 0 ? (
+                  {openTasks.length === 0 ? (
                     <div className="flex flex-col items-center gap-2 py-10 text-center">
                       <CheckCircle2 className="size-6 text-success" />
                       <p className="text-xs text-muted-foreground">{t('emp.no_open_tasks')}</p>
                     </div>
                   ) : (
                     <ul className="max-h-[340px] space-y-2 overflow-y-auto pr-1 [overscroll-behavior:contain] [scrollbar-gutter:stable]">
-                      {data.open_tasks.map((task) => (
+                      {openTasks.map((task) => (
                         <li
                           key={task.id}
                           className="flex items-start justify-between gap-3 rounded-lg border border-border-subtle bg-surface-sunken/60 p-3 text-xs"

@@ -6,13 +6,14 @@ import { Analytics } from '@/pages/Analytics'
 import { CallDetail } from '@/pages/CallDetail'
 import { Calls } from '@/pages/Calls'
 import { Clients } from '@/pages/Clients'
-import { EmployeeHome } from '@/pages/EmployeeHome'
+import { EscalationsPage } from '@/pages/Escalations'
 import { Login } from '@/pages/Login'
 import { ManagersAdminPage } from '@/pages/ManagersAdmin'
 import { ManagersDirectionsPage } from '@/pages/ManagersDirections'
 import { ManagersPage } from '@/pages/ManagersList'
 import { MyTasks } from '@/pages/MyTasks'
 import { Profile } from '@/pages/Profile'
+import { RubricsPage } from '@/pages/Rubrics'
 import { SettingsPage } from '@/pages/Settings'
 import { Signup } from '@/pages/Signup'
 import TelegramPage from '@/pages/Telegram'
@@ -26,6 +27,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { I18nProvider, useI18n } from '@/i18n/i18n'
 import { AuthProvider, useAuth } from '@/lib/auth'
 import { ModeProvider } from '@/lib/mode'
+import type { User } from '@/lib/types'
 
 function BootSkeleton() {
   return (
@@ -40,6 +42,20 @@ function BootSkeleton() {
       </div>
     </div>
   )
+}
+
+function RoleGuard({
+  roles,
+  children,
+}: {
+  roles: User['role'][]
+  children: React.ReactNode
+}) {
+  const { user } = useAuth()
+  if (!user || !roles.includes(user.role)) {
+    return <Navigate to="/" replace />
+  }
+  return <>{children}</>
 }
 
 function AuthedShell() {
@@ -63,18 +79,76 @@ function AuthedShell() {
         <ErrorBoundary lang={lang}>
           <Routes>
             <Route path="/" element={<Analytics />} />
-            <Route path="/my-day" element={<EmployeeHome />} />
+            <Route path="/my-day" element={<Navigate to="/" replace />} />
             <Route path="/tasks" element={<MyTasks />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/calls" element={<Calls />} />
             <Route path="/calls/:id" element={<CallDetail />} />
             <Route path="/clients" element={<Clients />} />
-            <Route path="/managers" element={<ManagersPage />} />
-            <Route path="/managers/admin" element={<ManagersAdminPage />} />
-            <Route path="/managers/directions" element={<ManagersDirectionsPage />} />
-            <Route path="/users" element={<UsersPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/telegram" element={<TelegramPage />} />
+            <Route
+              path="/managers"
+              element={
+                <RoleGuard roles={['admin', 'yonalish']}>
+                  <ManagersPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="/managers/admin"
+              element={
+                <RoleGuard roles={['admin']}>
+                  <ManagersAdminPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="/managers/directions"
+              element={
+                <RoleGuard roles={['admin', 'yonalish']}>
+                  <ManagersDirectionsPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="/escalations"
+              element={
+                <RoleGuard roles={['admin', 'yonalish']}>
+                  <EscalationsPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="/rubrics"
+              element={
+                <RoleGuard roles={['admin', 'yonalish']}>
+                  <RubricsPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="/users"
+              element={
+                <RoleGuard roles={['admin']}>
+                  <UsersPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <RoleGuard roles={['admin']}>
+                  <SettingsPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="/telegram"
+              element={
+                <RoleGuard roles={['admin', 'receptionist', 'yonalish']}>
+                  <TelegramPage />
+                </RoleGuard>
+              }
+            />
             <Route path="/invite/:token" element={<AcceptInvite />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

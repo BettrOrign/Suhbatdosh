@@ -103,7 +103,10 @@ def _analyze_call(call_id: int):
             org_id = call.get("org_id") or 1
             analyzer = Analyzer(org_id=org_id)
             result = asyncio.run(
-                asyncio.wait_for(analyzer.analyze(call["transcript"]), timeout=60)
+                asyncio.wait_for(
+                    analyzer.analyze(call["transcript"], call_type=call.get("call_type") or "manager"),
+                    timeout=60,
+                )
             )
 
             if (
@@ -128,7 +131,20 @@ def _analyze_call(call_id: int):
                         },
                     )
 
-            db.update_call(call_id, status="done", analysis=json.dumps(result, ensure_ascii=False))
+            sc = result.get("scorecard") or {}
+            overall = sc.get("overall") if isinstance(sc, dict) else None
+            coach_dec = str(result.get("coach_decision") or "").upper()
+            problem_status = (
+                "open"
+                if (isinstance(overall, (int, float)) and overall < 50) or coach_dec == "ESCALATE"
+                else "none"
+            )
+            db.update_call(
+                call_id,
+                status="done",
+                analysis=json.dumps(result, ensure_ascii=False),
+                problem_status=problem_status,
+            )
 
             topic = (result.get("topic") or "").strip()
             lang = (result.get("language") or "").strip()
@@ -140,6 +156,24 @@ def _analyze_call(call_id: int):
                 extra_updates["language"] = lang
             if extra_updates:
                 db.update_call(call_id, **extra_updates)
+
+            # Auto-enrich linked client/lead from AI lead_extraction
+            lead_ext = result.get("lead_extraction")
+            if call.get("client_id") and isinstance(lead_ext, dict):
+                client_row = db.get_client(call["client_id"], org_id=org_id)
+                if client_row:
+                    client_patch: dict = {}
+                    for fkey in ("student_grade", "test_date", "test_location"):
+                        val = str(lead_ext.get(fkey) or "").strip()
+                        if val and not (client_row.get(fkey) or "").strip():
+                            client_patch[fkey] = val
+                    s_stage = lead_ext.get("suggested_stage")
+                    if s_stage in db.PIPELINE_STAGES and client_row.get("pipeline_stage", "new_lead") == "new_lead":
+                        client_patch["pipeline_stage"] = s_stage
+                    elif lead_ext.get("test_scheduled") and client_row.get("pipeline_stage") in ("new_lead", "consulted"):
+                        client_patch["pipeline_stage"] = "test_scheduled"
+                    if client_patch:
+                        db.update_client(client_row["id"], **client_patch)
 
             # Interactive & Outactive Problem Escalation:
             # If problems are detected in conversation, AI selects the most competent
@@ -244,6 +278,46 @@ async def get_calls(
     if user["role"] == "manager":
         return db.list_calls(user_id=user["id"], call_type="manager", org_id=org_id)
     return db.list_calls(call_type="receptionist", org_id=org_id)
+
+
+@router.get("/calls/export.csv")
+def export_calls_csv(user: dict = Depends(require_role("admin", "yonalish"))):
+    """Export organization calls as a CSV spreadsheet for leadership reporting."""
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+
+    org_id = user.get("org_id") or 1
+    calls = db.list_calls(org_id=org_id, limit=1000)
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["id", "name", "call_type", "source_type", "status", "overall_score", "outcome", "problem_status", "duration_sec", "created_at"])
+    for c in calls:
+        analysis = {}
+        try:
+            analysis = json.loads(c.get("analysis") or "{}") if isinstance(c.get("analysis"), str) else (c.get("analysis") or {})
+        except Exception:
+            pass
+        score = (analysis.get("scorecard") or {}).get("overall") if isinstance(analysis, dict) else None
+        outcome = analysis.get("outcome") if isinstance(analysis, dict) else ""
+        writer.writerow([
+            c["id"],
+            c.get("name", ""),
+            c.get("call_type", ""),
+            c.get("source_type", ""),
+            c.get("status", ""),
+            score if score is not None else "",
+            outcome or "",
+            c.get("problem_status", "none"),
+            c.get("duration_sec") or "",
+            c.get("created_at", ""),
+        ])
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="suhbatdosh-calls.csv"'},
+    )
 
 
 @router.get("/calls/{call_id}")
@@ -385,7 +459,7 @@ def _reanalyse_done_calls(limit: int = 50):
 
     with db.get_db() as conn:
         rows = conn.execute(
-            "SELECT c.id, c.transcript, c.analysis FROM calls c "
+            "SELECT c.id, c.org_id, c.transcript, c.analysis FROM calls c "
             "WHERE c.status = 'done' AND c.transcript IS NOT NULL "
             "AND TRIM(c.transcript) != '' "
             "AND (c.analysis IS NULL OR c.analysis = '' OR c.analysis = '{}' "
@@ -399,7 +473,7 @@ def _reanalyse_done_calls(limit: int = 50):
         analysis = json.loads(r["analysis"] or "{}")
         if analysis.get("topic"):
             continue
-        need_reanalysis.append((r["id"], r["transcript"]))
+        need_reanalysis.append((r["id"], r["org_id"] or 1, r["transcript"]))
 
     if not need_reanalysis:
         return
@@ -407,14 +481,27 @@ def _reanalyse_done_calls(limit: int = 50):
     logger = logging.getLogger("suhbatdosh.api")
     logger.info("Re-analysing %d done calls to add topic field", len(need_reanalysis))
 
-    for idx, (call_id, transcript) in enumerate(need_reanalysis):
+    for idx, (call_id, call_org_id, transcript) in enumerate(need_reanalysis):
         try:
-            analyzer = Analyzer()
+            analyzer = Analyzer(org_id=call_org_id)
             result = asyncio.run(
                 asyncio.wait_for(analyzer.analyze(transcript), timeout=60)
             )
             if "error" not in result:
-                db.update_call(call_id, status="done", analysis=json.dumps(result, ensure_ascii=False))
+                sc = result.get("scorecard") or {}
+                overall = sc.get("overall") if isinstance(sc, dict) else None
+                coach_dec = str(result.get("coach_decision") or "").upper()
+                problem_status = (
+                    "open"
+                    if (isinstance(overall, (int, float)) and overall < 50) or coach_dec == "ESCALATE"
+                    else "none"
+                )
+                db.update_call(
+                    call_id,
+                    status="done",
+                    analysis=json.dumps(result, ensure_ascii=False),
+                    problem_status=problem_status,
+                )
                 topic = (result.get("topic") or "").strip()
                 if topic:
                     db.update_call(call_id, name=topic)
@@ -490,13 +577,41 @@ async def stats_ask_ai(payload: dict, user: dict = ORG_WIDE_STATS):
     question = (payload.get("question") or "").strip()
     if not question:
         raise HTTPException(400, "question is required")
+    history = payload.get("history")
     org_id = user.get("org_id") or 1
     calls_ctx = db.list_recent_calls_for_qa(limit=30, org_id=org_id)
     try:
-        return await Analyzer(org_id=org_id).ask_across_calls(question, calls_ctx)
+        analyzer = Analyzer(org_id=org_id)
+        if isinstance(history, list) and history:
+            return await analyzer.ask_across_calls(question, calls_ctx, history=history)
+        return await analyzer.ask_across_calls(question, calls_ctx)
     except Exception as exc:
         logger.exception("stats_ask_ai failed")
         raise HTTPException(502, f"AI query failed: {exc}") from exc
+
+
+@router.post("/calls/{call_id}/draft-followup")
+async def draft_call_followup(call_id: int, user: dict = Depends(get_current_user)):
+    """Generate a ready-to-send Uzbek follow-up message for the call's client/parent."""
+    call = db.get_call(call_id, org_id=user.get("org_id") or 1)
+    if not call:
+        raise HTTPException(404, "call not found")
+    _check_call_access(call, user)
+    if not (call.get("transcript") or "").strip():
+        raise HTTPException(400, "Call has no transcript yet")
+    analysis_data = {}
+    try:
+        analysis_data = json.loads(call["analysis"]) if isinstance(call.get("analysis"), str) else (call.get("analysis") or {})
+    except Exception:
+        pass
+    try:
+        return await Analyzer(org_id=user.get("org_id") or 1).draft_followup(
+            call["transcript"],
+            analysis_data=analysis_data,
+        )
+    except Exception as exc:
+        logger.exception("draft_followup failed")
+        raise HTTPException(502, f"AI draft failed: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -508,8 +623,9 @@ async def stats_ask_ai(payload: dict, user: dict = ORG_WIDE_STATS):
 def get_call_escalation_endpoint(call_id: int, user: dict = Depends(get_current_user)):
     """Return the most recent problem escalation for a specific call."""
     call = db.get_call(call_id)
-    if not call or (call.get("org_id") or 1) != (user.get("org_id") or 1):
+    if not call:
         raise HTTPException(404, "Call not found")
+    _check_call_access(call, user)
     esc = db.get_call_escalation(call_id)
     return {"escalation": esc}
 
@@ -583,8 +699,18 @@ def resolve_call_escalation(
     esc = db.get_escalation(escalation_id)
     if not esc or (esc.get("org_id") or 1) != (user.get("org_id") or 1):
         raise HTTPException(404, "Escalation not found")
+    if user["role"] not in ("admin", "yonalish") and esc.get("assigned_to_user_id") != user["id"]:
+        raise HTTPException(403, "Forbidden")
     notes = (payload or {}).get("notes", "")
     db.resolve_escalation(escalation_id, resolution_notes=notes)
+    db.log_audit(
+        org_id=user.get("org_id") or 1,
+        user_id=user["id"],
+        action="escalation.resolve",
+        target_type="escalation",
+        target_id=escalation_id,
+        details=notes[:200],
+    )
     return {"ok": True, "escalation": db.get_escalation(escalation_id)}
 
 

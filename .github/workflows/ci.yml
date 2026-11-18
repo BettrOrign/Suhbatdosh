@@ -1,0 +1,72 @@
+name: CI (Test & Lint)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-backend:
+    name: Backend Pytest (Python 3.12)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync
+
+      - name: Run Pytest
+        working-directory: backend
+        env:
+          GEMINI_API_KEY: "test-key"
+          SECRET_ENCRYPTION_KEY: "test-encryption-key-32-chars-long!"
+        run: uv run pytest
+
+  test-frontend:
+    name: Frontend Lint & Build (Node 22)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: TypeScript & Vite Build
+        working-directory: frontend
+        run: npm run build
+
+  test-rust-tauri:
+    name: Tauri Desktop Shell Check (Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cargo Check (src-tauri)
+        working-directory: src-tauri
+        run: cargo check

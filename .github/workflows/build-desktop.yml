@@ -3,21 +3,23 @@ name: Build Desktop App (Windows & Linux)
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     tags:
       - "v*"
 
 jobs:
   build-desktop:
+    name: Build Desktop (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             sidecar_name: suhbatdosh-backend
-            target_ext: ""
+            artifact_name: suhbatdosh-linux
           - os: windows-latest
             sidecar_name: suhbatdosh-backend.exe
-            target_ext: ".exe"
+            artifact_name: suhbatdosh-windows
 
     runs-on: ${{ matrix.os }}
 
@@ -40,7 +42,12 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Build frontend
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Install frontend dependencies & build
         working-directory: frontend
         run: |
           npm ci
@@ -49,8 +56,8 @@ jobs:
       - name: Build Python backend sidecar (PyInstaller)
         working-directory: backend
         run: |
-          python -m pip install --upgrade pip pyinstaller
-          python -m pip install .
+          uv pip install --system --upgrade pip pyinstaller
+          uv pip install --system .
           pyinstaller --noconfirm suhbatdosh-backend.spec
 
       - name: Copy sidecar binary into src-tauri
@@ -58,9 +65,32 @@ jobs:
         run: |
           mkdir -p src-tauri/binaries
           cp backend/dist/${{ matrix.sidecar_name }} src-tauri/${{ matrix.sidecar_name }}
+          cp backend/dist/${{ matrix.sidecar_name }} src-tauri/binaries/${{ matrix.sidecar_name }}
 
-      - name: Build Tauri bundle
-        uses: tauri-apps/tauri-action@v0
+      - name: Build Tauri Desktop App
+        shell: bash
+        run: |
+          ./frontend/node_modules/.bin/tauri build
+
+      - name: Upload Desktop Installer Artifact
+        uses: actions/upload-artifact@v4
         with:
-          projectPath: .
-          tauriScript: ./frontend/node_modules/.bin/tauri
+          name: ${{ matrix.artifact_name }}
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage
+          if-no-files-found: warn
+
+      - name: Release to GitHub Releases
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

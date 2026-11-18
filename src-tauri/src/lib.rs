@@ -125,20 +125,29 @@ fn spawn_backend(app: &tauri::AppHandle, port: u16) -> Option<Child> {
         return cmd.spawn().ok();
     }
 
-    // Release mode: look for bundled suhbatdosh-backend(.exe) next to our executable.
-    let exe_dir = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(PathBuf::from))
-        .unwrap_or_else(|| PathBuf::from("."));
+    // Release mode: look for bundled suhbatdosh-backend(.exe) next to executable or in resources.
     let sidecar_name = if cfg!(target_os = "windows") {
         "suhbatdosh-backend.exe"
     } else {
         "suhbatdosh-backend"
     };
-    let sidecar_path = exe_dir.join(sidecar_name);
-    if !sidecar_path.exists() {
-        return None;
+
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(PathBuf::from))
+        .unwrap_or_else(|| PathBuf::from("."));
+
+    let mut candidate_paths = vec![
+        exe_dir.join(sidecar_name),
+        exe_dir.join("binaries").join(sidecar_name),
+    ];
+
+    if let Ok(res_dir) = app.path().resource_dir() {
+        candidate_paths.push(res_dir.join(sidecar_name));
+        candidate_paths.push(res_dir.join("binaries").join(sidecar_name));
     }
+
+    let sidecar_path = candidate_paths.into_iter().find(|p| p.is_file())?;
     let mut cmd = Command::new(sidecar_path);
     cmd.arg("--port")
         .arg(port.to_string())

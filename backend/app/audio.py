@@ -197,19 +197,30 @@ def compute_acoustics(wav_path: Path, src_path: Path | None = None) -> dict:
 
     result: dict = {}
     if src_path and src_path.exists():
-        try:
-            probe = ffmpeg.probe(str(src_path))
-            streams = [s for s in probe.get("streams", []) if s.get("codec_type") == "audio"]
-            channels = int(streams[0].get("channels", 1)) if streams else 1
-            if channels >= 2:
-                out, _ = (
-                    ffmpeg.input(str(src_path))
-                    .output("pipe:", format="s16le", acodec="pcm_s16le", ar=16000, ac=2)
-                    .run(capture_stdout=True, capture_stderr=True)
-                )
-                result = _analyze_stereo_pcm(out, sample_rate=16000)
-        except Exception:
-            result = {}
+        if src_path.suffix.lower() == ".wav":
+            try:
+                with wave.open(str(src_path), "rb") as wf:
+                    sr = wf.getframerate() or 16000
+                    ch = wf.getnchannels()
+                    raw = wf.readframes(wf.getnframes())
+                if ch >= 2:
+                    result = _analyze_stereo_pcm(raw, sample_rate=sr)
+            except Exception:
+                result = {}
+        if not result:
+            try:
+                probe = ffmpeg.probe(str(src_path))
+                streams = [s for s in probe.get("streams", []) if s.get("codec_type") == "audio"]
+                channels = int(streams[0].get("channels", 1)) if streams else 1
+                if channels >= 2:
+                    out, _ = (
+                        ffmpeg.input(str(src_path))
+                        .output("pipe:", format="s16le", acodec="pcm_s16le", ar=16000, ac=2)
+                        .run(capture_stdout=True, capture_stderr=True)
+                    )
+                    result = _analyze_stereo_pcm(out, sample_rate=16000)
+            except Exception:
+                result = {}
 
     if not result and wav_path.exists():
         try:

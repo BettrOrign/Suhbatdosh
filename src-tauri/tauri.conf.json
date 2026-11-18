@@ -31,7 +31,6 @@
     "active": true,
     "targets": "all",
     "resources": [
-      "suhbatdosh-backend*",
       "binaries/*"
     ],
     "icon": [
